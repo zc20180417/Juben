@@ -663,6 +663,8 @@ project/
 - `open_loops.md`
 - `quality.anchor.md`
 
+> **状态文件格式要求**：上述 4 个状态文件的结构模板定义在 `script-recorder.md` 的 `[quality.anchor.md模板]` / `[story.state.md模板]` / `[relationship.board.md模板]` / `[open_loops.md模板]` 中。无工具回退模式下，主 Agent 在首次创建这些文件时必须先读取 `script-recorder.md` 获取对应模板，禁止自行发明格式。
+
 当 `outline.md` 或 `character.md` 被修改时：
 
 - 创建 `versions/` 快照
@@ -720,6 +722,7 @@ project/
 - 句式：<>
 - 口头习惯：<>
 - 禁用表达：<>
+- 狠的方式：<>
 
 ## 其他角色
 **<姓名>** <年龄>，<一句话外貌>。<一句话性格>。<一句话作用>。
