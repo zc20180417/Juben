@@ -24,47 +24,57 @@ Tool mapping:
 
 ## Source Of Truth
 
-- Follow this `AGENTS.md` first. For short-drama creation and novel adaptation tasks, this file delegates workflow details to `OPENAI.md`.
-- `OPENAI.md` is the authoritative runtime spec for this repository.
-- If `OPENAI.md` conflicts with `README.md`, `CLAUDE.md`, `script-aligner.md`, `script-recorder.md`, or any older notes in the repo, `OPENAI.md` wins.
-- `CLAUDE.md` is the historical baseline that `OPENAI.md` was derived from. Use it only as background when `OPENAI.md` is silent.
-- Treat older Kimi-specific or experimental workflow notes as legacy reference, not active runtime instructions.
+- Follow this `AGENTS.md` first.
+- [runtime-core.md](./runtime-core.md) is the canonical writing-stance spec — only describes how to write, no file routing.
+- [OPENAI.md](./OPENAI.md) and [CLAUDE.md](./CLAUDE.md) are thin runtime entry files that point to `runtime-core.md`.
+- Operational docs live under [_ops/](./_ops/) and are not default Writer context.
 
 ## Startup Behavior
 
-- For creative writing, short-drama planning, and novel adaptation requests in this repo, read `OPENAI.md` before responding in depth.
-- If the user provides novel text, chapter summaries, or adaptation requirements without an explicit command, assume novel-adaptation mode and start from `/adapt`, then continue into `/outline` unless the user says otherwise.
-- Keep all creative outputs and user-facing communication in Chinese unless the user explicitly requests another language.
+- For short-drama creation and novel adaptation, read [runtime-core.md](./runtime-core.md) before responding in depth.
+- If the task is Writer-phase generation, do not read `_ops/` docs by default.
+- If the task is explicit checking or recording, then read:
+  - [_ops/script-aligner.md](./_ops/script-aligner.md)
+  - [_ops/script-recorder.md](./_ops/script-recorder.md)
 
 ## Workflow Rules
 
-- Enforce the gated flow defined in `OPENAI.md`:
+- Writer phase:
   - create or revise content
-  - run aligner check
-  - only on PASS treat it as writable
-  - update recorder/progress
-  - guide the user to the next step
-- If the runtime has no separate aligner or recorder tools, simulate them explicitly in the reply using the structure required by `OPENAI.md`.
-- Write project artifacts to the standard paths defined in `OPENAI.md`, including:
-  - `outline.md`
+  - self-check against `runtime-core.md`
+  - only then continue
+- Check phase:
+  - run `_ops/episode-lint.py`
+  - run `_ops/script-aligner.md`
+  - only on PASS treat content as writable
+- Record phase:
+  - pass lint JSON + aligner result into `_ops/script-recorder.md`
+  - update progress via `_ops/script-recorder.md`
+
+## Writer Default Context
+
+**单一事实源**：Writer 读取范围仅由本节定义。`runtime-core.md` 不含文件白名单。
+
+- Allowed by default:
+  - `runtime-core.md`
+  - `voice-anchor.md`（如已填写）
   - `character.md`
+  - `outline.md`
   - `episode_index.md`
-  - `episodes/EP-XX.md`
+  - `quality.anchor.md` if present
+  - `story.state.md` / `relationship.board.md` / `open_loops.md` if present
   - `script.progress.md`
-  - `versions/`
+  - current episode brief and adjacent episode context
+- Not allowed by default:
+  - `_ops/script-aligner.md`
+  - `_ops/script-recorder.md`
+  - `_ops/README.md`
+  - `_ops/comparisons/`
+  - design specs, review notes, rationale docs
 
-## File Priority
+## Phase-Specific Loading Order
 
-1. `OPENAI.md`
-2. `README.md`
-3. `CLAUDE.md`
-4. `script-aligner.md`
-5. `script-recorder.md`
-6. `short-drama-cn.md`
-
-## Codex CLI Guidance
-
-- In Codex CLI sessions, prefer explicitly grounding on `OPENAI.md` before starting long creative work.
-- When instructions appear ambiguous, say that you are following `OPENAI.md` and proceed with the least-surprising workflow.
-- If the repository is opened outside Git, it is acceptable to run with `--skip-git-repo-check`.
-
+- **Writer phase**: `runtime-core.md` → `voice-anchor.md`（或 `character.md`）→ 素材文件（见 Writer Default Context）
+- **Check phase**: `_ops/script-aligner.md` → `runtime-core.md`（aligner 引用写法基准）
+- **Record phase**: `_ops/script-recorder.md`
+- **Platform entry**: `OPENAI.md` / `CLAUDE.md`（仅启动时读取，指向 `runtime-core.md`）
