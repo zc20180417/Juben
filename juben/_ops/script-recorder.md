@@ -335,7 +335,8 @@
             - 人物状态变化
             - aligner检查记录（从主Agent传入的检查结果中提取：检查次数、首次结果、主要问题类型、主标签、次标签、类型）
             - 若存在 lint 结果：
-              • 优先抽取机械 FAIL / WARNING 项
+              • 优先抽取 `checks.scene_failures[*].failures` 与 `checks.episode_failures` 中的机械 FAIL 项
+              • 同时抽取 `checks.warnings`
               • 按[薄弱原因标签规则]映射主标签 / 次标签 / 类型
               • 将 lint 的结构/风格结果附加到 aligner 检查记录中，便于后续统计
             - 修改记录

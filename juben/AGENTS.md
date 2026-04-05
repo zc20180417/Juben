@@ -74,7 +74,7 @@ Tool mapping:
 
 ## Phase-Specific Loading Order
 
-- **Writer phase**: `runtime-core.md` → `voice-anchor.md`（或 `character.md`）→ 素材文件（见 Writer Default Context）
+- **Writer phase**: `runtime-core.md` → `voice-anchor.md`（如已填写）→ `character.md` → 素材文件（见 Writer Default Context）
 - **Check phase**: `_ops/script-aligner.md` → `runtime-core.md`（aligner 引用写法基准）
 - **Record phase**: `_ops/script-recorder.md`
 - **Platform entry**: `OPENAI.md` / `CLAUDE.md`（仅启动时读取，指向 `runtime-core.md`）

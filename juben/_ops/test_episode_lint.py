@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -10,6 +11,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "_ops" / "episode-lint.py"
 VOICE_ANCHOR = ROOT / "voice-anchor.md"
+AGENTS = ROOT / "AGENTS.md"
+RECORDER = ROOT / "_ops" / "script-recorder.md"
 
 
 def _scene_header(scene_no: int, title: str, day: str, place_type: str, place: str) -> list[str]:
@@ -83,6 +86,20 @@ def _run_lint(text: str) -> dict:
 
 
 class EpisodeLintTests(unittest.TestCase):
+    def test_writer_phase_loading_order_keeps_character_context(self) -> None:
+        content = AGENTS.read_text(encoding="utf-8")
+        self.assertRegex(
+            content,
+            re.compile(
+                r"\*\*Writer phase\*\*: `runtime-core\.md` → `voice-anchor\.md`.*→ `character\.md` →",
+            ),
+        )
+        self.assertNotIn("`voice-anchor.md`（或 `character.md`）", content)
+
+    def test_recorder_explicitly_consumes_scene_failures(self) -> None:
+        content = RECORDER.read_text(encoding="utf-8")
+        self.assertIn("checks.scene_failures", content)
+
     def test_voice_anchor_is_filled_for_core_roles(self) -> None:
         content = VOICE_ANCHOR.read_text(encoding="utf-8")
         self.assertNotIn("### <角色名>", content)
