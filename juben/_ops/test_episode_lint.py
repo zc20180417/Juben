@@ -99,6 +99,7 @@ class EpisodeLintTests(unittest.TestCase):
         self.assertIn("genre_profile: revenge_palace", content)
         self.assertIn("distribution_mode: cn_paid_microdrama", content)
         self.assertIn("relation_layer: enabled", content)
+        self.assertIn("dialogue_adaptation_intensity: adaptive", content)
 
     def test_agents_routes_through_profile_layers(self) -> None:
         content = AGENTS.read_text(encoding="utf-8")
@@ -130,6 +131,8 @@ class EpisodeLintTests(unittest.TestCase):
         self.assertNotIn("第18-20集", content)
         self.assertNotIn("宫斗期", content)
         self.assertNotIn("甜宠", content)
+        self.assertIn("一句完整意思默认写成一行", content)
+        self.assertIn("不新增原著没有的态度", content)
 
     def test_aligner_is_profile_neutral_and_profile_check_exists(self) -> None:
         content = ALIGNER.read_text(encoding="utf-8")
@@ -138,6 +141,8 @@ class EpisodeLintTests(unittest.TestCase):
         self.assertNotIn("引流/宫斗期", content)
         self.assertNotIn("第18-20集必须包含至少1个情感高潮场景", content)
         self.assertNotIn("第20集结尾或第21集开头必须有重大悬念/转折", content)
+        self.assertIn("机械拆句", content)
+        self.assertIn("对白语义漂移", content)
 
     def test_voice_anchor_supports_relation_modes(self) -> None:
         content = VOICE_ANCHOR.read_text(encoding="utf-8")
@@ -146,6 +151,7 @@ class EpisodeLintTests(unittest.TestCase):
         self.assertIn("对亲近者", content)
         self.assertIn("对敌手", content)
         self.assertIn("对欲望对象", content)
+        self.assertNotIn("常拆成两三拍说完", content)
 
     def test_recorder_tracks_profile_fields(self) -> None:
         content = RECORDER.read_text(encoding="utf-8")
@@ -153,6 +159,7 @@ class EpisodeLintTests(unittest.TestCase):
         self.assertIn("genre_profile", content)
         self.assertIn("distribution_mode", content)
         self.assertIn("active profile", content)
+        self.assertIn("dialogue_adaptation_intensity", content)
 
     def test_writer_phase_loading_order_keeps_character_context(self) -> None:
         content = AGENTS.read_text(encoding="utf-8")
@@ -163,6 +170,7 @@ class EpisodeLintTests(unittest.TestCase):
             ),
         )
         self.assertNotIn("`voice-anchor.md`（或 `character.md`）", content)
+        self.assertIn("dialogue_adaptation_intensity", content)
 
     def test_recorder_explicitly_consumes_scene_failures(self) -> None:
         content = RECORDER.read_text(encoding="utf-8")

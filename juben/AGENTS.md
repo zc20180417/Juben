@@ -34,6 +34,11 @@ Tool mapping:
 ## Startup Behavior
 
 - For short-drama creation and novel adaptation, read [runtime-core.md](./runtime-core.md) before responding in depth.
+- Before any novel-adaptation script generation, confirm `dialogue_adaptation_intensity` for the current run if the user has not already specified it.
+  对外沟通时直接称为“对话改编力度”：
+  - `1` preserve: 尽可能保持原著对话，只做必要影视化整理
+  - `2` light: 小范围改编，保住原著语气和完整语义单位
+  - `3` adaptive: 视场景与可拍性决定（默认）
 - If the task is Writer-phase generation, do not read `_ops/` docs by default.
 - If the task is explicit checking or recording, then read:
   - [_ops/script-aligner.md](./_ops/script-aligner.md)
@@ -43,6 +48,7 @@ Tool mapping:
   - `genre_profile: revenge_palace`
   - `distribution_mode: cn_paid_microdrama`
   - `relation_layer: enabled`
+  - `dialogue_adaptation_intensity: adaptive`
 
 ## Workflow Rules
 

@@ -88,6 +88,7 @@
     - adaptation_mode: <from project.profile.md>
     - genre_profile: <from project.profile.md>
     - distribution_mode: <from project.profile.md>
+    - dialogue_adaptation_intensity: <from project.profile.md>
     - 集数：<总集数>
     - 进度：<百分比>%（已完成<X>集）
     
