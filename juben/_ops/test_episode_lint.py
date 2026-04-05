@@ -13,6 +13,12 @@ SCRIPT = ROOT / "_ops" / "episode-lint.py"
 VOICE_ANCHOR = ROOT / "voice-anchor.md"
 AGENTS = ROOT / "AGENTS.md"
 RECORDER = ROOT / "_ops" / "script-recorder.md"
+RUNTIME_CORE = ROOT / "runtime-core.md"
+ADAPTATION_CORE = ROOT / "adaptation-core.md"
+PROJECT_PROFILE = ROOT / "project.profile.md"
+ALIGNER = ROOT / "_ops" / "script-aligner.md"
+PROFILE_CHECK = ROOT / "_ops" / "profile-checks" / "revenge_palace.md"
+PROFILE_WRITER = ROOT / "profiles" / "revenge_palace.md"
 
 
 def _scene_header(scene_no: int, title: str, day: str, place_type: str, place: str) -> list[str]:
@@ -86,12 +92,74 @@ def _run_lint(text: str) -> dict:
 
 
 class EpisodeLintTests(unittest.TestCase):
+    def test_project_profile_exists_and_declares_defaults(self) -> None:
+        self.assertTrue(PROJECT_PROFILE.exists())
+        content = PROJECT_PROFILE.read_text(encoding="utf-8")
+        self.assertIn("adaptation_mode: novel_to_short_drama", content)
+        self.assertIn("genre_profile: revenge_palace", content)
+        self.assertIn("distribution_mode: cn_paid_microdrama", content)
+        self.assertIn("relation_layer: enabled", content)
+
+    def test_agents_routes_through_profile_layers(self) -> None:
+        content = AGENTS.read_text(encoding="utf-8")
+        self.assertTrue(PROFILE_WRITER.exists())
+        self.assertIn("project.profile.md", content)
+        self.assertRegex(
+            content,
+            re.compile(
+                r"\*\*Writer phase\*\*: read `project\.profile\.md`.*then `runtime-core\.md` → `adaptation-core\.md` → `profiles/revenge_palace\.md` → `voice-anchor\.md`.*→ `character\.md` →"
+            ),
+        )
+        self.assertRegex(
+            content,
+            re.compile(
+                r"\*\*Check phase\*\*: read `project\.profile\.md`.*then `_ops/script-aligner\.md` → `_ops/profile-checks/revenge_palace\.md` → `runtime-core\.md` → `adaptation-core\.md`"
+            ),
+        )
+        self.assertRegex(
+            content,
+            re.compile(r"\*\*Record phase\*\*: `_ops/script-recorder\.md` → `project\.profile\.md`"),
+        )
+
+    def test_runtime_core_is_profile_neutral(self) -> None:
+        content = RUNTIME_CORE.read_text(encoding="utf-8")
+        self.assertTrue(ADAPTATION_CORE.exists())
+        self.assertNotIn("每 5-8 集至少有一次真正脱离控制的局面", content)
+        self.assertNotIn("连续 3 集不能用相同的场次结构", content)
+        self.assertNotIn("复仇得手 / 伏笔回收 / 身份曝光场景必须有记忆唤醒手段", content)
+        self.assertNotIn("第18-20集", content)
+        self.assertNotIn("宫斗期", content)
+        self.assertNotIn("甜宠", content)
+
+    def test_aligner_is_profile_neutral_and_profile_check_exists(self) -> None:
+        content = ALIGNER.read_text(encoding="utf-8")
+        self.assertTrue(PROFILE_CHECK.exists())
+        self.assertNotIn("甜宠剧甜虐比 7:3", content)
+        self.assertNotIn("引流/宫斗期", content)
+        self.assertNotIn("第18-20集必须包含至少1个情感高潮场景", content)
+        self.assertNotIn("第20集结尾或第21集开头必须有重大悬念/转折", content)
+
+    def test_voice_anchor_supports_relation_modes(self) -> None:
+        content = VOICE_ANCHOR.read_text(encoding="utf-8")
+        self.assertIn("基础声纹", content)
+        self.assertIn("对上位者", content)
+        self.assertIn("对亲近者", content)
+        self.assertIn("对敌手", content)
+        self.assertIn("对欲望对象", content)
+
+    def test_recorder_tracks_profile_fields(self) -> None:
+        content = RECORDER.read_text(encoding="utf-8")
+        self.assertIn("adaptation_mode", content)
+        self.assertIn("genre_profile", content)
+        self.assertIn("distribution_mode", content)
+        self.assertIn("active profile", content)
+
     def test_writer_phase_loading_order_keeps_character_context(self) -> None:
         content = AGENTS.read_text(encoding="utf-8")
         self.assertRegex(
             content,
             re.compile(
-                r"\*\*Writer phase\*\*: `runtime-core\.md` → `voice-anchor\.md`.*→ `character\.md` →",
+                r"\*\*Writer phase\*\*: .*`voice-anchor\.md`.*→ `character\.md` →",
             ),
         )
         self.assertNotIn("`voice-anchor.md`（或 `character.md`）", content)

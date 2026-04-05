@@ -25,7 +25,9 @@ Tool mapping:
 ## Source Of Truth
 
 - Follow this `AGENTS.md` first.
+- `project.profile.md` is the runtime configuration source for adaptation mode, active genre profile, distribution assumptions, and relation-layer state.
 - [runtime-core.md](./runtime-core.md) is the canonical writing-stance spec — only describes how to write, no file routing.
+- [adaptation-core.md](./adaptation-core.md) is the canonical novel-to-short-drama adaptation spec.
 - [OPENAI.md](./OPENAI.md) and [CLAUDE.md](./CLAUDE.md) are thin runtime entry files that point to `runtime-core.md`.
 - Operational docs live under [_ops/](./_ops/) and are not default Writer context.
 
@@ -36,6 +38,11 @@ Tool mapping:
 - If the task is explicit checking or recording, then read:
   - [_ops/script-aligner.md](./_ops/script-aligner.md)
   - [_ops/script-recorder.md](./_ops/script-recorder.md)
+- If `project.profile.md` is missing, use compatibility defaults:
+  - `adaptation_mode: novel_to_short_drama`
+  - `genre_profile: revenge_palace`
+  - `distribution_mode: cn_paid_microdrama`
+  - `relation_layer: enabled`
 
 ## Workflow Rules
 
@@ -56,7 +63,10 @@ Tool mapping:
 **单一事实源**：Writer 读取范围仅由本节定义。`runtime-core.md` 不含文件白名单。
 
 - Allowed by default:
+  - `project.profile.md` if present
   - `runtime-core.md`
+  - `adaptation-core.md`
+  - `profiles/revenge_palace.md` when `genre_profile: revenge_palace`
   - `voice-anchor.md`（如已填写）
   - `character.md`
   - `outline.md`
@@ -74,7 +84,7 @@ Tool mapping:
 
 ## Phase-Specific Loading Order
 
-- **Writer phase**: `runtime-core.md` → `voice-anchor.md`（如已填写）→ `character.md` → 素材文件（见 Writer Default Context）
-- **Check phase**: `_ops/script-aligner.md` → `runtime-core.md`（aligner 引用写法基准）
-- **Record phase**: `_ops/script-recorder.md`
+- **Writer phase**: read `project.profile.md` to resolve active mode/profile, then `runtime-core.md` → `adaptation-core.md` → `profiles/revenge_palace.md` → `voice-anchor.md`（如已填写）→ `character.md` → 素材文件（见 Writer Default Context）
+- **Check phase**: read `project.profile.md` to resolve active profile, then `_ops/script-aligner.md` → `_ops/profile-checks/revenge_palace.md` → `runtime-core.md` → `adaptation-core.md`
+- **Record phase**: `_ops/script-recorder.md` → `project.profile.md`
 - **Platform entry**: `OPENAI.md` / `CLAUDE.md`（仅启动时读取，指向 `runtime-core.md`）

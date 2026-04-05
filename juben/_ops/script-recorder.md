@@ -13,6 +13,7 @@
     - 输出完整Markdown文档，可直接覆盖写入script.progress.md
     - 语言：中文
     - 若主流程同时提供 `_ops/episode-lint.py` 的 JSON 结果，优先使用 lint 的机械检查结论生成标签与统计，再补充 aligner 的主观判断结果
+    - `project.profile.md` 是 profile 权威来源；recorder 只镜像记录，不自行决定 profile
 
     **批次状态快照规则**：
     - 每完成5集正文，或用户要求自动连续生成多集时，必须更新：
@@ -84,6 +85,9 @@
     ## 项目信息
     - 剧名：《<剧本名称>》
     - 类型：<剧本方向>
+    - adaptation_mode: <from project.profile.md>
+    - genre_profile: <from project.profile.md>
+    - distribution_mode: <from project.profile.md>
     - 集数：<总集数>
     - 进度：<百分比>%（已完成<X>集）
     
@@ -93,7 +97,8 @@
     - episode_index.md：[✓/创作中/待创作] <YYYY-MM-DD HH:MM>
 
     ## 当前整季状态
-    - 当前阶段：<引流/宫斗期 | 猎杀/上位期 | 权谋/决战期>
+    - active profile: <from project.profile.md>
+    - 当前阶段：<由当前 profile 定义>
     - 当前批次：EP<X>-EP<Y>
     - 质量锚：<quality.anchor.md 已建立/待建立>
     
@@ -120,10 +125,7 @@
     **修改记录**：
     - <YYYY-MM-DD>：<修改内容>
 
-    [其余各集按此格式记录，可根据创作进度分段显示：
-    - 第1-10集（开场引流段）
-    - 第11-20集（免费段收尾，第20集标记付费转化点）
-    - 第21-X集（付费段）]
+    [其余各集按此格式记录，可根据当前 profile 或项目阶段做分段显示]
     
     ## 全局记录
     
@@ -192,6 +194,7 @@
         # 质量锚
         _基准样集：EP-<X> ~ EP-<Y>_
         _建立时间：<YYYY-MM-DD HH:MM>_
+        - active profile: <from project.profile.md>
 
         ## 场景厚度
         - 平均每场行数：<X>行
@@ -203,7 +206,7 @@
 
         ## os使用方式
         - 平均每集os数：<X>处
-        - os典型用途：<暴露算计/表里不一/自我激励/复仇宣言>
+        - os典型用途：<表里不一/代价暴露/闪回碎片/自我克制>
 
         ## 表情/镜头/音效密度
         - 每集表情特写：平均<X>处
@@ -212,7 +215,7 @@
 
         ## 代表性打法
         - 代表性台词风格：<摘录1-2句最能体现质感的台词>
-        - 代表性场景打法：<如"旧物触发+os反差+BGM骤停""三连打脸+全场跪">
+        - 代表性场景打法：<如"旧物触发+os反差+BGM骤停""安静铺局+突袭揭底">
         - 代表性留白手法：<如"放下茶杯不说话""镜头逼近眼睛，无台词">
 
     [story.state.md模板]
@@ -220,7 +223,8 @@
         _最后更新：EP-<XX> 完成后 <YYYY-MM-DD HH:MM>_
 
         ## 当前阶段
-        - 阶段标签：<引流/宫斗期 | 猎杀/上位期 | 权谋/决战期>
+        - active profile: <from project.profile.md>
+        - 阶段标签：<由当前 profile 定义>
         - 当前批次：EP-<X> ~ EP-<Y>
         - 下一批次预计：EP-<Y+1> ~ EP-<Y+5>
 
@@ -245,6 +249,7 @@
     [relationship.board.md模板]
         # 角色关系板
         _最后更新：EP-<XX> 完成后 <YYYY-MM-DD HH:MM>_
+        - active profile: <from project.profile.md>
 
         ## 核心关系网
 
@@ -261,6 +266,7 @@
     [open_loops.md模板]
         # 未回收伏笔与待解问题
         _最后更新：EP-<XX> 完成后 <YYYY-MM-DD HH:MM>_
+        - active profile: <from project.profile.md>
 
         ## 未回收伏笔
 
@@ -321,6 +327,7 @@
         
         第三步：剧本语义抽取
             从读取的文档中提取关键信息：
+            - project.profile.md：adaptation_mode、genre_profile、distribution_mode、relation_layer
             - outline.md：剧名、类型、总集数、核心冲突、故事分段
             - character.md：主角、反派、配角的设定和关系
             - episode_index.md：各集标题、一句话剧情
@@ -356,6 +363,7 @@
               • 每10集更新一次"质量趋势"（计算该段的平均检查次数、最稳定/薄弱方面）
             - 版本记录：若本次执行了版本快照，更新版本序号和最近变更
             - 整季状态文件：
+              • 镜像记录 adaptation_mode / genre_profile / distribution_mode
               • 每5集更新 story.state.md（当前阶段、权力格局、主要角色位置、最近关键转折）
               • 每5集更新 relationship.board.md（主要角色之间的信任/恨意/利用/依赖变化）
               • 实时更新 open_loops.md（未回收伏笔、未爆真相、待解冲突）
