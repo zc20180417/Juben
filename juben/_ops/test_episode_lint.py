@@ -19,6 +19,8 @@ PROJECT_PROFILE = ROOT / "project.profile.md"
 ALIGNER = ROOT / "_ops" / "script-aligner.md"
 PROFILE_CHECK = ROOT / "_ops" / "profile-checks" / "revenge_palace.md"
 PROFILE_WRITER = ROOT / "profiles" / "revenge_palace.md"
+OUTLINE = ROOT / "outline.md"
+SCRIPT_PROGRESS = ROOT / "script.progress.md"
 
 
 def _scene_header(scene_no: int, title: str, day: str, place_type: str, place: str) -> list[str]:
@@ -92,14 +94,26 @@ def _run_lint(text: str) -> dict:
 
 
 class EpisodeLintTests(unittest.TestCase):
-    def test_project_profile_exists_and_declares_defaults(self) -> None:
+    def test_project_profile_declares_light_contracts(self) -> None:
         self.assertTrue(PROJECT_PROFILE.exists())
         content = PROJECT_PROFILE.read_text(encoding="utf-8")
         self.assertIn("adaptation_mode: novel_to_short_drama", content)
         self.assertIn("genre_profile: revenge_palace", content)
         self.assertIn("distribution_mode: cn_paid_microdrama", content)
         self.assertIn("relation_layer: enabled", content)
-        self.assertIn("dialogue_adaptation_intensity: adaptive", content)
+        self.assertIn("dialogue_adaptation_intensity: light", content)
+        self.assertIn("`preserve`", content)
+        self.assertIn("`light`", content)
+        self.assertIn("`adaptive`", content)
+
+    def test_active_dialogue_intensity_is_consistent_across_runtime_files(self) -> None:
+        profile_content = PROJECT_PROFILE.read_text(encoding="utf-8")
+        outline_content = OUTLINE.read_text(encoding="utf-8")
+        progress_content = SCRIPT_PROGRESS.read_text(encoding="utf-8")
+
+        self.assertIn("dialogue_adaptation_intensity: light", profile_content)
+        self.assertIn("dialogue_adaptation_intensity：light", outline_content)
+        self.assertIn("dialogue_adaptation_intensity: light", progress_content)
 
     def test_agents_routes_through_profile_layers(self) -> None:
         content = AGENTS.read_text(encoding="utf-8")
@@ -133,6 +147,16 @@ class EpisodeLintTests(unittest.TestCase):
         self.assertNotIn("甜宠", content)
         self.assertIn("一句完整意思默认写成一行", content)
         self.assertIn("不新增原著没有的态度", content)
+        self.assertIn("允许换说法，不允许换态度", content)
+        self.assertIn("配角对白允许更散、更急、更带当下反应", content)
+        self.assertIn("不允许提前宣布计划得手", content)
+
+    def test_adaptation_core_declares_original_dialogue_anchor_flow(self) -> None:
+        content = ADAPTATION_CORE.read_text(encoding="utf-8")
+        self.assertIn("原著对白锚点", content)
+        self.assertIn("每场先抽取原著对应段落", content)
+        self.assertIn("原著对白是优先锚点，不是灵感素材", content)
+        self.assertIn("找不到相邻语义依据，优先回退", content)
 
     def test_aligner_is_profile_neutral_and_profile_check_exists(self) -> None:
         content = ALIGNER.read_text(encoding="utf-8")
@@ -143,6 +167,14 @@ class EpisodeLintTests(unittest.TestCase):
         self.assertNotIn("第20集结尾或第21集开头必须有重大悬念/转折", content)
         self.assertIn("机械拆句", content)
         self.assertIn("对白语义漂移", content)
+        self.assertIn("漂移类型", content)
+        self.assertIn("态度增强", content)
+        self.assertIn("机锋增强", content)
+        self.assertIn("关系温度偏移", content)
+        self.assertIn("说明化", content)
+        self.assertIn("解释剧情", content)
+        self.assertIn("提前暴露算计", content)
+        self.assertIn("把观众判断说穿", content)
 
     def test_voice_anchor_supports_relation_modes(self) -> None:
         content = VOICE_ANCHOR.read_text(encoding="utf-8")
@@ -151,6 +183,8 @@ class EpisodeLintTests(unittest.TestCase):
         self.assertIn("对亲近者", content)
         self.assertIn("对敌手", content)
         self.assertIn("对欲望对象", content)
+        self.assertIn("非核心角色", content)
+        self.assertIn("即时情绪优先", content)
         self.assertNotIn("常拆成两三拍说完", content)
 
     def test_recorder_tracks_profile_fields(self) -> None:
