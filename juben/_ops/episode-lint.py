@@ -290,6 +290,7 @@ def history_repetition(current_lines: list[str], history_files: list[Path]) -> d
 
 def build_checks(scenes: list[dict], totals: dict, history: dict) -> dict:
     scene_failures = []
+    total_scenes = len(scenes)
     for idx, scene in enumerate(scenes, 1):
         failures = []
         if scene["triangle_count"] < 3:
@@ -310,7 +311,8 @@ def build_checks(scenes: list[dict], totals: dict, history: dict) -> dict:
             failures.append("sfx")
         if scene["metaphor_count"] > 2:
             failures.append("metaphor_count")
-        if not scene["ending_has_hook"]:
+        if not scene["ending_has_hook"] and idx == total_scenes:
+            # Last scene must have a hook — hard failure
             failures.append("ending_hook")
         scene_failures.append({"scene": idx, "title": scene["title"], "failures": failures})
 
@@ -330,7 +332,17 @@ def build_checks(scenes: list[dict], totals: dict, history: dict) -> dict:
     if totals["psychological_comment_count"] >= 2:
         episode_failures.append("psychological_comment_count")
 
+    # Non-final scenes without hooks: allow 1 for pacing, fail if ≥ 2
+    hookless_non_final = sum(
+        1 for i, scene in enumerate(scenes, 1)
+        if i < total_scenes and not scene["ending_has_hook"]
+    )
+    if hookless_non_final >= 2:
+        episode_failures.append("too_many_hookless_scenes")
+
     warnings = []
+    if hookless_non_final == 1:
+        warnings.append("hookless_non_final_scene")
     if totals["line_count"] < 70:
         warnings.append("line_count")
     if any(scene["line_count"] < 18 for scene in scenes):
