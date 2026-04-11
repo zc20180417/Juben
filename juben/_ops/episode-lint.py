@@ -311,9 +311,6 @@ def build_checks(scenes: list[dict], totals: dict, history: dict) -> dict:
             failures.append("sfx")
         if scene["metaphor_count"] > 2:
             failures.append("metaphor_count")
-        if not scene["ending_has_hook"] and idx == total_scenes:
-            # Last scene must have a hook — hard failure
-            failures.append("ending_hook")
         scene_failures.append({"scene": idx, "title": scene["title"], "failures": failures})
 
     episode_failures = []
@@ -341,6 +338,8 @@ def build_checks(scenes: list[dict], totals: dict, history: dict) -> dict:
         episode_failures.append("too_many_hookless_scenes")
 
     warnings = []
+    if total_scenes >= 1 and not scenes[-1]["ending_has_hook"]:
+        warnings.append("hookless_final_scene")
     if hookless_non_final == 1:
         warnings.append("hookless_non_final_scene")
     if totals["line_count"] < 70:

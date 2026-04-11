@@ -1,5 +1,4 @@
 import json
-import re
 import subprocess
 import sys
 import tempfile
@@ -10,17 +9,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "_ops" / "episode-lint.py"
-VOICE_ANCHOR = ROOT / "voice-anchor.md"
-AGENTS = ROOT / "AGENTS.md"
-RECORDER = ROOT / "_ops" / "script-recorder.md"
-RUNTIME_CORE = ROOT / "runtime-core.md"
-ADAPTATION_CORE = ROOT / "adaptation-core.md"
-PROJECT_PROFILE = ROOT / "project.profile.md"
-ALIGNER = ROOT / "_ops" / "script-aligner.md"
-PROFILE_CHECK = ROOT / "_ops" / "profile-checks" / "revenge_palace.md"
-PROFILE_WRITER = ROOT / "profiles" / "revenge_palace.md"
-OUTLINE = ROOT / "outline.md"
-SCRIPT_PROGRESS = ROOT / "script.progress.md"
+WRITE_CONTRACT = ROOT / "harness" / "framework" / "write-contract.md"
+VERIFY_CONTRACT = ROOT / "harness" / "framework" / "verify-contract.md"
 
 
 def _scene_header(scene_no: int, title: str, day: str, place_type: str, place: str) -> list[str]:
@@ -54,7 +44,13 @@ def _base_scene(scene_no: int, title: str, day: str, place_type: str, place: str
     ]
 
 
-def _build_episode(*, line_padding: int = 0, psychological_comment: bool = False, scene_one_metaphors: int = 0) -> str:
+def _build_episode(
+    *,
+    line_padding: int = 0,
+    psychological_comment: bool = False,
+    scene_one_metaphors: int = 0,
+    final_hook: bool = True,
+) -> str:
     scene_one = _base_scene(1, "偏厅", "夜", "内", "偏厅")
     scene_two = _base_scene(2, "长廊", "夜", "外", "长廊")
 
@@ -70,6 +66,9 @@ def _build_episode(*, line_padding: int = 0, psychological_comment: bool = False
         scene_one[4] = metaphor_lines[0]
         scene_one[5] = metaphor_lines[1]
         scene_one[7] = metaphor_lines[2]
+
+    if not final_hook:
+        scene_two[-1] = "△：两个人都沉默了。烛火稳下来，她把手垂在身侧，呼吸终于缓了一寸。"
 
     lines = ["第1集：测试", ""] + scene_one + [""] + scene_two
     lines.extend([""] * line_padding)
@@ -94,146 +93,47 @@ def _run_lint(text: str) -> dict:
 
 
 class EpisodeLintTests(unittest.TestCase):
-    def test_project_profile_declares_light_contracts(self) -> None:
-        self.assertTrue(PROJECT_PROFILE.exists())
-        content = PROJECT_PROFILE.read_text(encoding="utf-8")
-        self.assertIn("adaptation_mode: novel_to_short_drama", content)
-        self.assertIn("genre_profile: revenge_palace", content)
-        self.assertIn("distribution_mode: cn_paid_microdrama", content)
-        self.assertIn("relation_layer: enabled", content)
-        self.assertIn("dialogue_adaptation_intensity: light", content)
-        self.assertIn("`preserve`", content)
-        self.assertIn("`light`", content)
-        self.assertIn("`adaptive`", content)
+    def test_write_contract_contains_core_rules(self) -> None:
+        content = WRITE_CONTRACT.read_text(encoding="utf-8")
+        self.assertIn("完整气口优先于碎句节拍", content)
+        self.assertIn("保留回应句时，必须保留上句触发语义", content)
+        self.assertIn("`os` 必须一眼读清主语、对象和判断落点", content)
+        self.assertIn("单点被看见", content)
+        self.assertIn("自然发生的关键节点", content)
+        self.assertIn("即时动作钩子", content)
 
-    def test_active_dialogue_intensity_is_consistent_across_runtime_files(self) -> None:
-        profile_content = PROJECT_PROFILE.read_text(encoding="utf-8")
-        outline_content = OUTLINE.read_text(encoding="utf-8")
-        progress_content = SCRIPT_PROGRESS.read_text(encoding="utf-8")
-
-        self.assertIn("dialogue_adaptation_intensity: light", profile_content)
-        self.assertIn("dialogue_adaptation_intensity：light", outline_content)
-        self.assertIn("dialogue_adaptation_intensity: light", progress_content)
-
-    def test_agents_routes_through_profile_layers(self) -> None:
-        content = AGENTS.read_text(encoding="utf-8")
-        self.assertTrue(PROFILE_WRITER.exists())
-        self.assertIn("project.profile.md", content)
-        self.assertRegex(
-            content,
-            re.compile(
-                r"\*\*Writer phase\*\*: read `project\.profile\.md`.*then `runtime-core\.md` → `adaptation-core\.md` → `profiles/revenge_palace\.md` → `voice-anchor\.md`.*→ `character\.md` →"
-            ),
-        )
-        self.assertRegex(
-            content,
-            re.compile(
-                r"\*\*Check phase\*\*: read `project\.profile\.md`.*then `_ops/script-aligner\.md` → `_ops/profile-checks/revenge_palace\.md` → `runtime-core\.md` → `adaptation-core\.md`"
-            ),
-        )
-        self.assertRegex(
-            content,
-            re.compile(r"\*\*Record phase\*\*: `_ops/script-recorder\.md` → `project\.profile\.md`"),
-        )
-
-    def test_runtime_core_is_profile_neutral(self) -> None:
-        content = RUNTIME_CORE.read_text(encoding="utf-8")
-        self.assertTrue(ADAPTATION_CORE.exists())
-        self.assertNotIn("每 5-8 集至少有一次真正脱离控制的局面", content)
-        self.assertNotIn("连续 3 集不能用相同的场次结构", content)
-        self.assertNotIn("复仇得手 / 伏笔回收 / 身份曝光场景必须有记忆唤醒手段", content)
-        self.assertNotIn("第18-20集", content)
-        self.assertNotIn("宫斗期", content)
-        self.assertNotIn("甜宠", content)
-        self.assertIn("一句完整意思默认写成一行", content)
-        self.assertIn("不新增原著没有的态度", content)
-        self.assertIn("允许换说法，不允许换态度", content)
-        self.assertIn("配角对白允许更散、更急、更带当下反应", content)
-        self.assertIn("不允许提前宣布计划得手", content)
-
-    def test_adaptation_core_declares_original_dialogue_anchor_flow(self) -> None:
-        content = ADAPTATION_CORE.read_text(encoding="utf-8")
-        self.assertIn("原著对白锚点", content)
-        self.assertIn("每场先抽取原著对应段落", content)
-        self.assertIn("原著对白是优先锚点，不是灵感素材", content)
-        self.assertIn("找不到相邻语义依据，优先回退", content)
-
-    def test_aligner_is_profile_neutral_and_profile_check_exists(self) -> None:
-        content = ALIGNER.read_text(encoding="utf-8")
-        self.assertTrue(PROFILE_CHECK.exists())
-        self.assertNotIn("甜宠剧甜虐比 7:3", content)
-        self.assertNotIn("引流/宫斗期", content)
-        self.assertNotIn("第18-20集必须包含至少1个情感高潮场景", content)
-        self.assertNotIn("第20集结尾或第21集开头必须有重大悬念/转折", content)
-        self.assertIn("机械拆句", content)
-        self.assertIn("对白语义漂移", content)
-        self.assertIn("漂移类型", content)
-        self.assertIn("态度增强", content)
-        self.assertIn("机锋增强", content)
-        self.assertIn("关系温度偏移", content)
-        self.assertIn("说明化", content)
-        self.assertIn("解释剧情", content)
-        self.assertIn("提前暴露算计", content)
-        self.assertIn("把观众判断说穿", content)
-
-    def test_voice_anchor_supports_relation_modes(self) -> None:
-        content = VOICE_ANCHOR.read_text(encoding="utf-8")
-        self.assertIn("基础声纹", content)
-        self.assertIn("对上位者", content)
-        self.assertIn("对亲近者", content)
-        self.assertIn("对敌手", content)
-        self.assertIn("对欲望对象", content)
-        self.assertIn("非核心角色", content)
-        self.assertIn("即时情绪优先", content)
-        self.assertNotIn("常拆成两三拍说完", content)
-
-    def test_recorder_tracks_profile_fields(self) -> None:
-        content = RECORDER.read_text(encoding="utf-8")
-        self.assertIn("adaptation_mode", content)
-        self.assertIn("genre_profile", content)
-        self.assertIn("distribution_mode", content)
-        self.assertIn("active profile", content)
-        self.assertIn("dialogue_adaptation_intensity", content)
-
-    def test_writer_phase_loading_order_keeps_character_context(self) -> None:
-        content = AGENTS.read_text(encoding="utf-8")
-        self.assertRegex(
-            content,
-            re.compile(
-                r"\*\*Writer phase\*\*: .*`voice-anchor\.md`.*→ `character\.md` →",
-            ),
-        )
-        self.assertNotIn("`voice-anchor.md`（或 `character.md`）", content)
-        self.assertIn("dialogue_adaptation_intensity", content)
-
-    def test_recorder_explicitly_consumes_scene_failures(self) -> None:
-        content = RECORDER.read_text(encoding="utf-8")
-        self.assertIn("checks.scene_failures", content)
-
-    def test_voice_anchor_is_filled_for_core_roles(self) -> None:
-        content = VOICE_ANCHOR.read_text(encoding="utf-8")
-        self.assertNotIn("### <角色名>", content)
-        self.assertNotIn("- 语速：<>", content)
-        self.assertIn("### 沈青鸾", content)
-        self.assertIn("### 萧景珩", content)
+    def test_verify_contract_contains_core_gates(self) -> None:
+        content = VERIFY_CONTRACT.read_text(encoding="utf-8")
+        self.assertIn("draft 未通过 `_ops/episode-lint.py`", content)
+        self.assertIn("回应句失去触发语义", content)
+        self.assertIn("自然事件被无依据改成设计局", content)
+        self.assertIn("概述性信息被擅自扩成具体事故", content)
+        self.assertIn("即时动作钩子在相邻下一集第一场未兑现", content)
+        self.assertIn("单点关系稀释", content)
+        self.assertIn("`os` 语义悬空", content)
 
     def test_line_count_warning_is_warn_not_fail(self) -> None:
         data = _run_lint(_build_episode())
         self.assertEqual(data["status"], "warn")
         self.assertIn("line_count", data["checks"]["warnings"])
-        self.assertNotIn("line_count_warning_only", data["checks"]["episode_failures"])
+        self.assertEqual(data["checks"]["episode_failures"], [])
 
     def test_single_psychological_comment_is_warn_not_fail(self) -> None:
         data = _run_lint(_build_episode(line_padding=40, psychological_comment=True))
         self.assertEqual(data["status"], "warn")
         self.assertIn("psychological_comment_count", data["checks"]["warnings"])
-        self.assertNotIn("psychological_comment_warning", data["checks"]["episode_failures"])
+        self.assertNotIn("psychological_comment_count", data["checks"]["episode_failures"])
 
     def test_scene_metaphor_limit_fails_even_when_episode_total_is_within_limit(self) -> None:
         data = _run_lint(_build_episode(line_padding=40, scene_one_metaphors=3))
         self.assertEqual(data["status"], "fail")
         self.assertEqual(data["totals"]["metaphor_count"], 3)
         self.assertIn("metaphor_count", data["checks"]["scene_failures"][0]["failures"])
+
+    def test_hookless_final_scene_is_warn_not_fail(self) -> None:
+        data = _run_lint(_build_episode(line_padding=40, final_hook=False))
+        self.assertEqual(data["status"], "warn")
+        self.assertIn("hookless_final_scene", data["checks"]["warnings"])
         self.assertEqual(data["checks"]["episode_failures"], [])
 
 

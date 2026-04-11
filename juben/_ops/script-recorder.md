@@ -1,393 +1,134 @@
 # Script Recorder
 
-读取已创作的剧本文档，进行语义抽取，将新增或变更信息合并进 script.progress.md。
-同时维护版本快照、质量统计、批次状态压缩和质量锚。
+本文件是 harness v2 的 record 执行规范。
+模板权威来自 `memory-contract.md`；本文件定义执行顺序、抽取逻辑和验证步骤。
 
-[总体规则]
-    - 根据主Agent的调用指令，主动读取相应文档并执行记录任务，不进行用户交互
-    - 高置信判定：仅当包含"确定/敲定/就这样/最终版"等确定性语言时才写入决策记录
-    - 受保护区块（角色核心设定）不可自动修订；若检测到潜在冲突，记录于待处理事项
-    - 角色档案采用增量更新策略：新信息补充原档案，冲突信息标注待确认
-    - 自动识别完成的场景/集数（包含"写完了/定稿/完成"等语义）
-    - 所有新增条目必须追加时间戳（YYYY-MM-DD HH:MM）
-    - 输出完整Markdown文档，可直接覆盖写入script.progress.md
-    - 语言：中文
-    - 若主流程同时提供 `_ops/episode-lint.py` 的 JSON 结果，优先使用 lint 的机械检查结论生成标签与统计，再补充 aligner 的主观判断结果
-    - `project.profile.md` 是 profile 权威来源；recorder 只镜像记录，不自行决定 profile
+## Authoritative Inputs
+- [memory-contract.md](../harness/framework/memory-contract.md)
+- [promote-contract.md](../harness/framework/promote-contract.md)
+- [run.manifest.md](../harness/project/run.manifest.md)
 
-    **批次状态快照规则**：
-    - 每完成5集正文，或用户要求自动连续生成多集时，必须更新：
-      • story.state.md
-      • relationship.board.md
-      • open_loops.md
-    - 这些文件属于"当前有效上下文"，不是历史档案
-    - 快照原则：保留高价值状态，不复制整段正文
+## Write Targets
+- [script.progress.md](../harness/project/state/script.progress.md)
+- [story.state.md](../harness/project/state/story.state.md)
+- [relationship.board.md](../harness/project/state/relationship.board.md)
+- [open_loops.md](../harness/project/state/open_loops.md)
+- [quality.anchor.md](../harness/project/state/quality.anchor.md)
+- [process.memory.md](../harness/project/state/process.memory.md)
+- [run.log.md](../harness/project/state/run.log.md)
 
-    **质量锚规则**：
-    - 在前3集或用户明确认可的样集通过后，生成/更新 quality.anchor.md
-    - 质量锚至少记录：
-      • 场景厚度特征
-      • 对话节奏特征
-      • os使用方式
-      • 表情/镜头/音效密度
-      • 代表性台词和代表性场景打法
-    - 后续仅在用户认可新基准时才重置质量锚，避免越写越漂
+## Preconditions（record 执行前必须全部成立）
+- controller 身份确认
+- promote 已完成（batch brief 状态为 `promoted`）
+- `state.lock` 为 `unlocked`
+- 任一条不满足 → 拒绝执行，输出原因
 
-    **薄弱原因标签规则**：
-    - FAIL时必须记录固定标签，不使用自由文本概括
-    - 结构标签从以下5类中选择：
-      • 对话不足
-      • 描写空洞
-      • 成片感缺失
-      • 情绪单一
-      • 标记缺失
-    - 风格标签从以下4类中选择：
-      • 比喻过密
-      • △心理评论
-      • 角色同腔
-      • 意象单一
-    - 主标签从结构5类 + 风格4类中选择1个
-    - 次标签可补充0-2个，用于描述同一集的次级薄弱点
-    - 类型字段固定为：结构 / 风格
-    - 首次FAIL的标签必须保留，后续重写通过后不覆盖原始标签
-    - 标签优先映射规则：
-      • lint 命中 `dialogue_rounds` / `pure_dialogue_run` → `对话不足`
-      • lint 命中 `triangle_sentence_count` / `triangle_visible_detail` → `描写空洞`
-      • lint 命中 `environment_anchor` / `ending_hook` / `scene_count` / `camera_count` / `sfx` / `sfx_total` → `成片感缺失`
-      • lint 命中 `psychological_comment_count` / 情绪层次失败 → `情绪单一` 或 `△心理评论`
-      • lint 命中 `os_vo_count` / `camera_count` / `sfx_total` → `标记缺失`
-      • lint 命中 `metaphor_count` → `比喻过密`
-      • lint 命中 `imagery_dense:*` / `imagery_repeat:*` → `意象单一`
-      • 角色区分度 / 禁用表达 / 原著声纹锚偏离 → `角色同腔`
+## Execution Steps
 
-    **版本快照规则**：
-    - 当 outline.md 或 character.md 被修改写入时，先将修改前的版本复制到 versions/ 目录
-    - 版本文件命名：v{三位序号}_{文件名}.md（如 v001_outline.md、v002_outline.md）
-    - 序号从 versions/ 目录中已有文件推算，递增
-    - 同时在 versions/changelog.md 中追加变更记录
-    - episode_index.md 和 EP-XX.md 不做版本快照（通过 script.progress.md 的修改记录追踪）
+### Step 1：Lock & Load
+- 将 `state.lock` 写为 `locked`，owner 为当前 session
+- 读取 `run.manifest.md` 获取当前 batch 范围
+- 读取 promoted episodes（`episodes/EP-XX.md`）
+- 读取 aligner 检查结果（lint JSON + aligner 判定）
+- 读取现有 state 文件做增量基准
 
-[功能判断]
-    - 自动触发：文档写入成功后，主Agent自动调用
-        • 主Agent传入参数：文档类型（outline/character/episode_index/EP-XX）
-        • 主Agent传入参数：操作类型（新建/修改）
-        • recorder根据参数读取对应文档
-        • 若存在当前集对应的 lint JSON 或 lint 摘要，一并读取
-        • 若操作类型为"修改"且文档为 outline.md 或 character.md → 额外执行版本快照
-    - 手动触发：收到"/record"指令时
-        • 扫描并读取所有已存在的文档
-        • 执行全面记录
+### Step 2：抽取（从 promoted episodes 中）
+对每集抽取：
+- 核心内容（一句话剧情概要）
+- 前情衔接摘要（2-3 句：主要角色当前处境、未解决悬念、情感状态）
+- 爽点
+- 伏笔埋设与回收
+- 人物状态变化
+- aligner 检查记录：检查次数、首次结果、主要问题、薄弱原因标签（主标签/次标签/类型）
 
-[模板]
-    # 剧本创作进度
-    _最后更新：<YYYY-MM-DD HH:MM>_
-    
-    ## 项目信息
-    - 剧名：《<剧本名称>》
-    - 类型：<剧本方向>
-    - adaptation_mode: <from project.profile.md>
-    - genre_profile: <from project.profile.md>
-    - distribution_mode: <from project.profile.md>
-    - dialogue_adaptation_intensity: <from project.profile.md>
-    - 集数：<总集数>
-    - 进度：<百分比>%（已完成<X>集）
-    
-    ## 基础文档
-    - outline.md：[✓/创作中/待创作] <YYYY-MM-DD HH:MM>
-    - character.md：[✓/创作中/待创作] <YYYY-MM-DD HH:MM>
-    - episode_index.md：[✓/创作中/待创作] <YYYY-MM-DD HH:MM>
+薄弱原因标签映射规则：
+- lint `dialogue_rounds` / `pure_dialogue_run` → `对话不足`
+- lint `triangle_sentence_count` / `triangle_visible_detail` → `描写空洞`
+- lint `environment_anchor` / `ending_hook` / `scene_count` / `camera_count` / `sfx` / `sfx_total` → `成片感缺失`
+- lint `psychological_comment_count` / 情绪层次失败 → `情绪单一` 或 `△心理评论`
+- lint `os_vo_count` / `camera_count` / `sfx_total` → `标记缺失`
+- lint `metaphor_count` → `比喻过密`
+- lint `imagery_dense:*` / `imagery_repeat:*` → `意象单一`
+- 角色区分度 / 禁用表达 / 声纹偏离 → `角色同腔`
 
-    ## 当前整季状态
-    - active profile: <from project.profile.md>
-    - 当前阶段：<由当前 profile 定义>
-    - 当前批次：EP<X>-EP<Y>
-    - 质量锚：<quality.anchor.md 已建立/待建立>
-    
-    ## 分集记录
+### Step 3：写入 script.progress.md
+按 `memory-contract.md` > State File Templates > script.progress.md 的必备 section 写入：
+- 更新 `## 项目信息` 的进度百分比
+- 更新 `## 基础文档` 时间戳
+- 更新 `## 当前整季状态` 的当前批次
+- 在 `## 分集记录` 中新增/更新本批各集
+- 更新 `## 全局记录`（创作决策、伏笔总表）
+- 更新 `## 质量统计`（检查记录表、高频问题 TOP3、质量趋势）
+- 更新 `## 版本记录`
 
-    ### 【第X集】<集标题>
-    **状态**：[✓已完成/创作中/待创作] <YYYY-MM-DD HH:MM>
-    **核心内容**：<一句话剧情概要>
-    **前情衔接摘要**：<2-3句话描述本集结尾时的剧情状态，供下一集创作时快速加载上下文，包括：主要角色当前处境、未解决的悬念、情感状态>
-    **爽点**：<本集爽点>
-    **伏笔**：
-    - 埋设：<伏笔内容>（计划EP<X>回收）
-    - 回收：<回收的伏笔>（来自EP<X>）
-    **人物**：
-    - <角色名>：<本集的状态/变化>
-    **aligner检查记录**：
-    - 检查次数：<N>次
-    - 首次结果：<PASS/FAIL>
-    - 主要问题：<问题类型，如"对话过长""场景过多"，首次PASS则填"无">
-    - 薄弱原因标签：
-      • 主标签：<对话不足/描写空洞/成片感缺失/情绪单一/标记缺失/比喻过密/△心理评论/角色同腔/意象单一/无>
-      • 次标签：<可选0-2个，首次PASS则填"无">
-      • 类型：<结构/风格/无>
-    **修改记录**：
-    - <YYYY-MM-DD>：<修改内容>
+### Step 4：写入 story.state.md
+按 `memory-contract.md` > State File Templates > story.state.md 的必备 section 写入：
+- `## 当前阶段`：更新批次和阶段标签
+- `## 权力格局`：更新角色当前位份/势力
+- `## 主要角色位置`：更新物理位置/情感状态
+- `## 最近关键转折（最近5集内）`：替换为本批转折
+- `## 下一批关键预期`：基于 `source.map.md` 的下一批 must-keep beats 推导
 
-    [其余各集按此格式记录，可根据当前 profile 或项目阶段做分段显示]
-    
-    ## 全局记录
-    
-    ### 创作决策
-    - YYYY-MM-DD HH:MM：<决策内容>（影响：EP<X>-EP<Y>）
-    
-    ### 创作规则
-    - <确立的规则>（适用：全剧/特定集）
-    
-    ### 灵感备忘
-    - YYYY-MM-DD：<创意>（可用于EP<X>）
-    
-    ### 待处理事项
-    - [ ] <问题描述>（相关：EP<X>）
-    
-    ### 伏笔总表
-    | 状态 | 埋设集 | 内容 | 计划回收 | 实际回收 |
-    |-----|-------|------|---------|---------|
-    | ✓已回收 | EP01 | <内容> | EP05 | EP05 |
-    | ⏳待回收 | EP02 | <内容> | EP08 | - |
+触发条件：每 5 集更新，或批次结束时。
 
-    ## 质量统计
+### Step 5：写入 relationship.board.md
+按 `memory-contract.md` > State File Templates > relationship.board.md 的必备 section 写入：
+- `## 核心关系网`：更新表格
+- `## 最近关系变动`：替换为最近 5 集内
+- `## 待爆关系线`：从 `source.map.md` 下一批推导
 
-    ### 检查记录
-    | 集数 | 检查次数 | 首次结果 | 主标签 | 次标签 | 类型 | 最终通过 |
-    |-----|---------|---------|-------|-------|-----|---------|
-    | EP-01 | <N> | <PASS/FAIL> | <标签或"-"> | <标签或"-"> | <结构/风格/-> | ✓ |
+触发条件：每 5 集更新，或批次结束时。
 
-    ### 高频问题 TOP3
-    （按固定标签出现频次降序排列，每次更新时重新统计）
-    1. **<标签>**（出现<N>次）→ <应对建议>
-    2. **<标签>**（出现<N>次）→ <应对建议>
-    3. **<标签>**（出现<N>次）→ <应对建议>
+### Step 6：写入 open_loops.md
+按 `memory-contract.md` > State File Templates > open_loops.md 的必备 section 写入：
+- `## 未回收伏笔`：新增本批埋设，标记已回收
+- `## 未爆真相`：更新
+- `## 待解冲突`：更新
+- `## 已超期伏笔`：检查埋设超过 20 集的
 
-    ### 结构标签统计
-    | 标签 | 次数 | 最近出现集数 |
-    |-----|-----|-------------|
-    | 对话不足 | <N> | <EP-XX/-> |
-    | 描写空洞 | <N> | <EP-XX/-> |
-    | 成片感缺失 | <N> | <EP-XX/-> |
-    | 情绪单一 | <N> | <EP-XX/-> |
-    | 标记缺失 | <N> | <EP-XX/-> |
+触发条件：每次 promote 后实时更新。
 
-    ### 风格标签统计
-    | 标签 | 次数 | 最近出现集数 |
-    |-----|-----|-------------|
-    | 比喻过密 | <N> | <EP-XX/-> |
-    | △心理评论 | <N> | <EP-XX/-> |
-    | 角色同腔 | <N> | <EP-XX/-> |
-    | 意象单一 | <N> | <EP-XX/-> |
+### Step 7：条件写入 quality.anchor.md
+按 `memory-contract.md` > State File Templates > quality.anchor.md 的必备 section 写入：
+- 触发条件：首批 3-5 集通过后初次建立，或用户认可新基准时重置
+- 从本批 promoted episodes 和 lint 数据中计算：
+  - 场景厚度（平均行数、△句数）
+  - 对话节奏（最长连续纯对白）
+  - os 使用方式（数量、用途分类）
+  - 表情/镜头/音效密度
+  - 代表性打法（代表性台词风格、场景打法、留白手法）
 
-    ### 质量趋势
-    - EP01-10 平均检查次数：<X>次
-    - EP11-20 平均检查次数：<X>次
-    - 最稳定方面：<如"节奏控制">
-    - 最薄弱方面：<如"人物对话区分度">
+### Step 8：写入 process.memory.md
+- 仅当本批出现新的流程问题时更新
+- 按 `memory-contract.md` > State File Templates > process.memory.md 的必备 section：
+  - `## 活跃流程问题`：新增条目（日期、问题、归类、防复发）
+  - `## 当前执行准则`：如有变化则更新
 
-    ## 版本记录
-    - 当前版本序号：v<NNN>
-    - 最近变更：<YYYY-MM-DD HH:MM> <简述变更内容>
-    - 详细变更日志见 versions/changelog.md
+### Step 9：写入 run.log.md
+按 `memory-contract.md` > Run Log Contract 追加本批 log entries：
+- 为本批每集的 draft_write / verify / promote 各追加一条
+- 为本次 record 追加一条
+- 如本批有 recovery 事件（context reset / 人工介入），追加对应条目
+- 只追加，不修改历史条目
 
-[状态文件模板]
+### Step 10：Validate & Unlock
+- 对每个写入的 state 文件，检查 `memory-contract.md` 要求的必备 section 是否全部存在
+- 缺失任一必备 section → 记录到 `process.memory.md` 并告警
+- 将 `state.lock` 写回 `unlocked`
+- 输出本次 record 摘要
 
-    [quality.anchor.md模板]
-        # 质量锚
-        _基准样集：EP-<X> ~ EP-<Y>_
-        _建立时间：<YYYY-MM-DD HH:MM>_
-        - active profile: <from project.profile.md>
+## Output Format
 
-        ## 场景厚度
-        - 平均每场行数：<X>行
-        - △描写平均句数：<X>句/条
+```
+[RECORD COMPLETE]
+- batch: EP-XX ~ EP-YY
+- script.progress.md: ✓ 更新（进度 N%）
+- story.state.md: ✓ 更新 / ⊘ 未触发
+- relationship.board.md: ✓ 更新 / ⊘ 未触发
+- open_loops.md: ✓ 更新
+- quality.anchor.md: ✓ 建立/更新 / ⊘ 未触发
+- process.memory.md: ✓ 更新 / ⊘ 无新问题
+- run.log.md: ✓ 追加 N 条
+- state.lock: unlocked
+```
 
-        ## 对话节奏
-        - 平均每场对话轮数：<X>轮
-        - 对话间隙最大连续纯对话：<X>句
-
-        ## os使用方式
-        - 平均每集os数：<X>处
-        - os典型用途：<表里不一/代价暴露/闪回碎片/自我克制>
-
-        ## 表情/镜头/音效密度
-        - 每集表情特写：平均<X>处
-        - 每集【镜头】：平均<X>处
-        - 每场♪：平均<X>处
-
-        ## 代表性打法
-        - 代表性台词风格：<摘录1-2句最能体现质感的台词>
-        - 代表性场景打法：<如"旧物触发+os反差+BGM骤停""安静铺局+突袭揭底">
-        - 代表性留白手法：<如"放下茶杯不说话""镜头逼近眼睛，无台词">
-
-    [story.state.md模板]
-        # 整季状态快照
-        _最后更新：EP-<XX> 完成后 <YYYY-MM-DD HH:MM>_
-
-        ## 当前阶段
-        - active profile: <from project.profile.md>
-        - 阶段标签：<由当前 profile 定义>
-        - 当前批次：EP-<X> ~ EP-<Y>
-        - 下一批次预计：EP-<Y+1> ~ EP-<Y+5>
-
-        ## 权力格局
-        - <角色A>：<当前位份/势力/靠山/掌握的筹码>
-        - <角色B>：<同上>
-        - <角色C>：<同上>
-        - 当前最大威胁：<谁对谁构成威胁，为什么>
-
-        ## 主要角色位置
-        - <角色>：<物理位置/情感状态/当前目标/下一步计划>
-
-        ## 最近关键转折（最近5集内）
-        - EP-<X>：<事件及其影响>
-        - EP-<Y>：<事件及其影响>
-
-        ## 下一批关键预期
-        - 预期爽点：<>
-        - 预期反派动作：<>
-        - 预期关系变化：<>
-
-    [relationship.board.md模板]
-        # 角色关系板
-        _最后更新：EP-<XX> 完成后 <YYYY-MM-DD HH:MM>_
-        - active profile: <from project.profile.md>
-
-        ## 核心关系网
-
-        | 角色A | 角色B | 关系类型 | 当前状态 | 变化趋势 |
-        |------|------|---------|---------|---------|
-        | <> | <> | 敌对/利用/爱恨/依赖/同盟/主仆 | <当前具体状态> | ↑升温/↓恶化/→稳定/⚡即将反转 |
-
-        ## 最近关系变动（最近5集内）
-        - EP-<X>：<谁和谁的关系发生了什么变化>
-
-        ## 待爆关系线
-        - <角色A>与<角色B>：<埋了什么线，预计什么时候爆>
-
-    [open_loops.md模板]
-        # 未回收伏笔与待解问题
-        _最后更新：EP-<XX> 完成后 <YYYY-MM-DD HH:MM>_
-        - active profile: <from project.profile.md>
-
-        ## 未回收伏笔
-
-        | 埋设集 | 内容 | 计划回收 | 紧急度 | 备注 |
-        |-------|------|---------|-------|------|
-        | EP-<X> | <伏笔内容> | EP-<Y> | 高/中/低 | <关联角色或剧情线> |
-
-        ## 未爆真相
-        - <真相内容>（观众已知/未知，角色已知/未知，预计揭露集数）
-
-        ## 待解冲突
-        - <冲突描述>（涉及角色，预计解决集数）
-
-        ## 已超期伏笔（埋设超过20集未回收）
-        - <若有，列出；若无，写"暂无">
-
-[功能]
-    [版本快照]
-        触发条件：主Agent传入操作类型为"修改"且文档为 outline.md 或 character.md
-
-        第一步：确定版本序号
-            - 读取 versions/ 目录已有文件
-            - 找到同名文件的最大序号，+1 得到新序号
-            - 若 versions/ 目录不存在则创建，序号从 001 开始
-
-        第二步：创建快照
-            - 将修改前的文档内容写入 versions/v{序号}_{文件名}.md
-            - 注意：保存的是修改前的版本，不是修改后的
-
-        第三步：更新 changelog.md
-            - 在 versions/changelog.md 顶部追加记录（最新在前）
-            - 格式：
-              ## v{序号} - YYYY-MM-DD HH:MM
-              - 文件：{outline.md/character.md}
-              - 变更：<简述修改了什么>
-              - 原因：<为什么修改，来自用户的修改意图>
-              - 影响范围：<aligner级联影响报告中列出的EP集数，若无则填"无">
-
-        第四步：更新 script.progress.md 的"版本记录"区块
-
-    [创作笔记同步]
-        第一步：文件检查与初始化
-            - 检查script.progress.md是否存在
-            - 若不存在则按模板初始化
-            - 记录操作时间戳
-        
-        第二步：读取文档内容
-            根据触发类型读取相应文档：
-            - outline.md（如存在）
-            - character.md（如存在）
-            - episode_index.md（如存在）
-            - episodes/EP-XX.md（已创作的集）
-            - 现有的script.progress.md进行增量更新
-            - quality.anchor.md（如存在）
-            - story.state.md（如存在）
-            - relationship.board.md（如存在）
-            - open_loops.md（如存在）
-        
-        第三步：剧本语义抽取
-            从读取的文档中提取关键信息：
-            - project.profile.md：adaptation_mode、genre_profile、distribution_mode、relation_layer
-            - outline.md：剧名、类型、总集数、核心冲突、故事分段
-            - character.md：主角、反派、配角的设定和关系
-            - episode_index.md：各集标题、一句话剧情
-            - EP-XX.md：场景内容、对话、动作、伏笔埋设/回收
-            
-        第四步：分集合并处理
-            定位到具体集数，更新该集的：
-            - 状态和时间戳
-            - 核心内容和爽点
-            - 前情衔接摘要（从EP正文末尾提取：主要角色当前处境、未解决悬念、情感状态）
-            - 伏笔埋设/回收
-            - 人物状态变化
-            - aligner检查记录（从主Agent传入的检查结果中提取：检查次数、首次结果、主要问题类型、主标签、次标签、类型）
-            - 若存在 lint 结果：
-              • 优先抽取 `checks.scene_failures[*].failures` 与 `checks.episode_failures` 中的机械 FAIL 项
-              • 同时抽取 `checks.warnings`
-              • 按[薄弱原因标签规则]映射主标签 / 次标签 / 类型
-              • 将 lint 的结构/风格结果附加到 aligner 检查记录中，便于后续统计
-            - 修改记录
-            - 统计已完成集数，计算进度百分比
-
-        第五步：全局信息更新
-            - 创作决策：按时间追加
-            - 创作规则：累积记录
-            - 灵感备忘：标注可用集数
-            - 待处理事项：及时更新
-            - 伏笔总表：同步维护
-            - 质量统计：
-              • 更新"检查记录"表格（新增本集数据行）
-              • 重新统计"高频问题 TOP3"（遍历所有固定标签，按频次排序）
-              • 更新"结构标签统计"表（记录5类结构标签的累计次数与最近出现集数）
-              • 更新"风格标签统计"表（记录4类风格标签的累计次数与最近出现集数）
-              • 每10集更新一次"质量趋势"（计算该段的平均检查次数、最稳定/薄弱方面）
-            - 版本记录：若本次执行了版本快照，更新版本序号和最近变更
-            - 整季状态文件：
-              • 镜像记录 adaptation_mode / genre_profile / distribution_mode
-              • 每5集更新 story.state.md（当前阶段、权力格局、主要角色位置、最近关键转折）
-              • 每5集更新 relationship.board.md（主要角色之间的信任/恨意/利用/依赖变化）
-              • 实时更新 open_loops.md（未回收伏笔、未爆真相、待解冲突）
-              • 首批3集通过后或用户指定后，更新 quality.anchor.md
-            
-        第六步：生成/更新完整script.progress.md
-            - 整合所有更新内容
-            - 确保格式符合模板
-            - 输出完整文档
-
-[输出规范]
-    直接输出完整的script.progress.md内容
-    
-    自检要点：
-    1) 每集信息完整且集中
-    2) 时间戳格式统一（YYYY-MM-DD HH:MM）
-    3) 伏笔追踪双向记录（分集+总表）
-    4) 人物变化按集记录
-    5) 修改历史保留在对应集下
-    6) 全局信息不与分集信息重复
-    7) 待处理事项标注相关集数
-    8) 每集必须包含"前情衔接摘要"（已完成的集）
-    9) 每集必须包含"aligner检查记录"
-    10) "高频问题 TOP3"每次更新时重新统计，确保准确
-    11) 版本快照文件命名序号连续无跳号
-    12) changelog.md 最新记录在最前面

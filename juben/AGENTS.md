@@ -20,77 +20,147 @@ Tool mapping:
 - ExitPlanMode: ignore
 <!-- END COMPOUND CODEX TOOL MAP -->
 
-# Current Project Instructions
+# Session Start Protocol
+
+When a user starts a conversation (including greetings like "hi", "你好", or any first message), you MUST:
+
+1. **Display the banner:**
+
+```
+     ██╗██╗   ██╗██████╗ ███████╗███╗   ██╗
+     ██║██║   ██║██╔══██╗██╔════╝████╗  ██║
+     ██║██║   ██║██████╔╝█████╗  ██╔██╗ ██║
+██   ██║██║   ██║██╔══██╗██╔══╝  ██║╚██╗██║
+╚█████╔╝╚██████╔╝██████╔╝███████╗██║ ╚████║
+ ╚════╝  ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝
+小说 → 短剧改编 Harness V2
+```
+
+2. **Read `harness/project/run.manifest.md`** to detect the current project, then show:
+
+```
+当前项目：<从 manifest 读取的信息>
+改编模式：<adaptation_strategy> / 对话力度：<dialogue_adaptation_intensity>
+流水线：Harness V2（三角色分离 · 双通道 · 程序化门控）
+```
+
+3. **Auto-detect project status** by running:
+   ```
+   python _ops/controller.py next
+   ```
+   Display the output to the user.
+
+4. **Show available commands:**
+
+```
+可用命令：
+  start <batch>        启动批次（生成 brief → 冻结 → 锁定）
+  check <batch>        检查批次（lint gate → verify 指令）
+  finish <batch>       完成批次（verify gate → promote）
+  record <batch>       记录状态（获取 state.lock → recorder 指令）
+  record-done <batch>  封存记录（验证 state → 释放锁）
+  next                 查看下一批次
+  status               查看完整流水线状态
+
+所有命令通过 python _ops/controller.py <command> 执行。
+```
+
+5. **Suggest next step** based on the detected status.
+
+This protocol applies to ALL first interactions, regardless of what the user says. After showing the intro, proceed to address the user's actual request if any.
+
+---
+
+# Init Extract Protocol
+
+When `controller.py init` outputs `AGENT_EXTRACT_REQUIRED`, or when `source.map.md` / `character.md` / `voice-anchor.md` contain `AGENT_EXTRACT_REQUIRED` markers, you MUST automatically execute this protocol **without asking the user**. This is the "一步到位" init flow.
+
+## Step 1: Read the novel
+
+Read `run.manifest.md` to get `source_file`. Read the novel file. If the novel is too large for a single read, read it in chapter-sized segments.
+
+## Step 2: Extract character.md
+
+From the full novel text, extract and write `character.md`:
+- All named characters with role (主角/配角/龙套)
+- Identity, status, appearance traits
+- Personality and behavioral patterns
+- Key relationships to other characters
+- Character arc summary (where they start → where they end)
+
+## Step 3: Extract voice-anchor.md
+
+From dialogue patterns in the novel, extract and write `voice-anchor.md`:
+- Per major character: sentence length tendency, speech register, verbal tics, emotional expression style
+- Forbidden expressions (things the character would never say)
+- Example dialogue lines from the novel (2-3 representative quotes per character)
+
+## Step 4: Fill source.map.md beats
+
+For each episode in `source.map.md` that has `AGENT_EXTRACT_REQUIRED`:
+
+1. Read the corresponding chapter range from the novel (use the `source chapter span` field)
+2. Extract and fill in:
+   - **must-keep beats**: Key plot points that MUST appear in this episode (use `；` separator). Include specific dialogue lines, character actions, and emotional turning points.
+   - **must-not-add / must-not-jump**: Hard boundaries — what the writer must NOT invent or skip. Derive from the novel's pacing and causality.
+   - **ending type**: `强闭环` (strong closure — the episode ends a complete narrative arc) or `前推力` (forward push — the episode ends with momentum into the next)
+
+3. When determining ending types:
+   - 强闭环: revenge completed, enemy defeated, major revelation, death scene, status change ceremony
+   - 前推力: setup planted, danger approaching, plan in motion, cliffhanger
+
+## Step 5: Determine key_episodes
+
+After filling all episodes, identify key episodes (付费节点 / 大高潮) and update `run.manifest.md`:
+- Major turning points, climactic confrontations, death scenes, status changes
+- Update the `key_episodes` field with comma-separated EP IDs
+
+## Step 6: Verify and report
+
+After all files are filled:
+1. Confirm no `AGENT_EXTRACT_REQUIRED` markers remain in any file
+2. Run `python _ops/controller.py validate` to check state files
+3. Report completion to the user with a summary:
+   - Number of chapters detected
+   - Number of episodes mapped
+   - Number of characters extracted
+   - Key episodes identified
+
+The project is then ready for `python _ops/controller.py start batch01`.
+
+---
+
+# Harness V2 Entry
 
 ## Source Of Truth
+- Runtime entry: [harness/framework/entry.md](./harness/framework/entry.md)
+- Runtime manifest: [harness/project/run.manifest.md](./harness/project/run.manifest.md)
 
-- Follow this `AGENTS.md` first.
-- `project.profile.md` is the runtime configuration source for adaptation mode, active genre profile, distribution assumptions, and relation-layer state.
-- [runtime-core.md](./runtime-core.md) is the canonical writing-stance spec — only describes how to write, no file routing.
-- [adaptation-core.md](./adaptation-core.md) is the canonical novel-to-short-drama adaptation spec.
-- [OPENAI.md](./OPENAI.md) and [CLAUDE.md](./CLAUDE.md) are thin runtime entry files that point to `runtime-core.md`.
-- Operational docs live under [_ops/](./_ops/) and are not default Writer context.
-
-## Startup Behavior
-
-- For short-drama creation and novel adaptation, read [runtime-core.md](./runtime-core.md) before responding in depth.
-- Before any novel-adaptation script generation, confirm `dialogue_adaptation_intensity` for the current run if the user has not already specified it.
-  对外沟通时直接称为“对话改编力度”：
-  - `1` preserve: 尽可能保持原著对话，只做必要影视化整理
-  - `2` light: 小范围改编，保住原著语气和完整语义单位
-  - `3` adaptive: 视场景与可拍性决定（默认）
-- If the task is Writer-phase generation, do not read `_ops/` docs by default.
-- If the task is explicit checking or recording, then read:
-  - [_ops/script-aligner.md](./_ops/script-aligner.md)
-  - [_ops/script-recorder.md](./_ops/script-recorder.md)
-- If `project.profile.md` is missing, use compatibility defaults:
-  - `adaptation_mode: novel_to_short_drama`
-  - `genre_profile: revenge_palace`
-  - `distribution_mode: cn_paid_microdrama`
-  - `relation_layer: enabled`
-  - `dialogue_adaptation_intensity: adaptive`
-
-## Workflow Rules
-
-- Writer phase:
-  - create or revise content
-  - self-check against `runtime-core.md`
-  - only then continue
-- Check phase:
-  - run `_ops/episode-lint.py`
-  - run `_ops/script-aligner.md`
-  - only on PASS treat content as writable
-- Record phase:
-  - pass lint JSON + aligner result into `_ops/script-recorder.md`
-  - update progress via `_ops/script-recorder.md`
-
-## Writer Default Context
-
-**单一事实源**：Writer 读取范围仅由本节定义。`runtime-core.md` 不含文件白名单。
-
-- Allowed by default:
-  - `project.profile.md` if present
-  - `runtime-core.md`
-  - `adaptation-core.md`
-  - `profiles/revenge_palace.md` when `genre_profile: revenge_palace`
-  - `voice-anchor.md`（如已填写）
-  - `character.md`
-  - `outline.md`
-  - `episode_index.md`
-  - `quality.anchor.md` if present
-  - `story.state.md` / `relationship.board.md` / `open_loops.md` if present
-  - `script.progress.md`
-  - current episode brief and adjacent episode context
-- Not allowed by default:
+## Default Routing
+- Before any writing, verifying, or recording, resolve the current run from `harness/project/run.manifest.md`.
+- Writer only follows:
+  - `harness/framework/entry.md`
+  - `harness/framework/input-contract.md`
+  - `harness/framework/write-contract.md`
+  - `harness/project/run.manifest.md`
+  - `harness/project/source.map.md`
+  - active `harness/project/batch-briefs/batchNN_*.md`
+  - `voice-anchor.md`（优先）→ 回退 `character.md`（声纹锚）
+- Verify only follows:
+  - `harness/framework/verify-contract.md`
+  - `harness/framework/regression-contract.md`
+  - optional regression packs under `harness/project/regressions/`
+  - `_ops/episode-lint.py`
   - `_ops/script-aligner.md`
+- Record only follows:
+  - `harness/framework/memory-contract.md`
   - `_ops/script-recorder.md`
-  - `_ops/README.md`
-  - `_ops/comparisons/`
-  - design specs, review notes, rationale docs
+  - `harness/project/state/*`
 
-## Phase-Specific Loading Order
+## Hard Gates
+- Writer must write candidate files only to `drafts/episodes/`.
+- Published files in `episodes/` are controller-promoted outputs only.
+- Verify reads draft lane only.
+- Record writes `harness/project/state/*` only.
+- Legacy v1 files under `harness/legacy/v1/` are not runtime authority.
 
-- **Writer phase**: read `project.profile.md` to resolve active mode/profile, then `runtime-core.md` → `adaptation-core.md` → `profiles/revenge_palace.md` → `voice-anchor.md`（如已填写）→ `character.md` → 素材文件（见 Writer Default Context）
-- **Check phase**: read `project.profile.md` to resolve active profile, then `_ops/script-aligner.md` → `_ops/profile-checks/revenge_palace.md` → `runtime-core.md` → `adaptation-core.md`
-- **Record phase**: `_ops/script-recorder.md` → `project.profile.md`
-- **Platform entry**: `OPENAI.md` / `CLAUDE.md`（仅启动时读取，指向 `runtime-core.md`）
