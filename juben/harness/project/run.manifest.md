@@ -10,7 +10,7 @@
 - generation_execution_mode: orchestrated_subagents
 - generation_reset_mode: clean_rebuild
 - run_status: active
-- active_batch: batch01_EP01-EP05_promoted
+- active_batch: batch02_promoted
 - source_authority: original novel manuscript + harness/project/source.map.md
 - draft_lane: drafts/episodes
 - publish_lane: episodes

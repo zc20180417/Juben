@@ -1,4 +1,4 @@
-# JUBEN — 小说 → 短剧改�� Agent
+# JUBEN — 小说 → 短剧改编 Agent
 
 通用的小说改编短剧 agent 框架。使用 `Harness V2` 管理：剧本生成 → 语义校验 → 发布 → 状态记录。
 
@@ -22,6 +22,92 @@ python _ops/controller.py start batch01
 - 草稿通道：`drafts/episodes/`
 - 框架层（通用）：`harness/framework/`
 - 项目层（当前小说）：`harness/project/`
+
+## 整体架构图
+
+```mermaid
+flowchart TD
+    A["原著小说<br/>source_file"] --> B["source.map.md<br/>章节到剧集映射"]
+    A --> C["character.md / voice-anchor.md<br/>角色资料与声纹"]
+    B --> D["run.manifest.md<br/>运行总线"]
+    C --> D
+
+    D --> E["controller.py<br/>流程编排与门控"]
+    E --> F["start / plan_inputs<br/>冻结 batch brief + 获取 lock"]
+    F --> G["Writer<br/>写 drafts/episodes/EP-XX.md"]
+    G --> H["episode-lint.py<br/>机械计数检查"]
+    H --> I["Verifier / aligner<br/>语义与风格校验"]
+    I --> J{"PASS?"}
+
+    J -- "FAIL" --> G
+    J -- "PASS" --> K["finish / promote<br/>发布到 episodes/"]
+    K --> L["record / record-done<br/>更新 state 文件"]
+
+    M["harness/framework/*<br/>通用合同层"] --> E
+    N["harness/project/*<br/>项目实例层"] --> E
+    L --> O["story.state / relationship.board / open_loops / process.memory / run.log"]
+```
+
+### 读图说明
+
+- `controller.py` 是唯一门控中心，负责冻结批次、推进 phase、发布正式稿和落状态。
+- `Writer` 只能写候选草稿，不能直接发布。
+- `Verifier` 只读 draft lane，不改稿，只给 `PASS / FAIL`。
+- `framework` 放通用规则，`project` 放当前小说的实例化配置和运行状态。
+- `episodes/` 是发布结果，不是当前写作输入。
+
+## 一句话理解 Harness V2
+
+它不是开放式的通用 Agent，而是一个围绕“短剧改编生产线”设计的专用 harness：
+
+- 用 `run.manifest.md` 管理当前运行实例
+- 用 `batch brief + locks` 管理批次推进
+- 用 `draft lane / publish lane` 分离候选稿和正式稿
+- 用 `lint + verify + promote + record` 保证内容进入正式区前经过门控
+
+## 标准时序图
+
+```mermaid
+sequenceDiagram
+    participant U as User / Controller
+    participant M as run.manifest + batch brief
+    participant W as Writer
+    participant L as episode-lint.py
+    participant V as Verifier / aligner
+    participant P as Published episodes
+    participant S as State files
+
+    U->>M: start batch01
+    M-->>U: 冻结 batch brief / 获取 batch.lock
+    U->>W: 下发当前 batch 上下文
+    W->>W: 写 drafts/episodes/EP-XX.md
+
+    U->>L: check batch01
+    L-->>U: lint 结果 + verify plan
+    U->>V: 按批次逐集校验 draft lane
+    V-->>U: verify-done EP-XX PASS / FAIL
+
+    alt 存在 FAIL
+        U->>W: 打回修改或重写
+        W->>W: 更新 drafts/episodes/EP-XX.md
+        U->>V: 重新 verify
+        V-->>U: 新结果
+    else 全部 PASS
+        U->>P: finish batch01 / promote
+        P-->>U: drafts -> episodes
+        U->>S: record batch01
+        S-->>U: 更新 story.state / relationship.board / open_loops / process.memory / run.log
+        U->>S: record-done batch01
+    end
+```
+
+### 时序图怎么读
+
+- `start` 阶段只做输入装配、冻结 brief 和加锁，不直接写正文。
+- `check` 阶段先过 lint，再把草稿交给 verifier 做语义校验。
+- `verify-done` 是 verifier 向 controller 回报结果的唯一入口。
+- 只有整批通过后，`finish` 才能 promote 到 `episodes/`。
+- `record` 永远发生在 promote 之后，只更新 `harness/project/state/*`。
 
 ## 项目结构
 

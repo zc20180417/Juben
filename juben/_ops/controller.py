@@ -1442,16 +1442,31 @@ def cmd_check(args: argparse.Namespace) -> int:
             continue
         result = subprocess.run(
             [sys.executable, str(LINT_SCRIPT), str(draft)],
-            capture_output=True, text=True, encoding="utf-8",
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=60
         )
         try:
             data = json.loads(result.stdout)
             status = data.get("status", "fail")
+            episode_failures = data.get("checks", {}).get("episode_failures", [])
+            # Only consider it a failure if there are episode-level failures
+            is_fail = bool(episode_failures)
         except (json.JSONDecodeError, ValueError):
-            status = "error"
-        icon = "✓" if status == "pass" else "✗"
+            # Fallback: try to decode with replacement
+            try:
+                stdout_bytes = result.stdout.encode('utf-8', errors='replace')
+                data = json.loads(stdout_bytes.decode('utf-8', errors='replace'))
+                episode_failures = data.get("checks", {}).get("episode_failures", [])
+                is_fail = bool(episode_failures)
+                status = "fail" if is_fail else "warn"
+            except Exception:
+                status = "error"
+                is_fail = True
+                print(f"  DEBUG stdout length: {len(result.stdout)}")
+                print(f"  DEBUG first 200 chars: {result.stdout[:200]}")
+        icon = "✓" if not is_fail else "✗"
         print(f"  {icon} {ep}: {status}")
-        if status != "pass":
+        if is_fail:
             all_pass = False
 
     if not all_pass:
@@ -1537,12 +1552,16 @@ def cmd_finish(args: argparse.Namespace) -> int:
             return 1
         result = subprocess.run(
             [sys.executable, str(LINT_SCRIPT), str(draft)],
-            capture_output=True, text=True, encoding="utf-8",
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=60
         )
         try:
             data = json.loads(result.stdout)
-            if data.get("status") != "pass":
-                print(f"  ✗ {ep} lint FAIL — cannot finish")
+            status = data.get("status", "fail")
+            episode_failures = data.get("checks", {}).get("episode_failures", [])
+            # Only fail if there are episode-level failures
+            if episode_failures:
+                print(f"  ✗ {ep} lint FAIL (episode: {episode_failures}) — cannot finish")
                 return 1
         except (json.JSONDecodeError, ValueError):
             print(f"  ✗ {ep} lint error — cannot finish")

@@ -1,5 +1,5 @@
 # Run Log
-_最后更新：2026-04-06 12:55_
+_最后更新：2026-04-13 13:55_
 
 ## Log Entries
 
@@ -20,3 +20,5 @@ _最后更新：2026-04-06 12:55_
 | 2026-04-06 11:31 | batch01 | EP-01~05 | promote | controller promote | ✓ | batch01 promoted |
 | 2026-04-06 11:31 | batch01 | EP-01~05 | record | recorder 完成 | ✓ | state 全量写入 |
 | 2026-04-06 12:55 | - | - | plan_inputs | harness v2 直切 | ✓ | 运行态权威迁入 harness/ |
+| 2026-04-12 17:16 | batch02 | - | plan_inputs | batch brief 冻结 | ✓ | controller start |
+| 2026-04-13 13:55 | batch02 | EP-06~EP-10 | promote | controller promote | ✓ | batch02 promoted |
