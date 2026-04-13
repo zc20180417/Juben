@@ -1297,7 +1297,31 @@ def cmd_init(args: argparse.Namespace) -> int:
     char_path = ROOT / "character.md"
     voice_path = ROOT / "voice-anchor.md"
     char_path.write_text(f"# Character Reference\n\n（AGENT_EXTRACT_REQUIRED — 从 {novel_name} 自动提取）\n", encoding="utf-8")
-    voice_path.write_text(f"# Voice Anchor\n\n（AGENT_EXTRACT_REQUIRED — 从 {novel_name} 自动提取）\n", encoding="utf-8")
+    # voice-anchor: preserve framework sections (使用原则 + 格式警告), only reset character data
+    voice_anchor_header = """\
+# Voice Anchor
+
+用于锁定关键角色的说话方式，防止全员同腔。
+
+## 使用原则
+- Writer 优先读取本文件；未列出的角色再回退到 `character.md`
+- 若本文件只剩模板占位，视为未填写，直接回退到 `character.md`
+- 没有原著时，只保留语音指纹；有原著时再补"原著样句 + 抽象特征"
+- 这里只存说话方式，不复述人物经历
+- 外显台词和 `os` 分开看：外显更克制，`os` 可以更短、更狠，但不能全员金句化
+
+## 格式警告（所有角色通用）
+本文件描述的是**角色说话内容的特征**（简洁、压迫、快节奏等），不是剧本排版指令。
+- "短句"＝角色说话简洁利落，不等于每句话都要单独占一行
+- "连打"/"连下两三句"＝角色一口气连续逼问或施压，通常写在同一行或相邻两行，不是拆成五六行
+- 只有语义上有**刻意停顿、转折、施压节拍**时才换行
+- 具体格式规则见 `write-contract.md` 的 Dialogue Formatting 章节
+
+## 核心角色
+
+（AGENT_EXTRACT_REQUIRED — 从 """ + novel_name + """ 自动提取）
+"""
+    voice_path.write_text(voice_anchor_header, encoding="utf-8")
     print(f"  + character.md (pending extraction)")
     print(f"  + voice-anchor.md (pending extraction)")
 

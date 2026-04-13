@@ -90,10 +90,13 @@ From the full novel text, extract and write `character.md`:
 
 ## Step 3: Extract voice-anchor.md
 
-From dialogue patterns in the novel, extract and write `voice-anchor.md`:
-- Per major character: sentence length tendency, speech register, verbal tics, emotional expression style
+`voice-anchor.md` 的顶部有两个通用章节（"使用原则"和"格式警告"），这些是框架层规则，**不要修改或删除**。只替换 `## 核心角色` 以下的角色声纹内容。
+
+From dialogue patterns in the novel, extract each major character's voice profile under `## 核心角色`:
+- Sentence length tendency, speech register, verbal tics, emotional expression style
 - Forbidden expressions (things the character would never say)
 - Example dialogue lines from the novel (2-3 representative quotes per character)
+- Follow the existing per-character template structure (基础声纹 / 对上位者 / 对亲近者 / 对敌手 / 对欲望对象 / 抽象特征)
 
 ## Step 4: Fill source.map.md beats
 
