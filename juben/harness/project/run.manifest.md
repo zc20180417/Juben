@@ -11,7 +11,7 @@
 - generation_reset_mode: clean_rebuild
 - run_status: active
 - active_batch: batch02_promoted
-- source_authority: original novel manuscript + harness/project/source.map.md
+- source_authority: original novel manuscript + harness/project/source.map.json
 - draft_lane: drafts/episodes
 - publish_lane: episodes
 - promotion_policy: controller_only_after_full_batch_verify
@@ -19,7 +19,7 @@
 ## Current Runtime
 - framework entry: harness/framework/entry.md
 - source map: harness/project/source.map.md
-- current batch brief: harness/project/batch-briefs/batch01_EP01-05.md
+- current batch brief: harness/project/batch-briefs/batch02_EP06-10.md
 - regression packs: optional under harness/project/regressions/
 - state directory: harness/project/state/
 

@@ -1,0 +1,541 @@
+{
+  "runtime_authority": "rebuild-2026-04",
+  "provenance": "rebuild-2026-04",
+  "ruleset_version": "episode-lint/v2",
+  "gold_set": "harness/project/releases/gold-set.json",
+  "current_batch": "batch02",
+  "current_batch_brief": "harness/project/batch-briefs/batch02_EP06-10.md",
+  "episodes": {
+    "EP-11": {
+      "episode": "EP-11",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-11.md",
+      "meta_path": null
+    },
+    "EP-12": {
+      "episode": "EP-12",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-12.md",
+      "meta_path": null
+    },
+    "EP-13": {
+      "episode": "EP-13",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-13.md",
+      "meta_path": null
+    },
+    "EP-14": {
+      "episode": "EP-14",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-14.md",
+      "meta_path": null
+    },
+    "EP-15": {
+      "episode": "EP-15",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-15.md",
+      "meta_path": null
+    },
+    "EP-16": {
+      "episode": "EP-16",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-16.md",
+      "meta_path": null
+    },
+    "EP-17": {
+      "episode": "EP-17",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-17.md",
+      "meta_path": null
+    },
+    "EP-18": {
+      "episode": "EP-18",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-18.md",
+      "meta_path": null
+    },
+    "EP-19": {
+      "episode": "EP-19",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-19.md",
+      "meta_path": null
+    },
+    "EP-20": {
+      "episode": "EP-20",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-20.md",
+      "meta_path": null
+    },
+    "EP-21": {
+      "episode": "EP-21",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-21.md",
+      "meta_path": null
+    },
+    "EP-22": {
+      "episode": "EP-22",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-22.md",
+      "meta_path": null
+    },
+    "EP-23": {
+      "episode": "EP-23",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-23.md",
+      "meta_path": null
+    },
+    "EP-24": {
+      "episode": "EP-24",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-24.md",
+      "meta_path": null
+    },
+    "EP-25": {
+      "episode": "EP-25",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-25.md",
+      "meta_path": null
+    },
+    "EP-26": {
+      "episode": "EP-26",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-26.md",
+      "meta_path": null
+    },
+    "EP-27": {
+      "episode": "EP-27",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-27.md",
+      "meta_path": null
+    },
+    "EP-28": {
+      "episode": "EP-28",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-28.md",
+      "meta_path": null
+    },
+    "EP-29": {
+      "episode": "EP-29",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-29.md",
+      "meta_path": null
+    },
+    "EP-30": {
+      "episode": "EP-30",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-30.md",
+      "meta_path": null
+    },
+    "EP-31": {
+      "episode": "EP-31",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-31.md",
+      "meta_path": null
+    },
+    "EP-32": {
+      "episode": "EP-32",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-32.md",
+      "meta_path": null
+    },
+    "EP-33": {
+      "episode": "EP-33",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-33.md",
+      "meta_path": null
+    },
+    "EP-34": {
+      "episode": "EP-34",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-34.md",
+      "meta_path": null
+    },
+    "EP-35": {
+      "episode": "EP-35",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-35.md",
+      "meta_path": null
+    },
+    "EP-36": {
+      "episode": "EP-36",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-36.md",
+      "meta_path": null
+    },
+    "EP-37": {
+      "episode": "EP-37",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-37.md",
+      "meta_path": null
+    },
+    "EP-38": {
+      "episode": "EP-38",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-38.md",
+      "meta_path": null
+    },
+    "EP-39": {
+      "episode": "EP-39",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-39.md",
+      "meta_path": null
+    },
+    "EP-40": {
+      "episode": "EP-40",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-40.md",
+      "meta_path": null
+    },
+    "EP-41": {
+      "episode": "EP-41",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-41.md",
+      "meta_path": null
+    },
+    "EP-42": {
+      "episode": "EP-42",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-42.md",
+      "meta_path": null
+    },
+    "EP-43": {
+      "episode": "EP-43",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-43.md",
+      "meta_path": null
+    },
+    "EP-44": {
+      "episode": "EP-44",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-44.md",
+      "meta_path": null
+    },
+    "EP-45": {
+      "episode": "EP-45",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-45.md",
+      "meta_path": null
+    },
+    "EP-46": {
+      "episode": "EP-46",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-46.md",
+      "meta_path": null
+    },
+    "EP-47": {
+      "episode": "EP-47",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-47.md",
+      "meta_path": null
+    },
+    "EP-48": {
+      "episode": "EP-48",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-48.md",
+      "meta_path": null
+    },
+    "EP-49": {
+      "episode": "EP-49",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-49.md",
+      "meta_path": null
+    },
+    "EP-50": {
+      "episode": "EP-50",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-50.md",
+      "meta_path": null
+    },
+    "EP-51": {
+      "episode": "EP-51",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-51.md",
+      "meta_path": null
+    },
+    "EP-52": {
+      "episode": "EP-52",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-52.md",
+      "meta_path": null
+    },
+    "EP-53": {
+      "episode": "EP-53",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-53.md",
+      "meta_path": null
+    },
+    "EP-54": {
+      "episode": "EP-54",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-54.md",
+      "meta_path": null
+    },
+    "EP-55": {
+      "episode": "EP-55",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-55.md",
+      "meta_path": null
+    },
+    "EP-56": {
+      "episode": "EP-56",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-56.md",
+      "meta_path": null
+    },
+    "EP-57": {
+      "episode": "EP-57",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-57.md",
+      "meta_path": null
+    },
+    "EP-58": {
+      "episode": "EP-58",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-58.md",
+      "meta_path": null
+    },
+    "EP-59": {
+      "episode": "EP-59",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-59.md",
+      "meta_path": null
+    },
+    "EP-60": {
+      "episode": "EP-60",
+      "release_status": "legacy",
+      "runtime_authority": "legacy",
+      "provenance": "legacy",
+      "content_path": "episodes/EP-60.md",
+      "meta_path": null
+    },
+    "EP-01": {
+      "episode": "EP-01",
+      "release_status": "gold",
+      "runtime_authority": "rebuild-2026-04",
+      "provenance": "rebuild-2026-04",
+      "source_batch": "batch01",
+      "verify_tier": "FULL",
+      "verify_status": "PASS",
+      "lint_status": "fail",
+      "content_path": "episodes/EP-01.md",
+      "meta_path": "episodes/EP-01.meta.json",
+      "updated_at": "2026-04-13 23:10"
+    },
+    "EP-02": {
+      "episode": "EP-02",
+      "release_status": "gold",
+      "runtime_authority": "rebuild-2026-04",
+      "provenance": "rebuild-2026-04",
+      "source_batch": "batch01",
+      "verify_tier": "STANDARD",
+      "verify_status": "PASS",
+      "lint_status": "fail",
+      "content_path": "episodes/EP-02.md",
+      "meta_path": "episodes/EP-02.meta.json",
+      "updated_at": "2026-04-13 23:10"
+    },
+    "EP-03": {
+      "episode": "EP-03",
+      "release_status": "gold",
+      "runtime_authority": "rebuild-2026-04",
+      "provenance": "rebuild-2026-04",
+      "source_batch": "batch01",
+      "verify_tier": "STANDARD",
+      "verify_status": "PASS",
+      "lint_status": "fail",
+      "content_path": "episodes/EP-03.md",
+      "meta_path": "episodes/EP-03.meta.json",
+      "updated_at": "2026-04-13 23:10"
+    },
+    "EP-04": {
+      "episode": "EP-04",
+      "release_status": "gold",
+      "runtime_authority": "rebuild-2026-04",
+      "provenance": "rebuild-2026-04",
+      "source_batch": "batch01",
+      "verify_tier": "STANDARD",
+      "verify_status": "PASS",
+      "lint_status": "fail",
+      "content_path": "episodes/EP-04.md",
+      "meta_path": "episodes/EP-04.meta.json",
+      "updated_at": "2026-04-13 23:10"
+    },
+    "EP-05": {
+      "episode": "EP-05",
+      "release_status": "gold",
+      "runtime_authority": "rebuild-2026-04",
+      "provenance": "rebuild-2026-04",
+      "source_batch": "batch01",
+      "verify_tier": "STANDARD",
+      "verify_status": "PASS",
+      "lint_status": "fail",
+      "content_path": "episodes/EP-05.md",
+      "meta_path": "episodes/EP-05.meta.json",
+      "updated_at": "2026-04-13 23:10"
+    },
+    "EP-06": {
+      "episode": "EP-06",
+      "release_status": "gold",
+      "runtime_authority": "rebuild-2026-04",
+      "provenance": "rebuild-2026-04",
+      "source_batch": "batch02",
+      "verify_tier": "FULL",
+      "verify_status": "PASS",
+      "lint_status": "fail",
+      "content_path": "episodes/EP-06.md",
+      "meta_path": "episodes/EP-06.meta.json",
+      "updated_at": "2026-04-13 23:10"
+    },
+    "EP-07": {
+      "episode": "EP-07",
+      "release_status": "gold",
+      "runtime_authority": "rebuild-2026-04",
+      "provenance": "rebuild-2026-04",
+      "source_batch": "batch02",
+      "verify_tier": "STANDARD",
+      "verify_status": "PASS",
+      "lint_status": "fail",
+      "content_path": "episodes/EP-07.md",
+      "meta_path": "episodes/EP-07.meta.json",
+      "updated_at": "2026-04-13 23:10"
+    },
+    "EP-08": {
+      "episode": "EP-08",
+      "release_status": "gold",
+      "runtime_authority": "rebuild-2026-04",
+      "provenance": "rebuild-2026-04",
+      "source_batch": "batch02",
+      "verify_tier": "STANDARD",
+      "verify_status": "PASS",
+      "lint_status": "fail",
+      "content_path": "episodes/EP-08.md",
+      "meta_path": "episodes/EP-08.meta.json",
+      "updated_at": "2026-04-13 23:10"
+    },
+    "EP-09": {
+      "episode": "EP-09",
+      "release_status": "gold",
+      "runtime_authority": "rebuild-2026-04",
+      "provenance": "rebuild-2026-04",
+      "source_batch": "batch02",
+      "verify_tier": "FULL",
+      "verify_status": "PASS",
+      "lint_status": "fail",
+      "content_path": "episodes/EP-09.md",
+      "meta_path": "episodes/EP-09.meta.json",
+      "updated_at": "2026-04-13 23:10"
+    },
+    "EP-10": {
+      "episode": "EP-10",
+      "release_status": "gold",
+      "runtime_authority": "rebuild-2026-04",
+      "provenance": "rebuild-2026-04",
+      "source_batch": "batch02",
+      "verify_tier": "STANDARD",
+      "verify_status": "PASS",
+      "lint_status": "fail",
+      "content_path": "episodes/EP-10.md",
+      "meta_path": "episodes/EP-10.meta.json",
+      "updated_at": "2026-04-13 23:10"
+    }
+  },
+  "updated_at": "2026-04-13 23:10"
+}

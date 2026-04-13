@@ -1,5 +1,6 @@
 import re
 import unittest
+import json
 from pathlib import Path
 
 
@@ -25,6 +26,8 @@ RELATIONSHIP = ROOT / "harness" / "project" / "state" / "relationship.board.md"
 OPEN_LOOPS = ROOT / "harness" / "project" / "state" / "open_loops.md"
 QUALITY = ROOT / "harness" / "project" / "state" / "quality.anchor.md"
 RUN_LOG = ROOT / "harness" / "project" / "state" / "run.log.md"
+RELEASE_INDEX = ROOT / "harness" / "project" / "releases" / "release.index.json"
+GOLD_SET = ROOT / "harness" / "project" / "releases" / "gold-set.json"
 ALIGNER = ROOT / "_ops" / "script-aligner.md"
 RECORDER = ROOT / "_ops" / "script-recorder.md"
 VOICE_ANCHOR = ROOT / "voice-anchor.md"
@@ -74,8 +77,22 @@ class StructureTests(unittest.TestCase):
             "draft_lane",
             "publish_lane",
             "promotion_policy",
+            "current batch brief",
         ]:
             self.assertIn(field, content)
+
+    def test_release_tracking_files_exist(self) -> None:
+        self.assertTrue(RELEASE_INDEX.exists(), RELEASE_INDEX)
+        self.assertTrue(GOLD_SET.exists(), GOLD_SET)
+        release_index = json.loads(RELEASE_INDEX.read_text(encoding="utf-8"))
+        gold_set = json.loads(GOLD_SET.read_text(encoding="utf-8"))
+        self.assertIn("episodes", release_index)
+        self.assertIn("episodes", gold_set)
+
+    def test_ep01_to_ep10_have_sidecar_metadata(self) -> None:
+        for i in range(1, 11):
+            meta = ROOT / "episodes" / f"EP-{i:02d}.meta.json"
+            self.assertTrue(meta.exists(), meta)
 
     def test_source_map_has_required_episode_fields(self) -> None:
         content = SOURCE_MAP.read_text(encoding="utf-8")

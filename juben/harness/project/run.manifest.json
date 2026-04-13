@@ -1,0 +1,22 @@
+{
+  "framework_entry": "harness/framework/entry.md",
+  "source_map": "harness/project/source.map.md",
+  "current_batch_brief": "harness/project/batch-briefs/batch02_EP06-10.md",
+  "regression_packs": "optional under harness/project/regressions/",
+  "state_directory": "harness/project/state/",
+  "source_file": "墨凰谋：庶女上位录.md",
+  "total_episodes": "60",
+  "batch_size": "5",
+  "key_episodes": "EP-20, EP-32, EP-49, EP-60",
+  "adaptation_mode": "novel_to_short_drama",
+  "adaptation_strategy": "original_fidelity",
+  "dialogue_adaptation_intensity": "light",
+  "generation_execution_mode": "orchestrated_subagents",
+  "generation_reset_mode": "clean_rebuild",
+  "run_status": "active",
+  "active_batch": "batch02_promoted",
+  "source_authority": "original novel manuscript + harness/project/source.map.json",
+  "draft_lane": "drafts/episodes",
+  "publish_lane": "episodes",
+  "promotion_policy": "controller_only_after_full_batch_verify"
+}

@@ -1,0 +1,59 @@
+{
+  "episode": "EP-03",
+  "provenance": "rebuild-2026-04",
+  "source_batch": "batch01",
+  "runtime_authority": "rebuild-2026-04",
+  "gold/provisional": "gold",
+  "release_status": "gold",
+  "ruleset_version": "episode-lint/v2",
+  "lint_profile": "default",
+  "lint_status": "fail",
+  "verify_tier": "STANDARD",
+  "verify_status": "PASS",
+  "contract_failures": [
+    {
+      "scope": "scene",
+      "scene": 1,
+      "title": "嫡姐抗旨",
+      "code": "pure_dialogue_run"
+    },
+    {
+      "scope": "scene",
+      "scene": 2,
+      "title": "请命入局",
+      "code": "environment_anchor"
+    },
+    {
+      "scope": "scene",
+      "scene": 2,
+      "title": "请命入局",
+      "code": "pure_dialogue_run"
+    },
+    {
+      "scope": "scene",
+      "scene": 3,
+      "title": "主母拴狗",
+      "code": "triangle_visible_detail"
+    },
+    {
+      "scope": "scene",
+      "scene": 3,
+      "title": "主母拴狗",
+      "code": "pure_dialogue_run"
+    },
+    {
+      "scope": "episode",
+      "code": "too_many_hookless_scenes"
+    }
+  ],
+  "craft_flags": [
+    "imagery_repeat:水",
+    "imagery_repeat:火",
+    "psychological_comment_count",
+    "warning_bundle"
+  ],
+  "style_warnings": [],
+  "batch_brief": "harness/project/batch-briefs/batch01_EP01-05.md",
+  "content_path": "episodes/EP-03.md",
+  "updated_at": "2026-04-13 23:10"
+}

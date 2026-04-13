@@ -115,26 +115,28 @@ class EpisodeLintTests(unittest.TestCase):
     def test_line_count_warning_is_warn_not_fail(self) -> None:
         data = _run_lint(_build_episode())
         self.assertEqual(data["status"], "warn")
-        self.assertIn("line_count", data["checks"]["warnings"])
-        self.assertEqual(data["checks"]["episode_failures"], [])
+        self.assertIn("line_count", data["style_warnings"])
+        self.assertEqual(data["contract_failures"], [])
 
     def test_single_psychological_comment_is_warn_not_fail(self) -> None:
         data = _run_lint(_build_episode(line_padding=40, psychological_comment=True))
         self.assertEqual(data["status"], "warn")
-        self.assertIn("psychological_comment_count", data["checks"]["warnings"])
-        self.assertNotIn("psychological_comment_count", data["checks"]["episode_failures"])
+        self.assertIn("psychological_comment_count", data["craft_flags"])
+        self.assertNotIn("psychological_comment_count", data["contract_failures"])
 
     def test_scene_metaphor_limit_fails_even_when_episode_total_is_within_limit(self) -> None:
         data = _run_lint(_build_episode(line_padding=40, scene_one_metaphors=3))
         self.assertEqual(data["status"], "fail")
-        self.assertEqual(data["totals"]["metaphor_count"], 3)
-        self.assertIn("metaphor_count", data["checks"]["scene_failures"][0]["failures"])
+        self.assertEqual(data["metrics"]["totals"]["metaphor_count"], 3)
+        self.assertTrue(
+            any(failure["scope"] == "scene" and failure["code"] == "metaphor_count" for failure in data["contract_failures"])
+        )
 
     def test_hookless_final_scene_is_warn_not_fail(self) -> None:
         data = _run_lint(_build_episode(line_padding=40, final_hook=False))
         self.assertEqual(data["status"], "warn")
-        self.assertIn("hookless_final_scene", data["checks"]["warnings"])
-        self.assertEqual(data["checks"]["episode_failures"], [])
+        self.assertIn("hookless_final_scene", data["craft_flags"])
+        self.assertEqual(data["contract_failures"], [])
 
 
 if __name__ == "__main__":

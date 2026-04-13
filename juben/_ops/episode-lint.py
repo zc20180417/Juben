@@ -288,8 +288,8 @@ def history_repetition(current_lines: list[str], history_files: list[Path]) -> d
     return {"reactions": reaction_hits, "imagery": imagery_hits}
 
 
-def build_checks(scenes: list[dict], totals: dict, history: dict) -> dict:
-    scene_failures = []
+def build_contract_failures(scenes: list[dict], totals: dict) -> list[dict]:
+    contract_failures = []
     total_scenes = len(scenes)
     for idx, scene in enumerate(scenes, 1):
         failures = []
@@ -311,23 +311,23 @@ def build_checks(scenes: list[dict], totals: dict, history: dict) -> dict:
             failures.append("sfx")
         if scene["metaphor_count"] > 2:
             failures.append("metaphor_count")
-        scene_failures.append({"scene": idx, "title": scene["title"], "failures": failures})
+        for code in failures:
+            contract_failures.append({"scope": "scene", "scene": idx, "title": scene["title"], "code": code})
 
-    episode_failures = []
     if totals["scene_count"] < 1 or totals["scene_count"] > 3:
-        episode_failures.append("scene_count")
+        contract_failures.append({"scope": "episode", "code": "scene_count"})
     if totals["triangle_count"] < 8:
-        episode_failures.append("triangle_count")
+        contract_failures.append({"scope": "episode", "code": "triangle_count"})
     if totals["os_count"] + totals["vo_count"] < 1:
-        episode_failures.append("os_vo_count")
+        contract_failures.append({"scope": "episode", "code": "os_vo_count"})
     if totals["camera_count"] < 2:
-        episode_failures.append("camera_count")
+        contract_failures.append({"scope": "episode", "code": "camera_count"})
     if totals["sfx_count"] < totals["scene_count"]:
-        episode_failures.append("sfx_total")
+        contract_failures.append({"scope": "episode", "code": "sfx_total"})
     if totals["metaphor_count"] > 5:
-        episode_failures.append("metaphor_count")
+        contract_failures.append({"scope": "episode", "code": "metaphor_count"})
     if totals["psychological_comment_count"] >= 2:
-        episode_failures.append("psychological_comment_count")
+        contract_failures.append({"scope": "episode", "code": "psychological_comment_count"})
 
     # Non-final scenes without hooks: allow 1 for pacing, fail if ≥ 2
     hookless_non_final = sum(
@@ -335,39 +335,45 @@ def build_checks(scenes: list[dict], totals: dict, history: dict) -> dict:
         if i < total_scenes and not scene["ending_has_hook"]
     )
     if hookless_non_final >= 2:
-        episode_failures.append("too_many_hookless_scenes")
+        contract_failures.append({"scope": "episode", "code": "too_many_hookless_scenes"})
 
-    warnings = []
+    return contract_failures
+
+
+def build_warning_buckets(scenes: list[dict], totals: dict, history: dict) -> tuple[list[str], list[str]]:
+    craft_flags = []
+    style_warnings = []
+    total_scenes = len(scenes)
+    hookless_non_final = sum(
+        1 for i, scene in enumerate(scenes, 1)
+        if i < total_scenes and not scene["ending_has_hook"]
+    )
     if total_scenes >= 1 and not scenes[-1]["ending_has_hook"]:
-        warnings.append("hookless_final_scene")
+        craft_flags.append("hookless_final_scene")
     if hookless_non_final == 1:
-        warnings.append("hookless_non_final_scene")
+        craft_flags.append("hookless_non_final_scene")
     if totals["line_count"] < 70:
-        warnings.append("line_count")
+        style_warnings.append("line_count")
     if any(scene["line_count"] < 18 for scene in scenes):
-        warnings.append("scene_line_count")
+        craft_flags.append("scene_line_count")
     if totals["psychological_comment_count"] == 1:
-        warnings.append("psychological_comment_count")
+        craft_flags.append("psychological_comment_count")
     if totals["all_os_polished"] and totals["os_count"] > 0:
-        warnings.append("os_polished")
+        craft_flags.append("os_polished")
     if totals["scene_tail_melodrama_run"] >= 3:
-        warnings.append("melodramatic_endings")
+        craft_flags.append("melodramatic_endings")
     for label, entry in history["reactions"].items():
         if entry["current_hit"] and entry["hits_in_previous_4_episodes"] >= 1:
-            warnings.append(f"reaction_repeat:{label}")
+            craft_flags.append(f"reaction_repeat:{label}")
     for label, entry in history["imagery"].items():
         if entry["current_count"] > 3:
-            warnings.append(f"imagery_dense:{label}")
+            craft_flags.append(f"imagery_dense:{label}")
         if entry["current_count"] > 0 and entry["hits_in_previous_2_episodes"] >= 2:
-            warnings.append(f"imagery_repeat:{label}")
-    if len(set(warnings)) >= 3:
-        warnings.append("warning_bundle")
+            craft_flags.append(f"imagery_repeat:{label}")
+    if len(set(craft_flags)) >= 3:
+        craft_flags.append("warning_bundle")
 
-    return {
-        "scene_failures": scene_failures,
-        "episode_failures": episode_failures,
-        "warnings": sorted(set(warnings)),
-    }
+    return sorted(set(craft_flags)), sorted(set(style_warnings))
 
 
 def main() -> int:
@@ -404,18 +410,23 @@ def main() -> int:
     }
 
     history = history_repetition(lines, history_files)
-    checks = build_checks(scene_metrics, totals, history)
-    has_failures = any(item["failures"] for item in checks["scene_failures"]) or bool(checks["episode_failures"])
-    has_warnings = bool(checks["warnings"])
+    contract_failures = build_contract_failures(scene_metrics, totals)
+    craft_flags, style_warnings = build_warning_buckets(scene_metrics, totals, history)
+    has_failures = bool(contract_failures)
+    has_warnings = bool(craft_flags or style_warnings)
     status = "fail" if has_failures else "warn" if has_warnings else "pass"
 
     result = {
         "file": str(path),
         "status": status,
-        "totals": totals,
-        "scenes": scene_metrics,
-        "history": history,
-        "checks": checks,
+        "contract_failures": contract_failures,
+        "craft_flags": craft_flags,
+        "style_warnings": style_warnings,
+        "metrics": {
+            "totals": totals,
+            "scenes": scene_metrics,
+            "history": history,
+        },
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0

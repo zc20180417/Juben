@@ -1,0 +1,49 @@
+{
+  "episode": "EP-10",
+  "provenance": "rebuild-2026-04",
+  "source_batch": "batch02",
+  "runtime_authority": "rebuild-2026-04",
+  "gold/provisional": "gold",
+  "release_status": "gold",
+  "ruleset_version": "episode-lint/v2",
+  "lint_profile": "default",
+  "lint_status": "fail",
+  "verify_tier": "STANDARD",
+  "verify_status": "PASS",
+  "contract_failures": [
+    {
+      "scope": "scene",
+      "scene": 1,
+      "title": "漪澜阁",
+      "code": "triangle_sentence_count"
+    },
+    {
+      "scope": "scene",
+      "scene": 1,
+      "title": "漪澜阁",
+      "code": "triangle_visible_detail"
+    },
+    {
+      "scope": "scene",
+      "scene": 2,
+      "title": "漪澜阁",
+      "code": "triangle_sentence_count"
+    },
+    {
+      "scope": "scene",
+      "scene": 2,
+      "title": "漪澜阁",
+      "code": "triangle_visible_detail"
+    }
+  ],
+  "craft_flags": [
+    "hookless_final_scene",
+    "hookless_non_final_scene",
+    "imagery_dense:火",
+    "warning_bundle"
+  ],
+  "style_warnings": [],
+  "batch_brief": "harness/project/batch-briefs/batch02_EP06-10.md",
+  "content_path": "episodes/EP-10.md",
+  "updated_at": "2026-04-13 23:10"
+}
