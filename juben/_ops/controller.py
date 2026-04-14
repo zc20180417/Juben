@@ -30,6 +30,7 @@ Low-level commands:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 import re
@@ -185,6 +186,17 @@ def _clear_retry_count(episode: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Content fingerprinting
+# ---------------------------------------------------------------------------
+
+def _file_sha256(path: Path) -> str:
+    """Return hex SHA-256 of a file, or empty string if missing."""
+    if not path.exists():
+        return ""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+# ---------------------------------------------------------------------------
 # Verify result tracking (per-episode JSON in locks dir)
 # ---------------------------------------------------------------------------
 
@@ -200,10 +212,43 @@ def _read_verify_result(episode: str) -> dict | None:
 
 
 def _write_verify_result(episode: str, tier: str, status: str) -> None:
-    data = {"episode": episode, "tier": tier, "status": status, "timestamp": NOW}
+    draft_path = DRAFTS / f"{episode}.md"
+    data = {
+        "episode": episode,
+        "tier": tier,
+        "status": status,
+        "timestamp": NOW,
+        "draft_sha256": _file_sha256(draft_path),
+        "brief_sha256": _file_sha256(BATCH_BRIEFS / _find_brief_for_episode(episode)),
+        "source_map_sha256": _file_sha256(SOURCE_MAP),
+    }
     _verify_result_path(episode).write_text(
         json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
     )
+
+
+def _find_brief_for_episode(episode: str) -> str:
+    """Find the batch brief filename that owns this episode."""
+    if BATCH_BRIEFS.exists():
+        for p in BATCH_BRIEFS.glob("*.md"):
+            content = p.read_text(encoding="utf-8")
+            if episode in content:
+                return p.name
+    return ""
+
+
+def _verify_draft_integrity(episode: str, verify_result: dict) -> str | None:
+    """Check that the current draft matches what was verified. Returns error message or None."""
+    recorded_sha = verify_result.get("draft_sha256", "")
+    if not recorded_sha:
+        return None  # legacy verify result without hash — skip check
+    current_sha = _file_sha256(DRAFTS / f"{episode}.md")
+    if current_sha != recorded_sha:
+        return (
+            f"{episode} draft modified after verify "
+            f"(verified: {recorded_sha[:12]}…, current: {current_sha[:12]}…)"
+        )
+    return None
 
 
 def _clear_verify_result(episode: str) -> None:
@@ -387,28 +432,113 @@ def _generate_batch_brief(batch_id: str, batch_info: dict) -> str:
 """
 
 
-def _compute_verify_tiers(episodes: list[str]) -> tuple[list, list, list]:
-    """Compute FULL/STANDARD/LIGHT verify tiers for a list of episodes."""
+def _compute_verify_tiers(episodes: list[str]) -> tuple[list, list, list, list]:
+    """Compute FULL/STANDARD/LIGHT verify tiers for a list of episodes.
+
+    Returns (full, standard, light, unmapped).
+    Unmapped episodes have no source-map data — they should not be silently
+    downgraded to LIGHT. Callers decide whether to hard-fail or require review.
+    """
     source_map_text = SOURCE_MAP.read_text(encoding="utf-8")
     manifest = _read_manifest()
     key_episodes_raw = manifest.get("key_episodes", "")
     key_episodes = {e.strip() for e in key_episodes_raw.split(",") if e.strip()}
 
-    full_eps, standard_eps, light_eps = [], [], []
+    full_eps, standard_eps, light_eps, unmapped_eps = [], [], [], []
     for i, ep in enumerate(episodes):
         ep_pattern = rf"###\s+{re.escape(ep)}\b(.*?)(?=###|\Z)"
         m = re.search(ep_pattern, source_map_text, re.DOTALL)
         block = m.group(1) if m else ""
+        if not block.strip():
+            unmapped_eps.append(ep)
+            continue
         is_first = (i == 0)
         is_strong_closure = "强闭环" in block
         is_key_episode = ep in key_episodes
         if is_first or is_strong_closure or is_key_episode:
             full_eps.append(ep)
-        elif not block.strip():
-            light_eps.append(ep)
         else:
             standard_eps.append(ep)
-    return full_eps, standard_eps, light_eps
+    return full_eps, standard_eps, light_eps, unmapped_eps
+
+
+# ---------------------------------------------------------------------------
+# Shared batch-level pre-checks
+# ---------------------------------------------------------------------------
+
+
+def _resolve_batch(batch_id: str, *, require_frozen: bool = False) -> tuple[Path, dict, list[str]] | None:
+    """Resolve batch → (brief_path, brief_data, episodes) or None on error."""
+    brief_path = _find_batch_brief(batch_id)
+    if brief_path is None:
+        print(f"ERROR: batch brief not found for '{batch_id}'")
+        return None
+    brief = _read_batch_brief(brief_path)
+    episodes = brief.get("episodes", [])
+    if not episodes:
+        print(f"ERROR: no episodes in batch '{batch_id}'")
+        return None
+    if require_frozen:
+        status = brief.get("status", "unknown")
+        if status == "promoted":
+            print(f"ERROR: batch '{batch_id}' is already promoted")
+            return None
+        if status != "frozen":
+            print(f"ERROR: batch brief status is '{status}', must be 'frozen'")
+            return None
+    return brief_path, brief, episodes
+
+
+def _run_lint_gate(episodes: list[str]) -> bool:
+    """Run lint on all draft episodes. Returns True if all pass."""
+    all_pass = True
+    for ep in episodes:
+        draft = DRAFTS / f"{ep}.md"
+        if not draft.exists():
+            print(f"  ✗ {ep}: draft missing")
+            all_pass = False
+            continue
+        result = subprocess.run(
+            [sys.executable, str(LINT_SCRIPT), str(draft)],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=60
+        )
+        try:
+            data = json.loads(result.stdout)
+            episode_failures = data.get("checks", {}).get("episode_failures", [])
+            is_fail = bool(episode_failures)
+        except (json.JSONDecodeError, ValueError):
+            is_fail = True
+        print(f"  {'✓' if not is_fail else '✗'} {ep} lint {'pass' if not is_fail else 'FAIL'}")
+        if is_fail:
+            all_pass = False
+    return all_pass
+
+
+def _run_verify_gate(episodes: list[str]) -> bool:
+    """Check unmapped, verify results, and draft integrity. Returns True if all pass."""
+    full_eps, standard_eps, light_eps, unmapped_eps = _compute_verify_tiers(episodes)
+    if unmapped_eps:
+        print(f"  ✗ Episodes missing source-map data: {', '.join(unmapped_eps)}")
+        print(f"    → Add entries to source.map.md first")
+        return False
+    for ep in episodes:
+        if ep in light_eps:
+            print(f"  ✓ {ep}: LIGHT (lint-only)")
+            continue
+        vr = _read_verify_result(ep)
+        if vr is None:
+            print(f"  ✗ {ep}: no verify result — run aligner + verify-done first")
+            return False
+        if vr.get("status") != "PASS":
+            print(f"  ✗ {ep}: verify {vr.get('status', '?')}")
+            return False
+        integrity_err = _verify_draft_integrity(ep, vr)
+        if integrity_err:
+            print(f"  ✗ {integrity_err} — must re-verify")
+            return False
+        print(f"  ✓ {ep}: verify PASS (tier: {vr.get('tier', '?')})")
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -613,65 +743,20 @@ def cmd_gate(args: argparse.Namespace) -> int:
 
 
 def cmd_promote(args: argparse.Namespace) -> int:
-    batch_id = args.batch_id
-    brief_path = _find_batch_brief(batch_id)
-    if brief_path is None:
-        print(f"ERROR: batch brief not found for '{batch_id}'")
+    resolved = _resolve_batch(args.batch_id, require_frozen=True)
+    if resolved is None:
         return 1
+    brief_path, brief, episodes = resolved
 
-    brief = _read_batch_brief(brief_path)
-    current_status = brief.get("status", "unknown")
-
-    if current_status == "promoted":
-        print(f"ERROR: batch '{batch_id}' is already promoted")
-        return 1
-
-    if current_status != "frozen":
-        print(f"ERROR: batch brief status is '{current_status}', must be 'frozen' to promote")
-        return 1
-
-    episodes = brief.get("episodes", [])
-
-    # Gate: all drafts must exist
-    missing = [ep for ep in episodes if not (DRAFTS / f"{ep}.md").exists()]
-    if missing:
-        print(f"ERROR: missing drafts: {', '.join(missing)}")
-        return 1
-
-    # Gate: all must pass lint
+    # Gate: lint
     print("Running lint gate...")
-    for ep in episodes:
-        result = subprocess.run(
-            [sys.executable, str(LINT_SCRIPT), str(DRAFTS / f"{ep}.md")],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        try:
-            data = json.loads(result.stdout)
-            if data.get("status") != "pass":
-                print(f"ERROR: {ep} lint FAIL — cannot promote")
-                return 1
-        except (json.JSONDecodeError, ValueError):
-            print(f"ERROR: {ep} lint error — cannot promote")
-            return 1
-        print(f"  ✓ {ep} lint pass")
+    if not _run_lint_gate(episodes):
+        return 1
 
-    # Gate: all non-LIGHT episodes must have verify PASS
+    # Gate: verify + integrity
     print("Running verify gate...")
-    full_eps, standard_eps, light_eps = _compute_verify_tiers(episodes)
-    for ep in episodes:
-        if ep in light_eps:
-            print(f"  ✓ {ep} verify: LIGHT (lint-only)")
-            continue
-        vr = _read_verify_result(ep)
-        if vr is None:
-            print(f"ERROR: {ep} has no verify result — run aligner + verify-done first")
-            return 1
-        if vr.get("status") != "PASS":
-            print(f"ERROR: {ep} verify {vr.get('status', '?')} — cannot promote")
-            return 1
-        print(f"  ✓ {ep} verify: PASS (tier: {vr.get('tier', '?')})")
+    if not _run_verify_gate(episodes):
+        return 1
 
     # Gate: state.lock must be free
     if _is_locked("state.lock"):
@@ -764,39 +849,34 @@ def cmd_retry(args: argparse.Namespace) -> int:
 
 def cmd_verify_plan(args: argparse.Namespace) -> int:
     """Compute verify tiers for a batch based on source.map metadata."""
-    batch_id = args.batch_id
-    brief_path = _find_batch_brief(batch_id)
-    if brief_path is None:
-        print(f"ERROR: batch brief not found for '{batch_id}'")
+    resolved = _resolve_batch(args.batch_id)
+    if resolved is None:
         return 1
+    brief_path, brief, episodes = resolved
 
-    brief = _read_batch_brief(brief_path)
-    episodes = brief.get("episodes", [])
-
-    full_eps, standard_eps, light_eps = _compute_verify_tiers(episodes)
+    full_eps, standard_eps, light_eps, unmapped_eps = _compute_verify_tiers(episodes)
 
     print(f"=== Verify Plan: {batch_id} ===")
     print(f"\n  FULL (8-step):    {', '.join(full_eps) or '(none)'}")
     print(f"  STANDARD (5-step): {', '.join(standard_eps) or '(none)'}")
     print(f"  LIGHT (lint only): {', '.join(light_eps) or '(none)'}")
+    if unmapped_eps:
+        print(f"  ⚠ UNMAPPED (no source-map): {', '.join(unmapped_eps)}")
+        print(f"    → These episodes CANNOT be verified or promoted until source.map.md is updated")
     print(f"\n  Batch-level adversarial sampling: 2 random episodes after all pass")
 
     # Output as structured data for agent consumption
-    plan = {"full": full_eps, "standard": standard_eps, "light": light_eps}
+    plan = {"full": full_eps, "standard": standard_eps, "light": light_eps, "unmapped": unmapped_eps}
     print(f"\n  JSON: {json.dumps(plan, ensure_ascii=False)}")
     return 0
 
 
 def cmd_batch_review(args: argparse.Namespace) -> int:
     """Print batch-level review checklist after all episodes in batch pass verify."""
-    batch_id = args.batch_id
-    brief_path = _find_batch_brief(batch_id)
-    if brief_path is None:
-        print(f"ERROR: batch brief not found for '{batch_id}'")
+    resolved = _resolve_batch(args.batch_id)
+    if resolved is None:
         return 1
-
-    brief = _read_batch_brief(brief_path)
-    episodes = brief.get("episodes", [])
+    brief_path, brief, episodes = resolved
 
     # Pick 2 episodes for adversarial sampling
     sample_size = min(2, len(episodes))
@@ -1428,11 +1508,14 @@ def cmd_start(args: argparse.Namespace) -> int:
         print(f"    must-not:  {mn[:80]}{'...' if len(mn) > 80 else ''}")
 
     # Verify plan
-    full_eps, standard_eps, light_eps = _compute_verify_tiers(episodes)
+    full_eps, standard_eps, light_eps, unmapped_eps = _compute_verify_tiers(episodes)
     print(f"\n--- Verify Plan ---")
     print(f"  FULL (8-step):     {', '.join(full_eps) or '(none)'}")
     print(f"  STANDARD (5-step): {', '.join(standard_eps) or '(none)'}")
     print(f"  LIGHT (lint only): {', '.join(light_eps) or '(none)'}")
+    if unmapped_eps:
+        print(f"  ⚠ UNMAPPED:        {', '.join(unmapped_eps)}")
+        print(f"    → Update source.map.md before running check/verify")
 
     print(f"\n--- Next Step ---")
     print(f"  Writer agent: draft {', '.join(episodes)} into drafts/episodes/")
@@ -1443,64 +1526,24 @@ def cmd_start(args: argparse.Namespace) -> int:
 
 def cmd_check(args: argparse.Namespace) -> int:
     """Gate (lint all) + verify-plan + semantic verify instructions."""
-    batch_id = args.batch_id
-    brief_path = _find_batch_brief(batch_id)
-    if brief_path is None:
-        print(f"ERROR: batch brief not found for '{batch_id}'")
+    resolved = _resolve_batch(args.batch_id)
+    if resolved is None:
         return 1
-
-    brief = _read_batch_brief(brief_path)
-    episodes = brief.get("episodes", [])
-    if not episodes:
-        print(f"ERROR: no episodes in batch '{batch_id}'")
-        return 1
+    brief_path, brief, episodes = resolved
 
     # Step 1: Lint gate
-    print(f"=== Lint Gate: {batch_id} ===")
-    all_pass = True
-    for ep in episodes:
-        draft = DRAFTS / f"{ep}.md"
-        if not draft.exists():
-            print(f"  ✗ {ep}: draft missing")
-            all_pass = False
-            continue
-        result = subprocess.run(
-            [sys.executable, str(LINT_SCRIPT), str(draft)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=60
-        )
-        try:
-            data = json.loads(result.stdout)
-            status = data.get("status", "fail")
-            episode_failures = data.get("checks", {}).get("episode_failures", [])
-            # Only consider it a failure if there are episode-level failures
-            is_fail = bool(episode_failures)
-        except (json.JSONDecodeError, ValueError):
-            # Fallback: try to decode with replacement
-            try:
-                stdout_bytes = result.stdout.encode('utf-8', errors='replace')
-                data = json.loads(stdout_bytes.decode('utf-8', errors='replace'))
-                episode_failures = data.get("checks", {}).get("episode_failures", [])
-                is_fail = bool(episode_failures)
-                status = "fail" if is_fail else "warn"
-            except Exception:
-                status = "error"
-                is_fail = True
-                print(f"  DEBUG stdout length: {len(result.stdout)}")
-                print(f"  DEBUG first 200 chars: {result.stdout[:200]}")
-        icon = "✓" if not is_fail else "✗"
-        print(f"  {icon} {ep}: {status}")
-        if is_fail:
-            all_pass = False
-
-    if not all_pass:
+    print(f"=== Lint Gate: {args.batch_id} ===")
+    if not _run_lint_gate(episodes):
         print(f"\n  GATE FAIL — fix lint errors before proceeding")
         return 1
-
     print(f"\n  GATE PASS")
 
     # Step 2: Verify plan
-    full_eps, standard_eps, light_eps = _compute_verify_tiers(episodes)
+    full_eps, standard_eps, light_eps, unmapped_eps = _compute_verify_tiers(episodes)
+    if unmapped_eps:
+        print(f"\n  ⚠ UNMAPPED episodes (no source-map data): {', '.join(unmapped_eps)}")
+        print(f"    → These episodes cannot proceed to verify. Update source.map.md first.")
+        return 1
     print(f"\n=== Verify Plan ===")
     print(f"  FULL (8-step):     {', '.join(full_eps) or '(none)'}")
     print(f"  STANDARD (5-step): {', '.join(standard_eps) or '(none)'}")
@@ -1550,63 +1593,20 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 def cmd_finish(args: argparse.Namespace) -> int:
     """Promote + validate + batch-review + log + next instructions."""
-    batch_id = args.batch_id
-    brief_path = _find_batch_brief(batch_id)
-    if brief_path is None:
-        print(f"ERROR: batch brief not found for '{batch_id}'")
+    resolved = _resolve_batch(args.batch_id, require_frozen=True)
+    if resolved is None:
         return 1
-
-    brief = _read_batch_brief(brief_path)
-    episodes = brief.get("episodes", [])
-    current_status = brief.get("status", "unknown")
-
-    if current_status == "promoted":
-        print(f"ERROR: batch '{batch_id}' is already promoted")
-        return 1
-    if current_status != "frozen":
-        print(f"ERROR: batch brief status is '{current_status}', must be 'frozen'")
-        return 1
+    brief_path, brief, episodes = resolved
 
     # Step 1: Final lint gate
     print(f"=== Step 1: Lint Gate ===")
-    for ep in episodes:
-        draft = DRAFTS / f"{ep}.md"
-        if not draft.exists():
-            print(f"  ✗ {ep}: draft missing")
-            return 1
-        result = subprocess.run(
-            [sys.executable, str(LINT_SCRIPT), str(draft)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=60
-        )
-        try:
-            data = json.loads(result.stdout)
-            status = data.get("status", "fail")
-            episode_failures = data.get("checks", {}).get("episode_failures", [])
-            # Only fail if there are episode-level failures
-            if episode_failures:
-                print(f"  ✗ {ep} lint FAIL (episode: {episode_failures}) — cannot finish")
-                return 1
-        except (json.JSONDecodeError, ValueError):
-            print(f"  ✗ {ep} lint error — cannot finish")
-            return 1
-        print(f"  ✓ {ep} lint pass")
+    if not _run_lint_gate(episodes):
+        return 1
 
-    # Step 2: Verify gate — all non-LIGHT episodes must have verify PASS
+    # Step 2: Verify gate
     print(f"\n=== Step 2: Verify Gate ===")
-    full_eps, standard_eps, light_eps = _compute_verify_tiers(episodes)
-    for ep in episodes:
-        if ep in light_eps:
-            print(f"  ✓ {ep}: LIGHT (lint-only)")
-            continue
-        vr = _read_verify_result(ep)
-        if vr is None:
-            print(f"  ✗ {ep}: no verify result — run aligner + verify-done first")
-            return 1
-        if vr.get("status") != "PASS":
-            print(f"  ✗ {ep}: verify {vr.get('status', '?')}")
-            return 1
-        print(f"  ✓ {ep}: verify PASS (tier: {vr.get('tier', '?')})")
+    if not _run_verify_gate(episodes):
+        return 1
 
     # Step 3: State lock check
     if _is_locked("state.lock"):
