@@ -1,7 +1,7 @@
 # Profile Check: revenge_palace
 
 本文件只检查 `revenge_palace` 题材与 `cn_paid_microdrama` 分发假设下的特有要求。
-不覆盖 `runtime-core.md` 与 base aligner 已经负责的跨题材规则。
+不覆盖 `harness/framework/write-contract.md`、`harness/framework/writer-style.md` 与 base aligner 已经负责的跨题材规则。
 
 ## 题材检查
 - 第1-10集：每2-3集应出现一次明显的小高潮、打脸或关系反转

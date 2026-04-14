@@ -1,7 +1,7 @@
 # Genre Profile: revenge_palace
 
 本 profile 只定义“复仇 / 宫斗 / 上位”题材的推进方式。
-它建立在 `runtime-core.md` 与 `adaptation-core.md` 之上。
+它建立在 `harness/framework/write-contract.md` 与 `harness/framework/writer-style.md` 之上。
 
 ## 题材引擎
 - 观众主要追看三件事：

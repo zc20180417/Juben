@@ -20,6 +20,7 @@
 - 运行时总线：`harness/project/run.manifest.md`
 - 输入装配：`harness/framework/input-contract.md`
 - 写作约束：`harness/framework/write-contract.md`
+- 写作风格：`harness/framework/writer-style.md`
 - 校验约束：`harness/framework/verify-contract.md`
 - 发布通道：`harness/framework/promote-contract.md`
 - 记忆与状态：`harness/framework/memory-contract.md`
@@ -43,7 +44,7 @@
    - promote 后才允许记录状态文件
 5. `record`
    - 只更新 `harness/project/state/*`
-   - 不回写 legacy v1 文件
+   - 不写回任何根目录旧 workflow 文件
    - 每次 record 必须追加 `run.log.md` 条目
 
 ## Fail Closed Rules
@@ -62,6 +63,7 @@
   - `source.map.md`（当前 batch 对应区段）
   - 当前 `batch brief`
   - `write-contract.md`
+  - `writer-style.md`
   - `voice-anchor.md` / `character.md`
   - 前一个 batch 的 `story.state.md` + `relationship.board.md` + `open_loops.md`（只读摘要，不加载全部正文）
 - **不跨 batch 累积正文上下文**：writer 不得把前 batch 的全部 episode 正文带入当前 batch 的生成上下文
@@ -95,4 +97,4 @@ verify FAIL 后的恢复策略：
 
 ## Entry Routing
 - root `AGENTS.md` 只路由到本文件和 `harness/project/run.manifest.md`
-- root `OPENAI.md` / `CLAUDE.md` 只路由到本文件
+- root `OPENAI.md` / `CLAUDE.md` 只路由到本文件和 `harness/project/run.manifest.md`

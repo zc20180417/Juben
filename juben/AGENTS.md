@@ -145,6 +145,7 @@ The project is then ready for `python _ops/controller.py start batch01`.
   - `harness/framework/entry.md`
   - `harness/framework/input-contract.md`
   - `harness/framework/write-contract.md`
+  - `harness/framework/writer-style.md`
   - `harness/project/run.manifest.md`
   - `harness/project/source.map.md`
   - active `harness/project/batch-briefs/batchNN_*.md`
@@ -165,5 +166,4 @@ The project is then ready for `python _ops/controller.py start batch01`.
 - Published files in `episodes/` are controller-promoted outputs only.
 - Verify reads draft lane only.
 - Record writes `harness/project/state/*` only.
-- Legacy v1 files under `harness/legacy/v1/` are not runtime authority.
-
+- Workflow authority lives only in `harness/framework/*`, `harness/project/*`, `_ops/controller.py`, `_ops/episode-lint.py`, `_ops/script-aligner.md`, and `_ops/script-recorder.md`.
