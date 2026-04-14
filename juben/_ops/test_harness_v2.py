@@ -49,8 +49,12 @@ class StructureTests(unittest.TestCase):
         self.assertIn("Treat Harness V2 as the only workflow source of truth", agents)
         self.assertIn("harness/framework/entry.md", openai)
         self.assertIn("harness/project/run.manifest.md", openai)
+        self.assertIn("Resolve workflow inputs from `entry.md`", openai)
+        self.assertIn("Treat Harness V2 as the only workflow source of truth", openai)
         self.assertIn("harness/framework/entry.md", claude)
         self.assertIn("harness/project/run.manifest.md", claude)
+        self.assertIn("Resolve workflow inputs from `entry.md`", claude)
+        self.assertIn("Treat Harness V2 as the only workflow source of truth", claude)
 
     def test_agents_doc_is_not_an_operations_manual(self) -> None:
         agents = AGENTS.read_text(encoding="utf-8")
@@ -62,6 +66,12 @@ class StructureTests(unittest.TestCase):
             "可用命令：",
         ]:
             self.assertNotIn(marker, agents)
+
+    def test_openai_and_claude_do_not_reference_missing_protocols(self) -> None:
+        for path in [OPENAI, CLAUDE]:
+            content = path.read_text(encoding="utf-8")
+            for marker in ["Session Start Protocol", "Init Extract Protocol", "AGENT_EXTRACT_REQUIRED"]:
+                self.assertNotIn(marker, content, f"{path.name} should not reference {marker}")
 
     def test_framework_contracts_exist(self) -> None:
         for path in [
