@@ -106,7 +106,6 @@ python _ops/controller.py check batch01
 python _ops/controller.py finish batch01
 python _ops/controller.py record batch01
 python _ops/controller.py record-done batch01
-python _ops/controller.py audit
 ```
 
 ## 历史说明
