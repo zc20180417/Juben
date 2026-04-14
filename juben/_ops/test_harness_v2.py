@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+README = ROOT / "README.md"
 AGENTS = ROOT / "AGENTS.md"
 OPENAI = ROOT / "OPENAI.md"
 CLAUDE = ROOT / "CLAUDE.md"
@@ -32,6 +33,9 @@ ALIGNER = ROOT / "_ops" / "script-aligner.md"
 RECORDER = ROOT / "_ops" / "script-recorder.md"
 VOICE_ANCHOR = ROOT / "voice-anchor.md"
 CHARACTER = ROOT / "character.md"
+WRITER_STYLE = ROOT / "harness" / "framework" / "writer-style.md"
+OPS_README = ROOT / "_ops" / "README.md"
+ARCHIVE_README = ROOT / "docs" / "archive" / "README_v2_history.md"
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +60,7 @@ class StructureTests(unittest.TestCase):
             ENTRY,
             INPUT_CONTRACT,
             WRITE_CONTRACT,
+            WRITER_STYLE,
             VERIFY_CONTRACT,
             PROMOTE_CONTRACT,
             MEMORY_CONTRACT,
@@ -147,13 +152,8 @@ class StructureTests(unittest.TestCase):
         for name in ["batch.lock", "episode-XX.lock", "state.lock"]:
             self.assertTrue((lock_dir / name).exists())
 
-    def test_legacy_v1_files_exist_and_root_authorities_are_removed(self) -> None:
-        for path in [
-            ROOT / "harness" / "legacy" / "v1" / "runtime-core.md",
-            ROOT / "harness" / "legacy" / "v1" / "adaptation-core.md",
-            ROOT / "harness" / "legacy" / "v1" / "project.profile.md",
-        ]:
-            self.assertTrue(path.exists(), path)
+    def test_legacy_v1_and_root_workflow_files_are_removed(self) -> None:
+        self.assertFalse((ROOT / "harness" / "legacy" / "v1").exists())
         for removed in [
             ROOT / "runtime-core.md",
             ROOT / "adaptation-core.md",
@@ -165,6 +165,38 @@ class StructureTests(unittest.TestCase):
             ROOT / "quality.anchor.md",
         ]:
             self.assertFalse(removed.exists(), removed)
+
+    def test_ops_history_readme_is_archived_out_of_ops(self) -> None:
+        self.assertFalse(OPS_README.exists(), OPS_README)
+        self.assertTrue(ARCHIVE_README.exists(), ARCHIVE_README)
+
+    def test_root_docs_only_describe_harness_v2_as_current_workflow(self) -> None:
+        banned_phrases = [
+            "主Agent",
+            "v2.0–v2.3.3",
+            "v2.0",
+            "v2.1",
+            "v2.2",
+            "v2.3",
+            "legacy/v1",
+            "runtime-core.md",
+        ]
+        for path in [README, AGENTS, OPENAI, CLAUDE]:
+            content = path.read_text(encoding="utf-8")
+            for phrase in banned_phrases:
+                self.assertNotIn(phrase, content, f"{path.name} should not mention {phrase} as active workflow context")
+
+    def test_harness_v2_authority_files_are_explicit(self) -> None:
+        readme = README.read_text(encoding="utf-8")
+        for path_text in [
+            "harness/framework/*",
+            "harness/project/*",
+            "_ops/controller.py",
+            "_ops/episode-lint.py",
+            "_ops/script-aligner.md",
+            "_ops/script-recorder.md",
+        ]:
+            self.assertIn(path_text, readme)
 
 
 # ---------------------------------------------------------------------------
@@ -339,6 +371,7 @@ class VoiceAnchorRoutingTests(unittest.TestCase):
         self.assertIn("Voice Anchor", wc)
         self.assertIn("voice-anchor.md", wc)
         self.assertIn("character.md", wc)
+        self.assertIn("writer-style.md", wc)
 
     def test_verify_contract_includes_voice_anchor(self) -> None:
         vc = VERIFY_CONTRACT.read_text(encoding="utf-8")

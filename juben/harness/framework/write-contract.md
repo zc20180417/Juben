@@ -1,11 +1,13 @@
 # Write Contract
 
 本文件定义 writer 的通用写作边界，不包含项目专有章节映射。
+具体写法风格补充见 `harness/framework/writer-style.md`。
 
 ## Writing Posture
 - `△` 只写摄影机能拍到的内容
 - `os` 是主观窗口，但不能承担剧情讲解职责
 - 完整气口优先于碎句节拍（见下方 Dialogue Formatting）
+- 具体场景打法、叙事姿态与风格警戒统一遵循 `writer-style.md`
 
 ## Dialogue Rules
 - 允许换说法，不允许换态度
@@ -61,6 +63,11 @@
 - 若 `voice-anchor.md` 不存在、仅剩模板占位或未列出当前角色，回退到 `character.md` 中的语音指纹
 - 只继承说话方式，不搬运小说叙述腔
 - 角色台词必须符合声纹锚中的句长基准、句式基准和禁用表达
+
+## Writer Style
+- 叙事立场、场景打法、对话打法、集级节奏和风格警戒统一定义在 `writer-style.md`
+- contract 负责门槛，`writer-style.md` 负责稳定成稿时的具体执行方式
+- 两者冲突时，以本文件的边界与硬门槛为准
 
 ## Original-Fidelity Rules
 - 章节顺序优先
