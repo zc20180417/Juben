@@ -49,11 +49,22 @@ class StructureTests(unittest.TestCase):
         claude = CLAUDE.read_text(encoding="utf-8")
         self.assertIn("harness/framework/entry.md", agents)
         self.assertIn("harness/project/run.manifest.md", agents)
-        self.assertIn("writer must write candidate files only to `drafts/episodes/`".lower(), agents.lower())
+        self.assertIn("Treat Harness V2 as the only workflow source of truth", agents)
         self.assertIn("harness/framework/entry.md", openai)
         self.assertIn("harness/project/run.manifest.md", openai)
         self.assertIn("harness/framework/entry.md", claude)
         self.assertIn("harness/project/run.manifest.md", claude)
+
+    def test_agents_doc_is_not_an_operations_manual(self) -> None:
+        agents = AGENTS.read_text(encoding="utf-8")
+        for marker in [
+            "Session Start Protocol",
+            "Init Extract Protocol",
+            "AGENT_EXTRACT_REQUIRED",
+            "python _ops/controller.py next",
+            "可用命令：",
+        ]:
+            self.assertNotIn(marker, agents)
 
     def test_framework_contracts_exist(self) -> None:
         for path in [
@@ -362,9 +373,9 @@ class VoiceAnchorRoutingTests(unittest.TestCase):
     """Verify voice-anchor -> character fallback chain is wired across all layers."""
 
     def test_writer_routing_includes_voice_anchor(self) -> None:
-        agents = AGENTS.read_text(encoding="utf-8")
-        self.assertIn("voice-anchor.md", agents)
-        self.assertIn("character.md", agents)
+        entry = ENTRY.read_text(encoding="utf-8")
+        self.assertIn("voice-anchor.md", entry)
+        self.assertIn("character.md", entry)
 
     def test_write_contract_includes_voice_anchor(self) -> None:
         wc = WRITE_CONTRACT.read_text(encoding="utf-8")
