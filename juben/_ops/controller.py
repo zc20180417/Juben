@@ -53,6 +53,14 @@ BATCH_BRIEFS = PROJECT / "batch-briefs"
 RUN_MANIFEST = PROJECT / "run.manifest.md"
 RUN_LOG = STATE / "run.log.md"
 MEMORY_CONTRACT = FRAMEWORK / "memory-contract.md"
+SOURCE_MAP = PROJECT / "source.map.md"
+RELEASES = PROJECT / "releases"
+RELEASE_INDEX = RELEASES / "release.index.json"
+GOLD_SET = RELEASES / "gold-set.json"
+
+RUNTIME_AUTHORITY = "rebuild-2026-04"
+RULESET_VERSION = "episode-lint/v2"
+LINT_PROFILE = "default"
 
 NOW = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -213,13 +221,17 @@ def _read_verify_result(episode: str) -> dict | None:
 
 def _write_verify_result(episode: str, tier: str, status: str) -> None:
     draft_path = DRAFTS / f"{episode}.md"
+    brief_name = _find_brief_for_episode(episode)
+    if not brief_name:
+        print(f"WARNING: no batch brief found for {episode} — brief_sha256 will be empty")
+    brief_sha = _file_sha256(BATCH_BRIEFS / brief_name) if brief_name else ""
     data = {
         "episode": episode,
         "tier": tier,
         "status": status,
         "timestamp": NOW,
         "draft_sha256": _file_sha256(draft_path),
-        "brief_sha256": _file_sha256(BATCH_BRIEFS / _find_brief_for_episode(episode)),
+        "brief_sha256": brief_sha,
         "source_map_sha256": _file_sha256(SOURCE_MAP),
     }
     _verify_result_path(episode).write_text(
@@ -238,16 +250,36 @@ def _find_brief_for_episode(episode: str) -> str:
 
 
 def _verify_draft_integrity(episode: str, verify_result: dict) -> str | None:
-    """Check that the current draft matches what was verified. Returns error message or None."""
-    recorded_sha = verify_result.get("draft_sha256", "")
-    if not recorded_sha:
+    """Check that draft, brief, and source_map match what was verified. Returns error message or None."""
+    # Draft check
+    recorded_draft = verify_result.get("draft_sha256", "")
+    if not recorded_draft:
         return None  # legacy verify result without hash — skip check
-    current_sha = _file_sha256(DRAFTS / f"{episode}.md")
-    if current_sha != recorded_sha:
+    current_draft = _file_sha256(DRAFTS / f"{episode}.md")
+    if current_draft != recorded_draft:
         return (
             f"{episode} draft modified after verify "
-            f"(verified: {recorded_sha[:12]}…, current: {current_sha[:12]}…)"
+            f"(verified: {recorded_draft[:12]}…, current: {current_draft[:12]}…)"
         )
+    # Brief check
+    recorded_brief = verify_result.get("brief_sha256", "")
+    if recorded_brief:
+        brief_name = _find_brief_for_episode(episode)
+        current_brief = _file_sha256(BATCH_BRIEFS / brief_name) if brief_name else ""
+        if current_brief != recorded_brief:
+            return (
+                f"{episode} batch brief modified after verify "
+                f"(verified: {recorded_brief[:12]}…, current: {current_brief[:12]}…)"
+            )
+    # Source map check
+    recorded_smap = verify_result.get("source_map_sha256", "")
+    if recorded_smap:
+        current_smap = _file_sha256(SOURCE_MAP)
+        if current_smap != recorded_smap:
+            return (
+                f"{episode} source.map.md modified after verify "
+                f"(verified: {recorded_smap[:12]}…, current: {current_smap[:12]}…)"
+            )
     return None
 
 
@@ -287,8 +319,6 @@ def _validate_state_file(name: str, sections: list[str]) -> list[str]:
 # ---------------------------------------------------------------------------
 # Source map parsing
 # ---------------------------------------------------------------------------
-
-SOURCE_MAP = PROJECT / "source.map.md"
 
 
 def _parse_source_map() -> dict:
@@ -463,6 +493,218 @@ def _compute_verify_tiers(episodes: list[str]) -> tuple[list, list, list, list]:
 
 
 # ---------------------------------------------------------------------------
+# Release / Gold tracking helpers
+# ---------------------------------------------------------------------------
+
+
+def _relative_to_root(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def _read_json_file(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _release_index_template() -> dict:
+    return {
+        "runtime_authority": RUNTIME_AUTHORITY,
+        "provenance": RUNTIME_AUTHORITY,
+        "ruleset_version": RULESET_VERSION,
+        "gold_set": _relative_to_root(GOLD_SET),
+        "current_batch": "(none)",
+        "current_batch_brief": "(none)",
+        "episodes": {},
+        "updated_at": NOW,
+    }
+
+
+def _gold_set_template() -> dict:
+    return {
+        "runtime_authority": RUNTIME_AUTHORITY,
+        "provenance": RUNTIME_AUTHORITY,
+        "episodes": [],
+        "updated_at": NOW,
+    }
+
+
+def _load_release_index() -> dict:
+    data = _read_json_file(RELEASE_INDEX)
+    if data is None:
+        data = _release_index_template()
+    data.setdefault("episodes", {})
+    return data
+
+
+def _load_gold_set() -> dict:
+    data = _read_json_file(GOLD_SET)
+    if data is None:
+        data = _gold_set_template()
+    data.setdefault("episodes", [])
+    return data
+
+
+def _write_release_files(index: dict, gold_set: dict) -> None:
+    RELEASES.mkdir(parents=True, exist_ok=True)
+    RELEASE_INDEX.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+    GOLD_SET.write_text(json.dumps(gold_set, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _meta_path(episode: str) -> Path:
+    return EPISODES / f"{episode}.meta.json"
+
+
+def _bootstrap_legacy_entries(index: dict, gold_episodes: set[str]) -> None:
+    """Register any published episodes not in gold set as 'legacy'."""
+    for episode_file in sorted(EPISODES.glob("EP-*.md")):
+        episode = episode_file.stem
+        if episode in gold_episodes:
+            continue
+        index["episodes"].setdefault(
+            episode,
+            {
+                "episode": episode,
+                "release_status": "legacy",
+                "runtime_authority": "legacy",
+                "provenance": "legacy",
+                "content_path": _relative_to_root(episode_file),
+                "meta_path": None,
+            },
+        )
+
+
+def _build_episode_metadata(
+    episode: str,
+    batch_id: str,
+    brief_path: Path,
+    lint_payload: dict,
+    verify_result: dict,
+    release_status: str = "gold",
+) -> dict:
+    checks = lint_payload.get("checks", {})
+    return {
+        "episode": episode,
+        "provenance": RUNTIME_AUTHORITY,
+        "source_batch": batch_id,
+        "runtime_authority": RUNTIME_AUTHORITY,
+        "release_status": release_status,
+        "ruleset_version": RULESET_VERSION,
+        "lint_profile": LINT_PROFILE,
+        "lint_status": lint_payload.get("status", "fail"),
+        "verify_tier": verify_result.get("tier", "STANDARD"),
+        "verify_status": verify_result.get("status", "MISSING"),
+        "episode_failures": checks.get("episode_failures", []),
+        "scene_failures": checks.get("scene_failures", []),
+        "warnings": checks.get("warnings", []),
+        "batch_brief": _relative_to_root(brief_path),
+        "content_path": _relative_to_root(EPISODES / f"{episode}.md"),
+        "updated_at": NOW,
+    }
+
+
+def _build_release_entry(metadata: dict) -> dict:
+    return {
+        "episode": metadata["episode"],
+        "release_status": metadata["release_status"],
+        "runtime_authority": metadata["runtime_authority"],
+        "provenance": metadata["provenance"],
+        "source_batch": metadata["source_batch"],
+        "verify_tier": metadata["verify_tier"],
+        "verify_status": metadata["verify_status"],
+        "lint_status": metadata["lint_status"],
+        "content_path": metadata["content_path"],
+        "meta_path": _relative_to_root(_meta_path(metadata["episode"])),
+        "updated_at": metadata["updated_at"],
+    }
+
+
+def _promote_batch(
+    batch_id: str, brief_path: Path, episodes: list[str], lint_results: dict[str, dict]
+) -> tuple[int, dict]:
+    """Staged promote: build metadata in staging dir → replace files sequentially.
+
+    NOTE: The replace loop is NOT atomic. A crash mid-replace can leave partial
+    state (some episodes updated, release index not yet). The staging dir is
+    cleaned up in the finally block, so forward-recovery from staged artifacts
+    is not yet possible. See project memory 'promote atomicity gap' for the
+    deferred journal-based recovery design.
+    """
+    stage_root = RELEASES / "staging" / f"{batch_id}-{NOW.replace(':', '').replace(' ', '-')}"
+    stage_root.mkdir(parents=True, exist_ok=True)
+
+    staged_episode_files: dict[str, Path] = {}
+    staged_meta_files: dict[str, Path] = {}
+    try:
+        # Stage draft files
+        for episode in episodes:
+            src = DRAFTS / f"{episode}.md"
+            staged = stage_root / f"{episode}.md"
+            shutil.copy2(src, staged)
+            staged_episode_files[episode] = staged
+
+        # Load / init release tracking
+        release_index = _load_release_index()
+        gold_set = _load_gold_set()
+        gold_episodes = set(gold_set.get("episodes", []))
+        _bootstrap_legacy_entries(release_index, gold_episodes.union(set(episodes)))
+
+        # Build metadata per episode
+        for episode in episodes:
+            verify_result = _read_verify_result(episode) or {
+                "episode": episode, "tier": "STANDARD", "status": "MISSING",
+            }
+            lint_payload = lint_results.get(episode, {})
+            metadata = _build_episode_metadata(
+                episode=episode,
+                batch_id=batch_id,
+                brief_path=brief_path,
+                lint_payload=lint_payload,
+                verify_result=verify_result,
+            )
+            staged_meta = stage_root / f"{episode}.meta.json"
+            staged_meta.write_text(
+                json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8",
+            )
+            staged_meta_files[episode] = staged_meta
+            release_index["episodes"][episode] = _build_release_entry(metadata)
+            gold_episodes.add(episode)
+
+        # Update gold set
+        gold_set["episodes"] = sorted(gold_episodes)
+        gold_set["updated_at"] = NOW
+        release_index["current_batch"] = batch_id
+        release_index["current_batch_brief"] = _relative_to_root(brief_path)
+        release_index["updated_at"] = NOW
+
+        # Stage release files
+        staged_release_index = stage_root / "release.index.json"
+        staged_gold_set = stage_root / "gold-set.json"
+        staged_release_index.write_text(
+            json.dumps(release_index, ensure_ascii=False, indent=2), encoding="utf-8",
+        )
+        staged_gold_set.write_text(
+            json.dumps(gold_set, ensure_ascii=False, indent=2), encoding="utf-8",
+        )
+
+        # Sequential move: staging → final locations (not atomic; see docstring)
+        EPISODES.mkdir(parents=True, exist_ok=True)
+        RELEASES.mkdir(parents=True, exist_ok=True)
+        for episode in episodes:
+            staged_episode_files[episode].replace(EPISODES / f"{episode}.md")
+            staged_meta_files[episode].replace(_meta_path(episode))
+        staged_release_index.replace(RELEASE_INDEX)
+        staged_gold_set.replace(GOLD_SET)
+        return 0, {"release_index": release_index, "gold_set": gold_set}
+    finally:
+        if stage_root.exists():
+            shutil.rmtree(stage_root, ignore_errors=True)
+
+
+# ---------------------------------------------------------------------------
 # Shared batch-level pre-checks
 # ---------------------------------------------------------------------------
 
@@ -489,9 +731,10 @@ def _resolve_batch(batch_id: str, *, require_frozen: bool = False) -> tuple[Path
     return brief_path, brief, episodes
 
 
-def _run_lint_gate(episodes: list[str]) -> bool:
-    """Run lint on all draft episodes. Returns True if all pass."""
+def _run_lint_gate(episodes: list[str]) -> tuple[bool, dict[str, dict]]:
+    """Run lint on all draft episodes. Returns (all_pass, {ep: lint_payload})."""
     all_pass = True
+    lint_results: dict[str, dict] = {}
     for ep in episodes:
         draft = DRAFTS / f"{ep}.md"
         if not draft.exists():
@@ -508,11 +751,13 @@ def _run_lint_gate(episodes: list[str]) -> bool:
             episode_failures = data.get("checks", {}).get("episode_failures", [])
             is_fail = bool(episode_failures)
         except (json.JSONDecodeError, ValueError):
+            data = {"status": "error"}
             is_fail = True
+        lint_results[ep] = data
         print(f"  {'✓' if not is_fail else '✗'} {ep} lint {'pass' if not is_fail else 'FAIL'}")
         if is_fail:
             all_pass = False
-    return all_pass
+    return all_pass, lint_results
 
 
 def _run_verify_gate(episodes: list[str]) -> bool:
@@ -576,28 +821,38 @@ def cmd_status(args: argparse.Namespace) -> int:
         print("  (draft lane missing)")
     print()
 
-    print("=== Published (batch ownership) ===")
-    # Build map of episode → batch for all promoted batches
-    batches = _parse_source_map()
-    ep_to_batch: dict[str, str] = {}
-    for bid in sorted(batches.keys()):
-        bp = _find_batch_brief(bid)
-        if bp:
-            bd = _read_batch_brief(bp)
-            if bd.get("status") == "promoted":
-                for ep in bd.get("episodes", []):
-                    ep_to_batch[ep] = bid
+    print("=== Published Episodes ===")
+    release_index = _load_release_index()
+    gold_set = _load_gold_set()
+    gold_episodes = set(gold_set.get("episodes", []))
+    release_entries = release_index.get("episodes", {})
 
     if EPISODES.exists():
         eps = sorted(EPISODES.glob("EP-*.md"))
         for e in eps:
-            owner = ep_to_batch.get(e.stem)
-            if owner:
-                print(f"  {e.name}  [{owner}]")
+            ep = e.stem
+            entry = release_entries.get(ep)
+            if entry:
+                rs = entry.get("release_status", "?")
+                batch = entry.get("source_batch", "?")
+                has_meta = _meta_path(ep).exists()
+                label = f"{rs}"
+                if rs == "gold":
+                    label += f", batch={batch}"
+                if has_meta:
+                    label += ", meta=✓"
+                print(f"  {e.name}  [{label}]")
+            elif ep in gold_episodes:
+                print(f"  {e.name}  [gold (index missing)]")
             else:
-                print(f"  {e.name}  [UNTRACKED — legacy or orphan]")
+                print(f"  {e.name}  [untracked]")
         if not eps:
             print("  (none)")
+    else:
+        print("  (no episodes directory)")
+
+    if gold_episodes:
+        print(f"\n  Gold set: {', '.join(sorted(gold_episodes))}")
     print()
 
     # Show verify results if any
@@ -743,6 +998,7 @@ def cmd_gate(args: argparse.Namespace) -> int:
 
 
 def cmd_promote(args: argparse.Namespace) -> int:
+    batch_id = args.batch_id
     resolved = _resolve_batch(args.batch_id, require_frozen=True)
     if resolved is None:
         return 1
@@ -750,7 +1006,8 @@ def cmd_promote(args: argparse.Namespace) -> int:
 
     # Gate: lint
     print("Running lint gate...")
-    if not _run_lint_gate(episodes):
+    lint_passed, lint_results = _run_lint_gate(episodes)
+    if not lint_passed:
         return 1
 
     # Gate: verify + integrity
@@ -763,13 +1020,13 @@ def cmd_promote(args: argparse.Namespace) -> int:
         print("ERROR: state.lock is held — cannot promote")
         return 1
 
-    # Execute promote: copy drafts → episodes
-    EPISODES.mkdir(parents=True, exist_ok=True)
+    # Execute promote: staging → sequential replace → release tracking
+    rc, _ = _promote_batch(batch_id, brief_path, episodes, lint_results)
+    if rc != 0:
+        print("ERROR: staging promote failed")
+        return 1
     for ep in episodes:
-        src = DRAFTS / f"{ep}.md"
-        dst = EPISODES / f"{ep}.md"
-        shutil.copy2(src, dst)
-        print(f"  → {ep}: draft → published")
+        print(f"  → {ep}: draft → published (gold)")
 
     # Update batch brief status
     _set_batch_status(brief_path, "promoted")
@@ -849,6 +1106,7 @@ def cmd_retry(args: argparse.Namespace) -> int:
 
 def cmd_verify_plan(args: argparse.Namespace) -> int:
     """Compute verify tiers for a batch based on source.map metadata."""
+    batch_id = args.batch_id
     resolved = _resolve_batch(args.batch_id)
     if resolved is None:
         return 1
@@ -873,6 +1131,7 @@ def cmd_verify_plan(args: argparse.Namespace) -> int:
 
 def cmd_batch_review(args: argparse.Namespace) -> int:
     """Print batch-level review checklist after all episodes in batch pass verify."""
+    batch_id = args.batch_id
     resolved = _resolve_batch(args.batch_id)
     if resolved is None:
         return 1
@@ -1526,6 +1785,7 @@ def cmd_start(args: argparse.Namespace) -> int:
 
 def cmd_check(args: argparse.Namespace) -> int:
     """Gate (lint all) + verify-plan + semantic verify instructions."""
+    batch_id = args.batch_id
     resolved = _resolve_batch(args.batch_id)
     if resolved is None:
         return 1
@@ -1533,7 +1793,8 @@ def cmd_check(args: argparse.Namespace) -> int:
 
     # Step 1: Lint gate
     print(f"=== Lint Gate: {args.batch_id} ===")
-    if not _run_lint_gate(episodes):
+    lint_passed, _ = _run_lint_gate(episodes)
+    if not lint_passed:
         print(f"\n  GATE FAIL — fix lint errors before proceeding")
         return 1
     print(f"\n  GATE PASS")
@@ -1593,6 +1854,7 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 def cmd_finish(args: argparse.Namespace) -> int:
     """Promote + validate + batch-review + log + next instructions."""
+    batch_id = args.batch_id
     resolved = _resolve_batch(args.batch_id, require_frozen=True)
     if resolved is None:
         return 1
@@ -1600,7 +1862,8 @@ def cmd_finish(args: argparse.Namespace) -> int:
 
     # Step 1: Final lint gate
     print(f"=== Step 1: Lint Gate ===")
-    if not _run_lint_gate(episodes):
+    lint_passed, lint_results = _run_lint_gate(episodes)
+    if not lint_passed:
         return 1
 
     # Step 2: Verify gate
@@ -1613,14 +1876,14 @@ def cmd_finish(args: argparse.Namespace) -> int:
         print("ERROR: state.lock is held — cannot finish")
         return 1
 
-    # Step 4: Promote
+    # Step 4: Promote (staging → sequential replace → release tracking)
     print(f"\n=== Step 3: Promote ===")
-    EPISODES.mkdir(parents=True, exist_ok=True)
+    rc, _ = _promote_batch(batch_id, brief_path, episodes, lint_results)
+    if rc != 0:
+        print("ERROR: staging promote failed")
+        return 1
     for ep in episodes:
-        src = DRAFTS / f"{ep}.md"
-        dst = EPISODES / f"{ep}.md"
-        shutil.copy2(src, dst)
-        print(f"  → {ep}: draft → published")
+        print(f"  → {ep}: draft → published (gold)")
 
     _set_batch_status(brief_path, "promoted")
     _write_lock("batch.lock", "unlocked")
@@ -1631,7 +1894,7 @@ def cmd_finish(args: argparse.Namespace) -> int:
     ep_range = f"{episodes[0]}~{episodes[-1]}" if len(episodes) > 1 else episodes[0]
     _append_log(batch_id, ep_range, "promote", "controller promote", "✓", f"{batch_id} promoted")
     _set_manifest_field("active_batch", f"{batch_id}_promoted")
-    print(f"  ✓ {len(episodes)} episodes promoted, batch.lock released")
+    print(f"  ✓ {len(episodes)} promoted to gold, batch.lock released")
 
     # Step 5: Validate state files
     print(f"\n=== Step 4: State Validation ===")
