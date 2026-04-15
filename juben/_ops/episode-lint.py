@@ -50,6 +50,13 @@ OS_POLISHED_PATTERNS = [
     re.compile(r"不是.+而是"),
     re.compile(r"既.+也"),
 ]
+QUOTED_TEXT_RE = re.compile(r"“[^”]*”|\"[^\"]*\"|「[^」]*」|『[^』]*』")
+FIRST_PERSON_NARRATION_PATTERNS = [
+    re.compile(r"(^|[，。！？；、：\s])我(?!们)(?=[的在把将正刚便就又也都只还仍已先没不想要会能敢得该心眼手脚身头脸嘴推抬转退走看听盯按扶攥咬收停觉得知道明白一下一阵])"),
+    re.compile(r"(^|[，。！？；、：\s])我的(?=\S)"),
+    re.compile(r"(^|[，。！？；、：\s])我们(?=[在把将正刚便就又也都只还仍已先没不想要会能敢得该心眼手脚身头脸嘴推抬转退走看听盯按扶攥咬收停觉得知道明白])"),
+    re.compile(r"(^|[，。！？；、：\s])咱们(?=[在把将正刚便就又也都只还仍已先没不想要会能敢得该])"),
+]
 
 
 @dataclass
@@ -140,6 +147,11 @@ def polished_os(text: str) -> bool:
     return any(pattern.search(text) for pattern in OS_POLISHED_PATTERNS)
 
 
+def has_first_person_narration(text: str) -> bool:
+    cleaned = QUOTED_TEXT_RE.sub("", text)
+    return any(pattern.search(cleaned) for pattern in FIRST_PERSON_NARRATION_PATTERNS)
+
+
 def collect_history_files(current: Path) -> list[Path]:
     match = re.search(r"EP-(\d+)\.md$", current.name)
     if not match:
@@ -172,6 +184,7 @@ def build_scene_metrics(scene: Scene) -> dict:
     interrupted = True
     last_speaker: str | None = None
     polished_os_count = 0
+    first_person_narration_count = 0
 
     for raw in scene.lines[1:]:
         line = normalize_line(raw)
@@ -185,6 +198,8 @@ def build_scene_metrics(scene: Scene) -> dict:
             metaphor_count += count_metaphors(content)
             if has_psychological_comment(content):
                 psychological_comment_count += 1
+            if has_first_person_narration(content):
+                first_person_narration_count += 1
             if between_dialogues:
                 action_inserts += 1
                 between_dialogues = False
@@ -217,8 +232,12 @@ def build_scene_metrics(scene: Scene) -> dict:
                 os_count += 1
                 if polished_os(content):
                     polished_os_count += 1
+                if has_first_person_narration(content):
+                    first_person_narration_count += 1
             if "（vo）" in speaker:
                 vo_count += 1
+                if has_first_person_narration(content):
+                    first_person_narration_count += 1
             if interrupted or speaker != last_speaker:
                 dialogue_rounds += 1
             last_speaker = speaker
@@ -255,6 +274,7 @@ def build_scene_metrics(scene: Scene) -> dict:
         "metaphor_count": metaphor_count,
         "psychological_comment_count": psychological_comment_count,
         "polished_os_count": polished_os_count,
+        "first_person_narration_count": first_person_narration_count,
         "ending_has_hook": has_hook(ending_text),
         "line_count": len(scene.lines),
     }
@@ -311,6 +331,8 @@ def build_checks(scenes: list[dict], totals: dict, history: dict) -> dict:
             failures.append("sfx")
         if scene["metaphor_count"] > 2:
             failures.append("metaphor_count")
+        if scene["first_person_narration_count"] > 0:
+            failures.append("first_person_narration")
         scene_failures.append({"scene": idx, "title": scene["title"], "failures": failures})
 
     episode_failures = []
@@ -328,6 +350,8 @@ def build_checks(scenes: list[dict], totals: dict, history: dict) -> dict:
         episode_failures.append("metaphor_count")
     if totals["psychological_comment_count"] >= 2:
         episode_failures.append("psychological_comment_count")
+    if totals["first_person_narration_count"] > 0:
+        episode_failures.append("first_person_narration")
 
     # Non-final scenes without hooks: allow 1 for pacing, fail if ≥ 2
     hookless_non_final = sum(
@@ -397,6 +421,7 @@ def main() -> int:
         "sfx_count": sum(scene["sfx_count"] for scene in scene_metrics),
         "metaphor_count": sum(scene["metaphor_count"] for scene in scene_metrics),
         "psychological_comment_count": sum(scene["psychological_comment_count"] for scene in scene_metrics),
+        "first_person_narration_count": sum(scene["first_person_narration_count"] for scene in scene_metrics),
         "line_count": len(lines),
         "all_os_polished": all_os_polished,
         "scene_tail_melodrama_run": scene_tail_melodrama_run,

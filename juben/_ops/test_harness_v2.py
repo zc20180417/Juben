@@ -15,7 +15,9 @@ VERIFY_CONTRACT = ROOT / "harness" / "framework" / "verify-contract.md"
 PROMOTE_CONTRACT = ROOT / "harness" / "framework" / "promote-contract.md"
 MEMORY_CONTRACT = ROOT / "harness" / "framework" / "memory-contract.md"
 REGRESSION_CONTRACT = ROOT / "harness" / "framework" / "regression-contract.md"
+PASSING_SAMPLE = ROOT / "harness" / "framework" / "passing-episode.sample.md"
 RUN_MANIFEST = ROOT / "harness" / "project" / "run.manifest.md"
+BOOK_BLUEPRINT = ROOT / "harness" / "project" / "book.blueprint.md"
 SOURCE_MAP = ROOT / "harness" / "project" / "source.map.md"
 BATCH_BRIEF = ROOT / "harness" / "project" / "batch-briefs" / "batch01_EP01-05.md"
 REGRESSION_DIR = ROOT / "harness" / "project" / "regressions"
@@ -56,6 +58,14 @@ class StructureTests(unittest.TestCase):
         self.assertIn("Resolve workflow inputs from `entry.md`", claude)
         self.assertIn("Treat Harness V2 as the only workflow source of truth", claude)
 
+    def test_agents_and_claude_route_tilde_commands_via_entry(self) -> None:
+        agents = AGENTS.read_text(encoding="utf-8")
+        claude = CLAUDE.read_text(encoding="utf-8")
+        self.assertIn("`~` 开头", agents)
+        self.assertIn("entry.md", agents)
+        self.assertIn("`~` 开头", claude)
+        self.assertIn("entry.md", claude)
+
     def test_agents_doc_is_not_an_operations_manual(self) -> None:
         agents = AGENTS.read_text(encoding="utf-8")
         for marker in [
@@ -79,6 +89,7 @@ class StructureTests(unittest.TestCase):
             INPUT_CONTRACT,
             WRITE_CONTRACT,
             WRITER_STYLE,
+            PASSING_SAMPLE,
             VERIFY_CONTRACT,
             PROMOTE_CONTRACT,
             MEMORY_CONTRACT,
@@ -86,13 +97,27 @@ class StructureTests(unittest.TestCase):
         ]:
             self.assertTrue(path.exists(), path)
 
+    def test_book_blueprint_file_exists(self) -> None:
+        self.assertTrue(BOOK_BLUEPRINT.exists(), BOOK_BLUEPRINT)
+        content = BOOK_BLUEPRINT.read_text(encoding="utf-8")
+        self.assertIn("recommended_total_episodes", content)
+        self.assertIn("## 集数建议", content)
+
     def test_run_manifest_fields_exist(self) -> None:
         content = RUN_MANIFEST.read_text(encoding="utf-8")
         for field in [
+            "total_episodes",
+            "recommended_total_episodes",
+            "episode_count_source",
+            "target_episode_minutes",
+            "episode_minutes_min",
+            "episode_minutes_max",
             "adaptation_mode",
             "adaptation_strategy",
             "dialogue_adaptation_intensity",
             "generation_execution_mode",
+            "writer_parallelism",
+            "writer_command",
             "generation_reset_mode",
             "run_status",
             "active_batch",
@@ -202,6 +227,22 @@ class StructureTests(unittest.TestCase):
         ]:
             self.assertIn(path_text, readme)
 
+    def test_entry_defines_chat_command_aliases(self) -> None:
+        entry = ENTRY.read_text(encoding="utf-8")
+        self.assertIn("Chat Command Aliases", entry)
+        for alias in ["~init", "~extract-book", "~map-book", "~start", "~run", "~check", "~finish", "~record", "~clean", "~clear", "~status"]:
+            self.assertIn(alias, entry)
+        self.assertIn("--episodes", entry)
+        self.assertIn("--batch-size", entry)
+        self.assertIn("可选人工覆盖", entry)
+        self.assertIn("smoke", entry)
+        self.assertIn("不是清空聊天记录", entry)
+
+    def test_passing_episode_sample_contains_required_shell_markers(self) -> None:
+        content = PASSING_SAMPLE.read_text(encoding="utf-8")
+        for marker in ["场1-1：", "日/夜", "外/内", "场景：", "♪：", "△：", "【镜头】：", "（os）"]:
+            self.assertIn(marker, content)
+
 
 # ---------------------------------------------------------------------------
 # Layer 2: Execution Coverage Tests (specs consume contracts)
@@ -233,6 +274,7 @@ class AlignerExecutionTests(unittest.TestCase):
             "具体事故",
             "强闭环",
             "即时动作钩子",
+            "第一人称",
             "publish lane",
         ]:
             self.assertIn(item, self.aligner, f"Fail Closed item missing from aligner: {item}")

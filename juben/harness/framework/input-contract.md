@@ -2,6 +2,7 @@
 
 ## Required Inputs
 - `harness/project/run.manifest.md`
+- `harness/project/book.blueprint.md`
 - `harness/project/source.map.md`
 - `harness/project/batch-briefs/batchNN_*.md`
 - 原著正文
@@ -9,6 +10,12 @@
 
 ## Run Manifest Contract
 必须字段：
+- `total_episodes`
+- `recommended_total_episodes`
+- `episode_count_source`
+- `target_episode_minutes`
+- `episode_minutes_min`
+- `episode_minutes_max`
 - `adaptation_mode`
 - `adaptation_strategy`
 - `dialogue_adaptation_intensity`
@@ -20,6 +27,16 @@
 - `draft_lane`
 - `publish_lane`
 - `promotion_policy`
+
+## Book Blueprint Contract
+全书级蓝图至少包含：
+- 集数建议（含 `recommended_total_episodes`）
+- 主线
+- 角色弧光
+- 关系变化
+- 关键反转
+- 结局闭环
+- 章节索引（仅定位）
 
 ## Source Map Contract
 每个 batch / episode 至少包含：
