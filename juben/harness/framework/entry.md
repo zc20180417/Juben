@@ -2,6 +2,14 @@
 
 本文件是 harness v2 的总入口。
 
+## Smoke-First Semantics
+
+Harness V2 的默认前置语义是 `smoke-first`：先确认剧本壳层、文件路径和 lane 形态都正确，再把注意力放到正文内容与情节推进上。
+
+- `smoke` 检查优先覆盖壳层标记、样例对齐和最小可写结构
+- 只要壳层不完整，就应按 fail-closed 处理，不进入后续正文修饰
+- `passing-episode.sample.md` 是最小通过样例，后续 writer stage 应优先对齐它的结构而不是自由发挥
+
 ## Role Architecture
 
 本 harness 采用三角色分离架构，防止"自己写自己判"的认知偏差：
@@ -53,6 +61,33 @@
 - draft 未通过 verify：禁止 promote
 - state lock 被占用：禁止 record
 - `episodes/` 中的正式稿永不作为当前候选结果的写作输入
+
+## Chat Command Aliases
+
+在 agent 聊天界面里，用户消息如果以 `~` 开头，应先按本节解释成 workflow 命令，再决定是否执行 shell。
+
+| 聊天命令 | 规范含义 | 对应 controller 命令 |
+|---|---|---|
+| `~init "<novel_file>" [--episodes <n>] --batch-size <n> --strategy <name> --intensity <name> [--key-episodes <ids>] [--force]` | 初始化/重建项目 scaffold；`--episodes` 是可选人工覆盖，默认由模型在 `extract-book` 后推荐并直接采用 | `python _ops/controller.py init "<novel_file>" [--episodes <n>] --batch-size <n> --strategy <name> --intensity <name> [--key-episodes <ids>] [--force]` |
+| `~extract-book` | 基于整本原著生成 `book.blueprint.md`，先锁全书主线/弧光/反转/结局 | `python _ops/controller.py extract-book` |
+| `~map-book` | 基于 `book.blueprint.md` 生成完整 `source.map.md` | `python _ops/controller.py map-book` |
+| `~start <batch_id>` | 启动总入口：prepare → writer stage → run | `python _ops/controller.py start <batch_id>` |
+| `~run <batch_id>` | 对已有 draft 执行快路径 | `python _ops/controller.py run <batch_id>` |
+| `~check <batch_id>` | 只跑 lint gate + verify 计划输出 | `python _ops/controller.py check <batch_id>` |
+| `~finish <batch_id>` | 完成 promote / validate / review / next | `python _ops/controller.py finish <batch_id>` |
+| `~record <batch_id>` | 进入 record phase | `python _ops/controller.py record <batch_id>` |
+| `~clean` | 备份并清理当前项目 runtime 数据缓存 | `python _ops/controller.py clean` |
+| `~clear` | 与 `~clean` 同义；在本仓库里不是清空聊天记录 | `python _ops/controller.py clean` |
+| `~status` | 查看当前 pipeline 状态 | `python _ops/controller.py status` |
+
+解释规则：
+- `~command` 在本仓库优先视为 harness workflow 命令，不优先按普通闲聊文本处理
+- `~clear` 在本仓库中不是清空聊天记录，而是 `clean` 的聊天别名
+- `~init` 需要的 `novel_file`、`--batch-size`、`--strategy`、`--intensity` 等参数按 `controller.py init` 语义处理；`--episodes` 是可选人工覆盖，不再是默认必填控制项
+- 默认节奏约束是单集 1-3 分钟动态区间、平均按 2 分钟/集；`~extract-book` 需先给出推荐总集数，并默认直接写回 `run.manifest.md`
+- `~extract-book` 先完成全书级抽取；`~map-book` 再把全书蓝图落成 `source.map.md`
+- 若参数缺失且无法安全推断，先要求用户补全，而不是猜测 batch id
+- root `AGENTS.md` / `CLAUDE.md` 只负责把 `~command` 路由到本节，不在根文件里重复维护命令语义
 
 ## Context Reset Protocol
 

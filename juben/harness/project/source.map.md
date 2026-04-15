@@ -1,409 +1,410 @@
-# Original Fidelity Rebuild Map
-
-日期：2026-04-06
-模式：`original_fidelity`
-对话改编力度：`light`
-执行方式：`orchestrated_subagents`
-重建方式：`clean_rebuild`
-
-说明：
-- 本文件是本轮 clean rebuild 的 controller-only 映射权威。
-- 原著章节顺序优先；一章可拆多集，多个相邻章节可合拍。
-- `outline.md` / `episode_index.md` 本轮仅作低优先级参考，不得覆盖本映射。
-- `must-not-add` / `must-not-jump` 为硬边界，writer subagent 不得自行突破。
-
-## Batch 01：EP-01 ~ EP-05
-原著范围：第1章 ~ 第5章
-
-### EP-01
-- source chapter span：第1章
-- must-keep beats：窗外听刑；柳姨娘"您害我，不怕遭报应吗"；沈夫人"报应？在这宰相府，我就是天"；柳姨娘断气；沈丞相冷反应；后山埋母；母坟立誓
-- must-not-add / must-not-jump：不得删掉回应句触发语义；不得为了 cliffhanger 把立誓切走；不得漏掉父亲冷反应
-- ending type：强闭环
-
-### EP-02
-- source chapter span：第2章
-- must-keep beats：选秀旨意压府；沈明珠拒绝入宫；沈青鸾低姿态请命替姐入宫；沈夫人把她视为眼线与弃子
-- must-not-add / must-not-jump：不得把她写成得意宣言式入局；不得弱化"命贱、愿替长姐受苦"的求生腔
-- ending type：前推力
-
-### EP-03
-- source chapter span：第3章
-- must-keep beats：扮丑扮病；选秀入场；宸妃轻视；皇帝因朱砂痣和"看不透"的眼神注意她；留牌封答应；低位入住凝香阁
-- must-not-add / must-not-jump：不得把第一次注意写成常规机锋问答；不得让她提前显得锋芒太露
-- ending type：前推力
-
-### EP-04
-- source chapter span：第4章
-- must-keep beats：深居简出；后宫新人被打压形成环境压力；御花园自然偶遇；皇帝点她侍寝
-- must-not-add / must-not-jump：不得把偶遇改成预谋布局；不得把概述性后宫压力扩成具体事故
-- ending type：前推力
-
-### EP-05
-- source chapter span：第5章
-- must-keep beats：初次承宠；若即若离；借"宠爱会带来灾祸/宸妃威胁"递刀；次日升常在赐居；宸妃震怒
-- must-not-add / must-not-jump：不得把隐藏策略说透；不得新增具体后宫事故；不得把 `os` 写成总结得手
-- ending type：前推力
-
-## Batch 02：EP-06 ~ EP-10
-原著范围：第6章 ~ 第8章
-
-### EP-06
-- source chapter span：第6章前半
-- must-keep beats：宸妃设宴；沈青鸾明知鸿门宴仍去；不去即示弱
-- must-not-add / must-not-jump：不得跳过宴前压迫直接写羞辱
-- ending type：前推力
-
-### EP-07
-- source chapter span：第6章后半
-- must-keep beats：当众献舞羞辱；皇帝撞见；护短落下；宸妃受挫
-- must-not-add / must-not-jump：不得把这场写成普通嘴仗；不得跳过皇帝亲见
-- ending type：前推力
-
-### EP-08
-- source chapter span：第7章前半
-- must-keep beats：宸妃巫蛊设局；沈青鸾提前识破
-- must-not-add / must-not-jump：不得直接写宸妃冷宫；不得提前宣布反制成功
-- ending type：前推力
-
-### EP-09
-- source chapter span：第7章后半
-- must-keep beats：搜宫反转；证据指向宸妃；降位冷宫；"以其人之道还治其人之身"
-- must-not-add / must-not-jump：不得把送冷宫写成过度工整说教
-- ending type：强闭环
-
-### EP-10
-- source chapter span：第8章
-- must-keep beats：家书催命；回信伪孝；给沈明珠递毒婚约；"就让他们狗咬狗吧"
-- must-not-add / must-not-jump：不得跳过家书直接进入婚约成毒结果
-- ending type：前推力
-
-## Batch 03：EP-11 ~ EP-15
-原著范围：第9章 ~ 第11章前半
-
-### EP-11
-- source chapter span：第9章前半
-- must-keep beats：沈夫人大喜；沈明珠不愿嫁赵家纨绔；婚事逼压
-- must-not-add / must-not-jump：不得跳过婚事压迫直接写赵家塌台
-- ending type：前推力
-
-### EP-12
-- source chapter span：第9章后半
-- must-keep beats：镇国将军府通敌抄家；婚事崩盘；沈夫人写信质问；借皇帝之手递刀
-- must-not-add / must-not-jump：不得把抄家写成与前文无因果的天降事件
-- ending type：前推力
-
-### EP-13
-- source chapter span：第10章前半
-- must-keep beats：沈丞相因贪腐落马；沈家跌落；沈夫人求情
-- must-not-add / must-not-jump：不得提前把沈明珠接进宫
-- ending type：前推力
-
-### EP-14
-- source chapter span：第10章后半
-- must-keep beats：沈明珠寄居亲族；沈青鸾"好心"接她入宫暂住；噩梦刚开始
-- must-not-add / must-not-jump：不得把沈明珠直接写成成熟宫斗对手
-- ending type：前推力
-
-### EP-15
-- source chapter span：第11章前半
-- must-keep beats：淑妃糕点；慢毒判断；将计就计；找云太医
-- must-not-add / must-not-jump：不得一集内直接完成淑妃冷宫
-- ending type：前推力
-
-## Batch 04：EP-16 ~ EP-20
-原著范围：第11章后半 ~ 第14章前半
-
-### EP-16
-- source chapter span：第11章后半
-- must-keep beats：装病卧床；皇帝日日探视；借淑妃糕点递证据；淑妃冷宫
-- must-not-add / must-not-jump：不得写成女主一开始就把毒局讲透给观众
-- ending type：强闭环
-
-### EP-17
-- source chapter span：第12章
-- must-keep beats：沈明珠起野心；花园卖弄；萧景珩斥责；逐出宫去
-- must-not-add / must-not-jump：不得把这段写成皇帝被她短暂勾住
-- ending type：强闭环
-
-### EP-18
-- source chapter span：第13章
-- must-keep beats：皇后注意；召见敲打；沈青鸾确认皇后是最大目标
-- must-not-add / must-not-jump：不得提前打太子线
-- ending type：前推力
-
-### EP-19
-- source chapter span：第14章前半
-- must-keep beats：皇后买通宫人下毒；翠竹发现端倪
-- must-not-add / must-not-jump：不得直接让翠竹替死而没有铺垫
-- ending type：前推力
-
-### EP-20
-- source chapter span：第14章后半
-- must-keep beats：翠竹替死；临终托付报仇；沈青鸾彻底转向主动猎杀
-- must-not-add / must-not-jump：不得用 `os` 替代情绪与动作承载
-- ending type：强闭环
-
-## Batch 05：EP-21 ~ EP-25
-原著范围：第15章 ~ 第17章前半
-
-### EP-21
-- source chapter span：第15章前半
-- must-keep beats：决定从太子下手；靠近太子；建立信任
-- must-not-add / must-not-jump：不得把女主写成直接给太子灌输整套阴谋
-- ending type：前推力
-
-### EP-22
-- source chapter span：第15章后半
-- must-keep beats：故事离间；太子开始把坏皇后投向生母；皇后震怒
-- must-not-add / must-not-jump：不得直接写到御前对峙
-- ending type：前推力
-
-### EP-23
-- source chapter span：第16章
-- must-keep beats：皇后掌嘴未成；萧景珩到场；沈青鸾委屈应对；皇后吃闷亏
-- must-not-add / must-not-jump：不得把沈青鸾写成当面挑衅过狠
-- ending type：前推力
-
-### EP-24
-- source chapter span：第17章前半
-- must-keep beats：皇后设计太子落水并欲嫁祸；沈青鸾提前防备
-- must-not-add / must-not-jump：不得直接写皇后禁足结果
-- ending type：前推力
-
-### EP-25
-- source chapter span：第17章后半
-- must-keep beats：太子被救；嬷嬷供出；皇后禁足凤仪宫
-- must-not-add / must-not-jump：不得弱化"嬷嬷反咬"这一证据落点
-- ending type：强闭环
-
-## Batch 06：EP-26 ~ EP-30
-原著范围：第18章 ~ 第20章
-
-### EP-26
-- source chapter span：第18章前半
-- must-keep beats：娴妃协理六宫；沈夫人回京求情；被"请"入宫
-- must-not-add / must-not-jump：不得直接进入母女清算结果
-- ending type：前推力
-
-### EP-27
-- source chapter span：第18章后半
-- must-keep beats：雨夜旧账对质；送沈夫人入冷宫；"生不如死"
-- must-not-add / must-not-jump：不得把母亲线写得太体面
-- ending type：强闭环
-
-### EP-28
-- source chapter span：第19章
-- must-keep beats：沈明珠发疯喊冤；沈青鸾当面承认又反证无门；慎刑司收场
-- must-not-add / must-not-jump：不得把沈明珠写成突然聪明控局
-- ending type：前推力
-
-### EP-29
-- source chapter span：第20章
-- must-keep beats：沈夫人疯死；沈明珠自尽；沈丞相死讯；母坟前告慰；复仇第一阶段完成
-- must-not-add / must-not-jump：不得跳过母坟回返
-- ending type：强闭环
-
-### EP-30
-- source chapter span：第21章前半
-- must-keep beats：后位空悬；朝臣反对立后；沈青鸾装病拒见
-- must-not-add / must-not-jump：不得直接落立后诏
-- ending type：前推力
-
-## Batch 07：EP-31 ~ EP-35
-原著范围：第21章后半 ~ 第24章前半
-
-### EP-31
-- source chapter span：第21章后半
-- must-keep beats：开门落泪；以退为进；皇帝钉死立后之意
-- must-not-add / must-not-jump：不得把逼立后写成她公开索位
-- ending type：前推力
-
-### EP-32
-- source chapter span：第22章
-- must-keep beats：立后大典；众人下跪；庶女翻身为后
-- must-not-add / must-not-jump：不得削弱身份跃迁的场面重量
-- ending type：强闭环
-
-### EP-33
-- source chapter span：第23章前半
-- must-keep beats：新后意识到太子是障碍；开始纵坏太子
-- must-not-add / must-not-jump：不得直接杀太子
-- ending type：前推力
-
-### EP-34
-- source chapter span：第23章后半
-- must-keep beats：皇帝对太子彻底失望；废太子落定
-- must-not-add / must-not-jump：不得在废储前让前皇后出局
-- ending type：前推力
-
-### EP-35
-- source chapter span：第24章前半
-- must-keep beats：废太子入她宫中；慈母姿态下慢毒
-- must-not-add / must-not-jump：不得把温柔照料直接写穿成下毒明牌
-- ending type：前推力
-
-## Batch 08：EP-36 ~ EP-40
-原著范围：第24章后半 ~ 第27章前半
-
-### EP-36
-- source chapter span：第24章后半
-- must-keep beats：太子临终忏悔；托她照顾生母；太子死
-- must-not-add / must-not-jump：不得提前让前皇后疯癫出局
-- ending type：强闭环
-
-### EP-37
-- source chapter span：第25章
-- must-keep beats：前皇后公开指控；以"她疯了"为名送冷宫
-- must-not-add / must-not-jump：不得弱化"她疯了"的政治用法
-- ending type：前推力
-
-### EP-38
-- source chapter span：第26章前半
-- must-keep beats：太子与前皇后都倒下；后宫秩序被她接管
-- must-not-add / must-not-jump：不得提前写帝王深情毒局
-- ending type：强闭环
-
-### EP-39
-- source chapter span：第26章后半
-- must-keep beats：后宫尽归她手；独宠格局形成；她意识到这还不够
-- must-not-add / must-not-jump：不得把香囊慢毒提前显性化
-- ending type：前推力
-
-### EP-40
-- source chapter span：第27章前半
-- must-keep beats：萧景珩依赖更深；她继续演爱；偶有恍惚又迅速清醒
-- must-not-add / must-not-jump：不得提前亮出"他不能活太久"
-- ending type：前推力
-
-## Batch 09：EP-41 ~ EP-45
-原著范围：第27章后半 ~ 第30章
-
-### EP-41
-- source chapter span：第27章后半
-- must-keep beats：香囊送出；皇帝戴上；慢毒局正式点亮
-- must-not-add / must-not-jump：不得把这场写成直接摊牌
-- ending type：前推力
-
-### EP-42
-- source chapter span：第28章
-- must-keep beats："怀孕"喜讯；她根本不能生的真相；必须造出一个孩子
-- must-not-add / must-not-jump：不得在此之前提前揭出不能生
-- ending type：前推力
-
-### EP-43
-- source chapter span：第29章
-- must-keep beats：设计流产；嫁祸丽嫔；为假孕铺路
-- must-not-add / must-not-jump：不得直接进入借腹执行
-- ending type：前推力
-
-### EP-44
-- source chapter span：第30章前半
-- must-keep beats：再度"怀孕"；买通院正；开始找借腹对象；阿碧被选中
-- must-not-add / must-not-jump：不得提前把孩子生产成既成事实
-- ending type：前推力
-
-### EP-45
-- source chapter span：第30章后半
-- must-keep beats：阿碧被秘密安置；沈青鸾温柔安抚；生后灭口意图被钉死
-- must-not-add / must-not-jump：不得弱化她对这条线的冷狠
-- ending type：前推力
-
-## Batch 10：EP-46 ~ EP-50
-原著范围：第31章 ~ 第33章前半
-
-### EP-46
-- source chapter span：第31章前半
-- must-keep beats：阿碧临产；产局封闭；沈青鸾守产局
-- must-not-add / must-not-jump：不得提前公开换子真相
-- ending type：前推力
-
-### EP-47
-- source chapter span：第31章后半
-- must-keep beats：阿碧生子；灭口阿碧；假母换子；太子立成
-- must-not-add / must-not-jump：不得削弱灭口与换子的因果
-- ending type：强闭环
-
-### EP-48
-- source chapter span：第32章前半
-- must-keep beats：萧景珩病重；沈青鸾侍病
-- must-not-add / must-not-jump：不得提前说破"他一直都知道"
-- ending type：前推力
-
-### EP-49
-- source chapter span：第32章后半
-- must-keep beats：萧景珩摊牌"朕知道你一直在利用朕"；仍说爱她；托孤；驾崩
-- must-not-add / must-not-jump：不得把情感摊牌提前到前中段
-- ending type：强闭环
-
-### EP-50
-- source chapter span：第33章前半
-- must-keep beats：太后临朝；群臣反对；遗诏压场
-- must-not-add / must-not-jump：不得直接写朝中噤声
-- ending type：前推力
-
-## Batch 11：EP-51 ~ EP-55
-原著范围：第33章后半 ~ 第36章
-
-### EP-51
-- source chapter span：第33章后半
-- must-keep beats：王铮上疏；旧案反打；满门抄斩；杀鸡儆猴
-- must-not-add / must-not-jump：不得弱化朝堂立威
-- ending type：强闭环
-
-### EP-52
-- source chapter span：第34章
-- must-keep beats：系统清洗异己；镇国公正面反对
-- must-not-add / must-not-jump：不得提前写边关军功稳权
-- ending type：前推力
-
-### EP-53
-- source chapter span：第34章后半 + 第35章前半
-- must-keep beats：镇国公斩立决；北狄告急；李靖出征
-- must-not-add / must-not-jump：不得跳过镇国公被斩直接写军权稳固
-- ending type：前推力
-
-### EP-54
-- source chapter span：第35章后半
-- must-keep beats：李靖凯旋；封异姓王；军权更稳
-- must-not-add / must-not-jump：不得削弱她借军功巩权
-- ending type：强闭环
-
-### EP-55
-- source chapter span：第36章
-- must-keep beats：小皇帝长大；要求亲政；她表面放权实则试探
-- must-not-add / must-not-jump：不得直接进入废帝
-- ending type：前推力
-
-## Batch 12：EP-56 ~ EP-60
-原著范围：第37章 ~ 第40章
-
-### EP-56
-- source chapter span：第37章前半
-- must-keep beats：亲政处处碰壁；发现自己只是空壳皇帝
-- must-not-add / must-not-jump：不得提前揭穿身世
-- ending type：前推力
-
-### EP-57
-- source chapter span：第37章后半
-- must-keep beats：母子撕破脸；身世揭穿；只把他当工具；拖去冷宫
-- must-not-add / must-not-jump：不得把冷宫软禁提前到亲政前
-- ending type：强闭环
-
-### EP-58
-- source chapter span：第38章
-- must-keep beats：废帝；另立幼帝；继续垂帘
-- must-not-add / must-not-jump：不得跳过废帝程序
-- ending type：前推力
-
-### EP-59
-- source chapter span：第39章
-- must-keep beats：晚年治国政绩；"毒妇/明君"双重评价；只爱权力的迟来承认
-- must-not-add / must-not-jump：不得提前把定评放到刚临朝时
-- ending type：强闭环
-
-### EP-60
-- source chapter span：第40章
-- must-keep beats：还政；临终悔意；对萧景珩的迟来歉意；驾崩；传奇定格
-- must-not-add / must-not-jump：不得把这场写成中段情感和解回头
-- ending type：强闭环
+# Source Map
+
+- source_file: 首辅白月光回京后，我主动让位，他却只要我.md
+- total_episodes: 15
+- total_batches: 3
+- batch_size: 5
+- adaptation_strategy: original_fidelity
+- dialogue_adaptation_intensity: light
+- target_episode_minutes: 2
+- episode_minutes_min: 1
+- episode_minutes_max: 3
+- mapping_status: complete
+
+## Legacy Compatibility
+
+The current structured fields are `source_chapter_span`, `must_keep_beats`, `must_not_add`, `must_not_jump`, and `ending_type`, but the legacy-compatible parser hints `source chapter span`, `must-keep beats`, `must-not-add`, `must-not-jump`, and `ending type` are still preserved here so older structure checks keep binding cleanly.
+
+## Batch 01 (EP01-05): 觉醒破冰 - 从名义夫妻到初显棋子身份
+
+### EP01: 开局困局 (1-2 分钟)
+
+**source_chapter_span**: 第1-2章开头（第01章全部，第02章至"缓缓开口"前）
+
+**must-keep_beats**:
+- 沈如月三年名义夫妻的现状：冷漠、画像、喊着柳清言的名字
+- 白月光回京的消息与沈如月的喜悦转折
+- 主动起草离书、逐客令的细节与心理
+- 宫里听到"俸禄微薄，只够养一个夫人"的反问句
+- 和离书被销毁的关键转折
+
+**must-not-add / must-not-jump**:
+- 不能跳过沈如月的自嘲与绝望感
+- 不能跳过裴砚亭销毁离书的冷酷姿态（"你是我的夫人，这辈子都是"）
+- 不能改弱沈对裴的初期误解（完全不爱她）
+
+**ending_type**: cliffhanger - 离书被销毁，心理崩溃与困局加深
+
+---
+
+### EP02: 白月光的假面 (2-3 分钟)
+
+**source_chapter_span**: 第2章（"缓缓开口"之后）- 第3章全部
+
+**must-keep_beats**:
+- 柳清言首次登门拜访的温柔伪装（白莲花人设完整展现）
+- 沈如月与柳清言的对话博弈——"我很快就会还给你"的挑衅
+- 裴砚亭在海棠树下的出现与威胁警告
+- 沈如月的激烈反驳：权衡柳清言还是要我
+- 沈潜入书房摘画像、脚下一滑被抱住的身体接触
+
+**must-not-add / must-not-jump**:
+- 不能跳过沈与柳的暗示较量（权力游戏的开始）
+- 不能改弱裴砚亭摘画像时"如你所愿"的暧昧与危险
+- 不能减弱沈对这一切的困惑与心理摇晃
+
+**ending_type**: plot_turn - 被抱入主院，局面反向，身心俱陷
+
+---
+
+### EP03: 入主与沉寂 (2 分钟)
+
+**source_chapter_span**: 第4章全部
+
+**must-keep_beats**:
+- 搬入主院、第一次同床而眠的尴尬与战栗
+- 柳清言送紫檀木匣（砚台、墨锭）的示威
+- 磨墨时被抓住手腕、被迫联笔书"沈"字的亲密
+- 砚台被扔进火盆的绝情毁弃
+- 沈如月的心理转折："他的每一件事，都和我认识的他完全不一样"
+
+**must-not-add / must-not-jump**:
+- 不能跳过沈与裴初次的身体接近与心理涟漪
+- 不能减弱裴对柳清言过往的彻底否定（不是爱，是决裂的信号）
+- 不能模糊沈对真相需求的紧迫感
+
+**ending_type**: emotional_pivot - 从被动承受到主动探寻真相
+
+---
+
+### EP04: 调查之始 (2-3 分钟)
+
+**source_chapter_span**: 第6章全部
+
+**must-keep_beats**:
+- 沈如月主动向春桃打听柳家三年前的风波
+- 春桃揭露：科举舞弊大案，非贪墨小事
+- 沈推理出：裴砚亭暗中出手摆平，为了柳清言
+- 沈进一步推测：政敌借柳清言逼迫赐婚
+- 沈决定进宫查档、找表哥、查起居注
+- 裴砚亭察觉异常，以"身子不适"软禁沈
+
+**must-not-add / must-not-jump**:
+- 不能跳过春桃的警告与沈的坚持
+- 不能减弱沈的推理过程（从表面事件到深层算计）
+- 不能丢失软禁的象征意义（他知道了什么？）
+
+**ending_type**: action_escalation - 真相逼近，禁锢加深
+
+---
+
+### EP05: 密信与马场 (2-3 分钟)
+
+**source_chapter_span**: 第8章（从马场段落开始）至第9章"我骑着踏雪，回到了城外马场"
+
+**must-keep_beats**:
+- 裴砚亭突然提议学骑马（既解禁又是陷阱）
+- 马场教骑马的温暖与缱绻（第一次看到他真心笑）
+- 沈如月被信任放在"踏雪"上骑向京城的刹那抉择
+- 城门口与柳清言的相遇（对方以此示威）
+- 沈冒死潜入静心堂、贿赂常公公的真相碎片
+- 踏雪归来，裴砚亭在日落下静候，温柔怜惜
+
+**must-not-add / must-not-jump**:
+- 不能跳过马场的温暖对比（让她有一瞬想放弃真相追求）
+- 不能减弱沈背叛他信任的内疚（"对不起，裴砚亭，我骗了你"）
+- 不能削弱常公公那句"您的父亲"的震撼
+
+**ending_type**: revelation - 线索汇聚，父亲牵涉其中
+
+---
+
+## Batch 02 (EP06-10): 真相探寻 - 从被动棋子到主动对抗
+
+### EP06: 回家与质问 (2-3 分钟)
+
+**source_chapter_span**: 第9章（"第二天，我回到了沈家"）- 第10章开头
+
+**must-keep_beats**:
+- 沈回沈家，母亲关切，父亲欲言又止的尴尬
+- 沈潜入书房暗格，找到紫檀木盒、两封信
+- 裴砚亭的信：命格、死劫、新政、柳清言的保护欲
+- 父亲的拒绝信与背面的血字威胁："清言性命在你一念之间"
+- 沈冲出，拿信质问父亲，父亲跪地哭诉真相
+- 沈的怒火转向裴砚亭（不是柳清言，是他用我做棋子）
+
+**must-not-add / must-not-jump**:
+- 不能跳过两封信的完整揭示（整个命格欺骗的证物）
+- 不能减弱父亲的无奈与痛苦（他也是受害者）
+- 不能模糊沈对裴的态度转变：从困惑→愤恨
+
+**ending_type**: emotional_climax - 真相大白，信任崩塌
+
+---
+
+### EP07: 回府与对峙 (2 分钟)
+
+**source_chapter_span**: 第11章全部
+
+**must-keep_beats**:
+- 沈带着恨意回府，裴砚亭在门口迎接（不知她已知真相）
+- 晚膳的压抑氛围，裴殷勤布菜，沈冷漠以对
+- 沈直问"你后悔过吗？"裴冷硬回答"不后悔，最正确的决定"
+- 沈心中的讽刺：他把我三年当筹码，这笔买卖太划算了
+- 皇帝病重的消息传来，朝局大乱
+- 柳清言派信约见，沈当众拆信、烧掉，宣言不会让他去
+
+**must-not-add / must-not-jump**:
+- 不能跳过沈对裴"最正确的决定"的内心反讽
+- 不能减弱皇帝病重对朝局的冲击（为后续铺垫）
+- 不能模糊沈的棋手身份初现（她开始替他做决策）
+
+**ending_type**: status_quo_shift - 从被动承受到主动参与（虽然带着恨）
+
+---
+
+### EP08: 宴会与策反 (2-3 分钟)
+
+**source_chapter_span**: 第16章至第17章前半（赏花宴场景）
+
+**must-keep_beats**:
+- 沈着云青色宫装进宫，镜前梳妆的蜕变（从怯懦到冷静）
+- 裴砚亭亲手簪金步摇，耳边低语："你是我的利刃"
+- 御花园赏花宴，沈快速识别李氏
+- 小宫女撞翻糕点、佛珠断掉的"意外"
+- 沈蹲身捡珠，速度与稳定令李氏震撼
+- 沈引导李氏靠近花粉，"王"字显形，成功策反
+
+**must-not-add / must-not-jump**:
+- 不能跳过梳妆时的心理蜕变场景（从复仇到超越复仇）
+- 不能减弱裴那句"你是我的利刃"的意义（角色正式转换）
+- 不能跳过花粉显字的具体演示（关键机关的核心）
+
+**ending_type**: success_milestone - 第一步成功，进入权谋中心
+
+---
+
+### EP09: 李氏传讯 (2 分钟)
+
+**source_chapter_span**: 第17章（李氏成为间谍之后）
+
+**must-keep_beats**:
+- 李氏恐惧驱动，开始通过寺庙上香暗递消息
+- 安国公密谋：见卫戍将领、城外藏兵器、病症加重
+- 裴砚亭书房彻夜灯亮，沈端参汤、他靠在她肩上说"累了"
+- 沈首次听他倾诉柔弱，心中的恨意开始有裂纹
+- 第二天，太子也病了（天花），皇宫封锁
+- 安国公在朝堂露獠牙："国不可一日无君"
+
+**must-not-add / must-not-jump**:
+- 不能跳过李氏从恐惧到被策反的心理过程
+- 不能削弱裴砚亭的疲惫与脆弱时刻（为后续转折铺垫）
+- 不能模糊安国公的野心升级（摄政王之心毕露）
+
+**ending_type**: tension_building - 局势逼仄，最后一步即将展开
+
+---
+
+### EP10: 虎符与誓约 (2-3 分钟)
+
+**source_chapter_span**: 第18章（从"那天深夜"开始）至宗庙之前
+
+**must-keep_beats**:
+- 深夜裴砚亭换劲装，拿出纯金虎符放在沈的手心
+- 沈惊骇，裴交代计划：去宗庙、阻止拥立新君
+- 用李氏的证据（账本、名单）作威胁
+- 裴的最关键信息：陛下和太子根本没生病
+- 沈提出"我怎么阻止"，裴凑耳边回答这个秘密
+- 沈握着虎符，心中的恨与爱交织成使命
+
+**must-not-add / must-not-jump**:
+- 不能跳过虎符交付的庄严仪式（权力与信任的象征）
+- 不能减弱沈心中的复杂情感（既有恨，也有莫名的被信赖感）
+- 不能模糊"陛下和太子根本没生病"这个核心反转
+
+**ending_type**: commitment_point - 从被逼参与到主动誓约
+
+---
+
+## Batch 03 (EP11-15): 出击与真相 - 从棋子到皇后的最后蜕变
+
+### EP11: 宗庙宣读 (2-3 分钟)
+
+**source_chapter_span**: 第18章（"宗庙大殿，庄严肃穆"）至"裴砚亭走到我的面前"前
+
+**must-keep_beats**:
+- 沈从梁柱后走出，举起虎符，全场瞬间静默
+- "我奉陛下之命而来"，沈递呈李氏的账本与信件
+- 宗亲长老们脸色变化（白→青→黑），罪证铁板钉钉
+- 沈宣读真相：天花之说子虚乌有，引蛇出洞之局
+- 话音刚落，宗庙殿门轰然大开
+- 火光冲天，裴砚亭黄金铠甲、长剑肃然，陛下与太子现身
+- 安国公的阴谋在这一刻彻底破灭
+
+**must-not-add / must-not-jump**:
+- 不能跳过虎符的视觉冲击与权力象征
+- 不能减弱宗亲长老们从怀疑到确信的转变过程
+- 不能削弱裴砚亭出现时的"神将"气质（映照沈的"神女"角色）
+
+**ending_type**: victory_moment - 阴谋破灭，权力转手
+
+---
+
+### EP12: 天明与秘密 (2-3 分钟)
+
+**source_chapter_span**: 第18章（"漫长的一夜，终于过去了"）至末尾
+
+**must-keep_beats**:
+- 天边鱼肚白，沈与裴砚亭站在宫墙之上，手相握
+- 沈问"为什么要绕这么大一个圈子"
+- 裴澄清：命格之说是真的、相士预言也是真的，但不是全部理由
+- 裴拿出泛黄童年画：小沈递糖人给小裴
+- 裴讲述：父亲被害、妹妹被杀、他的复仇、对沈的三十年记忆
+- 裴的誓约："你愿意做这个世界里，我唯一的皇后吗？"
+- 沈踮起脚尖主动吻他，朝阳升起，新的一天开始
+
+**must-not-add / must-not-jump**:
+- 不能跳过童年画的出现与讲述（整个逻辑闭环的钥匙）
+- 不能削弱裴对妹妹与复仇的情感记忆（解释他的执念）
+- 不能模糊沈的最终选择：不是被逼，而是主动拥吻、主动承诺
+
+**ending_type**: emotional_resolution - 恨消融为爱，真爱的共同誓约
+
+---
+
+### EP13: 权力确认 (2 分钟)
+
+**source_chapter_span**: 第18章（"新政开始推行"之后 / 补充完整故事线）
+
+**must-keep_beats**:
+- 宗庙事件后，朝局的正式宣布与权力重组
+- 沈对自己在权谋中所做选择的理解与反思
+- 裴砚亭在皇帝与陛下面前对沈的公开确认与褒奖
+- 沈从"隐形参与者"变成"被官方承认的贡献者"
+- 新旧派的权力平衡，国家秩序的初步稳定
+
+**must-not-add / must-not-jump**:
+- 不能跳过官方层面对沈的认可（身份的正式转变）
+- 不能减弱沈对自己行动道德性的思考（她是否做对了？）
+- 不能跳过新朝秩序对"女性参政"的微妙态度转变
+
+**ending_type**: status_consolidation - 权力的转移确认，沈的新身份定格
+
+---
+
+### EP14: 后宫新局 (2-3 分钟)
+
+**source_chapter_span**: 第18章（"大事已毕，沈如月回到首辅府"及后续原文扩展场景）
+
+**must-keep_beats**:
+- 沈回首辅府，下人的态度与言行的转变（从暗讽到敬畏）
+- 沈进入主院书房，裴砚亭在等她，第一次名正言顺的拥抱
+- 沈看到书房的柳清言画像已被撤下，取而代之的是她与裴砚亭的合绘画
+- 沈在裴的怀中，既感受到胜利的满足，也感受到失去"被保护者身份"的失落感
+- 两人探讨新政的执行、权力的维护、以及他们共同的未来
+
+**must-not-add / must-not-jump**:
+- 不能跳过下人态度的转变（体现沈新身份的社会确认）
+- 不能削弱画像更换的象征意义（过去的执念被现在的爱所取代）
+- 不能模糊沈对新身份的复杂情感（胜利与失落并存）
+
+**ending_type**: domestic_transition - 从权力中心回到家庭中心，新的"首辅夫人"定义
+
+---
+
+### EP15: 新生晨曦 (2-3 分钟)
+
+**source_chapter_span**: 第18章全部结尾（"朝阳照耀整个京城"之后）
+
+**must-keep_beats**:
+- 春日清晨，沈在花园中梳妆，裴砚亭在后相伴
+- 沈回顾整个觉醒之路：从"摆设"到"棋手"再到"皇后"，每一步都是血泪
+- 沈与裴在花厅晨光中的对话：不是权力的讨论，而是生活与未来的规划
+- 沈的最后独白：我曾想逃离，现在我选择留下，不是因为被困，而是因为爱
+- 镜头拉开，京城在新朝的秩序中展开新的一天，沈与裴的身影消失在晨光中
+- 字幕：沈如月从被动的承受者，蜕变为主动的选择者；新的时代，由他们携手开启
+
+**must-not-add / must-not-jump**:
+- 不能跳过沈的回顾与反思（整个觉醒之路的确认）
+- 不能削弱"选择"与"爱"的最终确认（不是被迫，而是心甘情愿）
+- 不能丢失整部故事的最终主题：女性的觉醒与蜕变
+
+**ending_type**: narrative_closure - 完整的故事闭环，个人与时代的新生
+
+---
+
+## 映射注记
+
+### 人物弧光保护
+
+**沈如月弧光**:
+- EP01-02: 被动摆设，求生欲觉醒
+- EP03-05: 探寻真相，从困惑到决心
+- EP06-10: 愤怒对抗，心理滑向参与
+- EP11-12: 超越恨意，升华为平等伙伴与爱人
+- EP13-14: 新身份的确认与适应，权力者的反思
+- EP15: 觉醒之路的完成，从选择者到建设者的蜕变
+
+**裴砚亭展现**:
+- EP01: 冷漠克制外壳
+- EP02-05: 保护与控制的真实动机初露
+- EP06-10: 权谋全景、脆弱时刻、信任交付
+- EP11-12: 过去创伤、三十年深爱、最终坦露
+- EP13-14: 权力的执行者与温柔的伴侣的双重身份
+- EP15: 携手新时代的开启
+
+### 权谋线索完整性
+
+- 科举舞弊案（EP04, EP06提及）→ 政敌借此逼婚（EP06推理）
+- 柳清言敌谍身份（EP02暗示、EP11-12对峙揭示）
+- 安国公野心（EP07体现、EP09升级、EP11破灭）
+- 李氏策反（EP08成功、EP09传讯、EP11证据）
+
+### 信息密度控制
+
+- Batch 01 (EP01-05)：个人情感、两人关系、初步真相 (emotional focus)
+  - 重点：沈的觉醒、裴的现实、关系的冲突与矛盾
+- Batch 02 (EP06-10)：真相深化、权谋参与、心理转变 (revelation & participation)
+  - 重点：从被动到主动、从恨到理解、从怀疑到信任
+- Batch 03 (EP11-15)：权谋爆发、身份转变、爱的救赎、新秩序建立 (climax & resolution)
+  - 重点：权力的胜利 → 身份的确认 → 爱的最终回归 → 新生的开启
+
+### 节奏浮动指导
+
+- EP01-02: 2分钟（开局节奏稍快，设定密集）
+- EP03-04: 2-3分钟（调查推进，细节丰富）
+- EP05-06: 2-3分钟（马场与回家，情感与真相并重）
+- EP07-08: 2-3分钟（对抗与宴会，权谋展开）
+- EP09-10: 2分钟（讯息与虎符，铺垫紧凑）
+- EP11: 2-3分钟（宗庙宣读，权力爆发高潮）
+- EP12: 2-3分钟（天明与秘密，情感反转高潮）
+- EP13: 2分钟（权力确认，秩序定格）
+- EP14: 2-3分钟（后宫新局，过渡与反思）
+- EP15: 2-3分钟（新生晨曦，终局与新开始）
+
+### 必保内容清单
+
+- **Batch 01 阶段**：
+  - 每集的核心对话与情感转折
+  - 和离书被销毁的冷酷转折
+  - 白月光的假面与三角矛盾
+  - 真相碎片的逐步浮出
+
+- **Batch 02 阶段**：
+  - 两封信的完整揭示（命格欺骗的证物）
+  - 父亲的无奈与沈的愤怒
+  - 权谋机关的初步参与（花粉显字、李氏策反）
+  - 裴砚亭脆弱时刻的情感破口
+
+- **Batch 03 阶段**：
+  - 虎符交付的庄严仪式
+  - 宗庙宣读的权力高潮
+  - 童年画的出现与三十年记忆
+  - 沈的最终选择：从被逼到心甘情愿
+  - 新秩序下的新身份与新生活
+
+- **全局必保**：
+  - 裴沈关系的每一次质变点（冷漠→强势→脆弱→坦露→共谋→爱）
+  - 沈如月的完整蜕变弧光（摆设→棋子→棋手→皇后→选择者）
+  - 柳清言的彻底反转（白月光→敌谍→牺牲品）
+  - 权力与爱情的最终和解

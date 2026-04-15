@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "_ops" / "episode-lint.py"
 WRITE_CONTRACT = ROOT / "harness" / "framework" / "write-contract.md"
+WRITER_STYLE = ROOT / "harness" / "framework" / "writer-style.md"
 VERIFY_CONTRACT = ROOT / "harness" / "framework" / "verify-contract.md"
 
 
@@ -98,9 +99,14 @@ class EpisodeLintTests(unittest.TestCase):
         self.assertIn("完整气口优先于碎句节拍", content)
         self.assertIn("保留回应句时，必须保留上句触发语义", content)
         self.assertIn("`os` 必须一眼读清主语、对象和判断落点", content)
+        self.assertIn("第一人称原著默认改写成第三人称可拍视角", content)
         self.assertIn("单点被看见", content)
         self.assertIn("自然发生的关键节点", content)
         self.assertIn("即时动作钩子", content)
+
+    def test_writer_style_contains_third_person_posture(self) -> None:
+        content = WRITER_STYLE.read_text(encoding="utf-8")
+        self.assertIn("第一人称原著进入剧本时，默认拆掉“我”叙述腔", content)
 
     def test_verify_contract_contains_core_gates(self) -> None:
         content = VERIFY_CONTRACT.read_text(encoding="utf-8")
@@ -109,34 +115,71 @@ class EpisodeLintTests(unittest.TestCase):
         self.assertIn("自然事件被无依据改成设计局", content)
         self.assertIn("概述性信息被擅自扩成具体事故", content)
         self.assertIn("即时动作钩子在相邻下一集第一场未兑现", content)
+        self.assertIn("第一人称原著的小说式“我”叙述腔未改成第三人称可拍视角", content)
         self.assertIn("单点关系稀释", content)
         self.assertIn("`os` 语义悬空", content)
 
     def test_line_count_warning_is_warn_not_fail(self) -> None:
         data = _run_lint(_build_episode())
         self.assertEqual(data["status"], "warn")
-        self.assertIn("line_count", data["style_warnings"])
-        self.assertEqual(data["contract_failures"], [])
+        self.assertIn("line_count", data["checks"]["warnings"])
+        self.assertEqual(data["checks"]["episode_failures"], [])
 
     def test_single_psychological_comment_is_warn_not_fail(self) -> None:
         data = _run_lint(_build_episode(line_padding=40, psychological_comment=True))
         self.assertEqual(data["status"], "warn")
-        self.assertIn("psychological_comment_count", data["craft_flags"])
-        self.assertNotIn("psychological_comment_count", data["contract_failures"])
+        self.assertIn("psychological_comment_count", data["checks"]["warnings"])
+        self.assertNotIn("psychological_comment_count", data["checks"]["episode_failures"])
 
     def test_scene_metaphor_limit_fails_even_when_episode_total_is_within_limit(self) -> None:
         data = _run_lint(_build_episode(line_padding=40, scene_one_metaphors=3))
         self.assertEqual(data["status"], "fail")
-        self.assertEqual(data["metrics"]["totals"]["metaphor_count"], 3)
-        self.assertTrue(
-            any(failure["scope"] == "scene" and failure["code"] == "metaphor_count" for failure in data["contract_failures"])
-        )
+        self.assertEqual(data["totals"]["metaphor_count"], 3)
+        self.assertIn("metaphor_count", data["checks"]["scene_failures"][0]["failures"])
 
     def test_hookless_final_scene_is_warn_not_fail(self) -> None:
         data = _run_lint(_build_episode(line_padding=40, final_hook=False))
         self.assertEqual(data["status"], "warn")
-        self.assertIn("hookless_final_scene", data["craft_flags"])
-        self.assertEqual(data["contract_failures"], [])
+        self.assertIn("hookless_final_scene", data["checks"]["warnings"])
+        self.assertEqual(data["checks"]["episode_failures"], [])
+
+    def test_first_person_triangle_narration_fails(self) -> None:
+        episode = _build_episode(line_padding=40).replace(
+            "△：廊灯压着青砖，冷光落在地上。她抬手扶住门框，袖口轻轻一晃。",
+            "△：我推开门，冷光一下子压到我肩上。我抬手扶住门框，袖口轻轻一晃。",
+            1,
+        )
+        data = _run_lint(episode)
+        self.assertEqual(data["status"], "fail")
+        self.assertEqual(data["totals"]["first_person_narration_count"], 1)
+        self.assertTrue(
+            any("first_person_narration" in scene["failures"] for scene in data["checks"]["scene_failures"])
+        )
+
+    def test_first_person_os_narration_fails(self) -> None:
+        episode = _build_episode(line_padding=40).replace(
+            "甲（os）：今晚不能退",
+            "甲（os）：我今晚不能退，我得先稳住他。",
+            1,
+        )
+        data = _run_lint(episode)
+        self.assertEqual(data["status"], "fail")
+        self.assertEqual(data["totals"]["first_person_narration_count"], 1)
+        self.assertTrue(
+            any("first_person_narration" in scene["failures"] for scene in data["checks"]["scene_failures"])
+        )
+
+    def test_first_person_dialogue_does_not_trigger_narration_gate(self) -> None:
+        episode = _build_episode(line_padding=40).replace(
+            "甲：人到了吗",
+            "甲：我知道人到了，你先别动。",
+            1,
+        )
+        data = _run_lint(episode)
+        self.assertNotIn("first_person_narration", data["checks"]["episode_failures"])
+        self.assertFalse(
+            any("first_person_narration" in scene["failures"] for scene in data["checks"]["scene_failures"])
+        )
 
 
 if __name__ == "__main__":

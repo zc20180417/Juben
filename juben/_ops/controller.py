@@ -4,9 +4,12 @@ Harness V2 Controller — programmatic gate enforcement.
 
 Project setup:
   init <novel_file>      Scaffold new project (manifest, source.map, state templates)
+  extract-book          Fill book.blueprint.md from the full novel
+  map-book              Generate source.map.md from book.blueprint.md
 
 Orchestration commands:
-  start <batch_id>       Full kickoff: generate brief → freeze → lock → show context
+  start <batch_id>       Total entry: prepare → writer stage → run pipeline
+  run <batch_id>         Full pipeline: lint → auto-verify → promote → review → next
   check <batch_id>       Lint gate + verify-plan + verify instructions
   finish <batch_id>      Lint gate + verify gate + promote + validate + batch-review
   next                   Show pipeline progress and next batch to start
@@ -18,6 +21,7 @@ Verify / record gate commands:
 
 Low-level commands:
   status                 Show current pipeline state (with batch ownership)
+  clean                  Backup + clear runtime project data cache
   plan <batch_id>        Freeze batch brief, acquire batch lock
   lint <EP-XX>           Run lint on a draft, gate on result
   gate <batch_id>        Check all drafts in batch passed lint
@@ -30,7 +34,9 @@ Low-level commands:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import random
 import re
 import shutil
@@ -50,20 +56,28 @@ EPISODES = ROOT / "episodes"
 LINT_SCRIPT = ROOT / "_ops" / "episode-lint.py"
 BATCH_BRIEFS = PROJECT / "batch-briefs"
 RUN_MANIFEST = PROJECT / "run.manifest.md"
-RUN_MANIFEST_JSON = PROJECT / "run.manifest.json"
+RUN_LOG = STATE / "run.log.md"
+MEMORY_CONTRACT = FRAMEWORK / "memory-contract.md"
+BOOK_BLUEPRINT = PROJECT / "book.blueprint.md"
 SOURCE_MAP = PROJECT / "source.map.md"
-SOURCE_MAP_JSON = PROJECT / "source.map.json"
 RELEASES = PROJECT / "releases"
 RELEASE_INDEX = RELEASES / "release.index.json"
 GOLD_SET = RELEASES / "gold-set.json"
-RUN_LOG = STATE / "run.log.md"
-MEMORY_CONTRACT = FRAMEWORK / "memory-contract.md"
 
 RUNTIME_AUTHORITY = "rebuild-2026-04"
 RULESET_VERSION = "episode-lint/v2"
 LINT_PROFILE = "default"
 
 NOW = datetime.now().strftime("%Y-%m-%d %H:%M")
+WRITER_COMMAND_ENV = "JUBEN_WRITER_COMMAND"
+DEFAULT_WRITER_PARALLELISM = 3
+DEFAULT_TARGET_EPISODE_MINUTES = 2
+DEFAULT_EPISODE_MINUTES_MIN = 1
+DEFAULT_EPISODE_MINUTES_MAX = 3
+PENDING_TOTAL_EPISODES = "pending_model_recommendation"
+PENDING_RECOMMENDED_TOTAL_EPISODES = "pending_book_extraction"
+PENDING_BLUEPRINT_RECOMMENDATION = "pending_extraction"
+PENDING_TOTAL_BATCHES = "pending_total_episodes"
 
 
 # ---------------------------------------------------------------------------
@@ -133,106 +147,86 @@ def _set_batch_status(path: Path, new_status: str) -> None:
 # Run manifest helpers
 # ---------------------------------------------------------------------------
 
-def _relative_to_root(path: Path) -> str:
-    try:
-        return path.resolve().relative_to(ROOT.resolve()).as_posix()
-    except ValueError:
-        return path.as_posix()
-
-
-def _read_json_file(path: Path) -> dict | None:
-    if not path.exists():
-        return None
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    return {str(k): str(v) if not isinstance(v, (dict, list)) else v for k, v in raw.items()}
-
-
-def _parse_manifest_markdown(content: str) -> dict:
+def _read_manifest() -> dict:
+    content = RUN_MANIFEST.read_text(encoding="utf-8")
     data = {}
     for line in content.splitlines():
-        m = re.match(r"^- ([^:]+):\s*(.+)$", line)
+        m = re.match(r"^- (\w[\w_]*):\s*(.+)$", line)
         if m:
-            key = m.group(1).strip().replace(" ", "_")
-            data[key] = m.group(2).strip()
+            data[m.group(1)] = m.group(2).strip()
     return data
 
 
-def _normalize_manifest(data: dict | None) -> dict:
-    base = {
-        "framework_entry": "harness/framework/entry.md",
-        "source_map": "harness/project/source.map.md",
-        "current_batch_brief": "(none)",
-        "regression_packs": "optional under harness/project/regressions/",
-        "state_directory": "harness/project/state/",
-    }
-    if data:
-        base.update(data)
-    return base
-
-
-def _render_manifest_markdown(data: dict) -> str:
-    return f"""# Run Manifest
-
-- source_file: {data.get("source_file", "")}
-- total_episodes: {data.get("total_episodes", "")}
-- batch_size: {data.get("batch_size", "")}
-- key_episodes: {data.get("key_episodes", "")}
-- adaptation_mode: {data.get("adaptation_mode", "")}
-- adaptation_strategy: {data.get("adaptation_strategy", "")}
-- dialogue_adaptation_intensity: {data.get("dialogue_adaptation_intensity", "")}
-- generation_execution_mode: {data.get("generation_execution_mode", "")}
-- generation_reset_mode: {data.get("generation_reset_mode", "")}
-- run_status: {data.get("run_status", "")}
-- active_batch: {data.get("active_batch", "")}
-- source_authority: {data.get("source_authority", "")}
-- draft_lane: {data.get("draft_lane", "")}
-- publish_lane: {data.get("publish_lane", "")}
-- promotion_policy: {data.get("promotion_policy", "")}
-
-## Current Runtime
-- framework entry: {data.get("framework_entry", "harness/framework/entry.md")}
-- source map: {data.get("source_map", "harness/project/source.map.md")}
-- current batch brief: {data.get("current_batch_brief", "(none)")}
-- regression packs: {data.get("regression_packs", "optional under harness/project/regressions/")}
-- state directory: {data.get("state_directory", "harness/project/state/")}
-
-## Defaults
-- stale legacy v1 files are not runtime authority
-- published episodes are read-only outputs for current run
-- draft episodes are the only candidate lane for verify
-"""
-
-
-def _write_manifest(data: dict) -> None:
-    normalized = _normalize_manifest(data)
-    RUN_MANIFEST_JSON.parent.mkdir(parents=True, exist_ok=True)
-    RUN_MANIFEST_JSON.write_text(
-        json.dumps(normalized, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    RUN_MANIFEST.write_text(_render_manifest_markdown(normalized), encoding="utf-8")
-
-
-def _read_manifest() -> dict:
-    json_data = _read_json_file(RUN_MANIFEST_JSON)
-    if json_data is not None:
-        return _normalize_manifest(json_data)
-    return _normalize_manifest(_parse_manifest_markdown(RUN_MANIFEST.read_text(encoding="utf-8")))
-
-
 def _set_manifest_field(field: str, value: str) -> None:
-    data = _read_manifest()
-    data[field] = value
-    _write_manifest(data)
+    content = RUN_MANIFEST.read_text(encoding="utf-8")
+    content = re.sub(
+        rf"(^- {field}:\s*).+$",
+        rf"\g<1>{value}",
+        content,
+        flags=re.MULTILINE,
+    )
+    RUN_MANIFEST.write_text(content, encoding="utf-8")
 
 
-def _set_manifest_runtime(active_batch: str | None = None, current_batch_brief: Path | None = None) -> None:
-    data = _read_manifest()
-    if active_batch is not None:
-        data["active_batch"] = active_batch
-    if current_batch_brief is not None:
-        data["current_batch_brief"] = _relative_to_root(current_batch_brief)
-    _write_manifest(data)
+def _set_manifest_line(label: str, value: str) -> None:
+    content = RUN_MANIFEST.read_text(encoding="utf-8")
+    pattern = rf"(^- {re.escape(label)}:\s*).+$"
+    replacement = rf"\g<1>{value}"
+    if re.search(pattern, content, re.MULTILINE):
+        content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
+    else:
+        content = content.rstrip() + f"\n- {label}: {value}\n"
+    RUN_MANIFEST.write_text(content, encoding="utf-8")
+
+
+def _manifest_source_file() -> str | None:
+    return _read_manifest().get("source_file")
+
+
+def _manifest_source_path() -> Path | None:
+    source_file = _manifest_source_file()
+    if not source_file:
+        print("ERROR: run.manifest.md is missing source_file")
+        return None
+    novel_path = ROOT / source_file
+    if not novel_path.exists():
+        print(f"ERROR: source novel file not found: {novel_path}")
+        return None
+    return novel_path
+
+
+def _book_blueprint_has_placeholders() -> bool:
+    if not BOOK_BLUEPRINT.exists():
+        return True
+    content = BOOK_BLUEPRINT.read_text(encoding="utf-8")
+    return "AGENT_EXTRACT_REQUIRED" in content or re.search(r"^- extraction_status:\s*pending$", content, re.MULTILINE) is not None
+
+
+def _recommended_total_episodes_from_blueprint() -> int | None:
+    if not BOOK_BLUEPRINT.exists():
+        return None
+    content = BOOK_BLUEPRINT.read_text(encoding="utf-8")
+    match = re.search(r"^- recommended_total_episodes:\s*(\d+)\s*$", content, re.MULTILINE)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def _parse_manifest_int(field: str) -> int | None:
+    value = _read_manifest().get(field, "")
+    return int(value) if value.isdigit() else None
+
+
+def _sync_recommended_episode_count_from_blueprint() -> int | None:
+    recommended = _recommended_total_episodes_from_blueprint()
+    if recommended is None:
+        return None
+
+    _set_manifest_field("recommended_total_episodes", str(recommended))
+    manifest = _read_manifest()
+    if manifest.get("episode_count_source", "model_recommended") == "model_recommended":
+        _set_manifest_field("total_episodes", str(recommended))
+    return recommended
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +270,17 @@ def _clear_retry_count(episode: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Content fingerprinting
+# ---------------------------------------------------------------------------
+
+def _file_sha256(path: Path) -> str:
+    """Return hex SHA-256 of a file, or empty string if missing."""
+    if not path.exists():
+        return ""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+# ---------------------------------------------------------------------------
 # Verify result tracking (per-episode JSON in locks dir)
 # ---------------------------------------------------------------------------
 
@@ -291,10 +296,67 @@ def _read_verify_result(episode: str) -> dict | None:
 
 
 def _write_verify_result(episode: str, tier: str, status: str) -> None:
-    data = {"episode": episode, "tier": tier, "status": status, "timestamp": NOW}
+    draft_path = DRAFTS / f"{episode}.md"
+    brief_name = _find_brief_for_episode(episode)
+    if not brief_name:
+        print(f"WARNING: no batch brief found for {episode} — brief_sha256 will be empty")
+    brief_sha = _file_sha256(BATCH_BRIEFS / brief_name) if brief_name else ""
+    data = {
+        "episode": episode,
+        "tier": tier,
+        "status": status,
+        "timestamp": NOW,
+        "draft_sha256": _file_sha256(draft_path),
+        "brief_sha256": brief_sha,
+        "source_map_sha256": _file_sha256(SOURCE_MAP),
+    }
     _verify_result_path(episode).write_text(
         json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
     )
+
+
+def _find_brief_for_episode(episode: str) -> str:
+    """Find the batch brief filename that owns this episode."""
+    if BATCH_BRIEFS.exists():
+        for p in BATCH_BRIEFS.glob("*.md"):
+            content = p.read_text(encoding="utf-8")
+            if episode in content:
+                return p.name
+    return ""
+
+
+def _verify_draft_integrity(episode: str, verify_result: dict) -> str | None:
+    """Check that draft, brief, and source_map match what was verified. Returns error message or None."""
+    # Draft check
+    recorded_draft = verify_result.get("draft_sha256", "")
+    if not recorded_draft:
+        return None  # legacy verify result without hash — skip check
+    current_draft = _file_sha256(DRAFTS / f"{episode}.md")
+    if current_draft != recorded_draft:
+        return (
+            f"{episode} draft modified after verify "
+            f"(verified: {recorded_draft[:12]}…, current: {current_draft[:12]}…)"
+        )
+    # Brief check
+    recorded_brief = verify_result.get("brief_sha256", "")
+    if recorded_brief:
+        brief_name = _find_brief_for_episode(episode)
+        current_brief = _file_sha256(BATCH_BRIEFS / brief_name) if brief_name else ""
+        if current_brief != recorded_brief:
+            return (
+                f"{episode} batch brief modified after verify "
+                f"(verified: {recorded_brief[:12]}…, current: {current_brief[:12]}…)"
+            )
+    # Source map check
+    recorded_smap = verify_result.get("source_map_sha256", "")
+    if recorded_smap:
+        current_smap = _file_sha256(SOURCE_MAP)
+        if current_smap != recorded_smap:
+            return (
+                f"{episode} source.map.md modified after verify "
+                f"(verified: {recorded_smap[:12]}…, current: {current_smap[:12]}…)"
+            )
+    return None
 
 
 def _clear_verify_result(episode: str) -> None:
@@ -318,6 +380,25 @@ TEMPLATE_SECTIONS: dict[str, list[str]] = {
 }
 
 
+def _state_templates(now: str | None = None) -> dict[str, str]:
+    stamp = now or NOW
+    return {
+        "script.progress.md": "# Script Progress\n\n## 项目信息\n\n## 基础文档\n\n## 当前整季状态\n\n## 分集记录\n\n## 全局记录\n\n## 质量统计\n\n## 版本记录\n",
+        "story.state.md": "# Story State\n\n## 当前阶段\n\n## 权力格局\n\n## 主要角色位置\n\n## 最近关键转折\n\n## 下一批关键预期\n",
+        "relationship.board.md": "# Relationship Board\n\n## 核心关系网\n\n## 最近关系变动\n\n## 待爆关系线\n",
+        "open_loops.md": "# Open Loops\n\n## 未回收伏笔\n\n## 未爆真相\n\n## 待解冲突\n\n## 已超期伏笔\n",
+        "quality.anchor.md": "# Quality Anchor\n\n## 场景厚度\n\n## 对话节奏\n\n## os 使用方式\n\n## 代表性打法\n",
+        "process.memory.md": "# Process Memory\n\n## 活跃流程问题\n\n## 当前执行准则\n",
+        "run.log.md": f"# Run Log\n_最后更新：{stamp}_\n\n## Log Entries\n\n| 时间戳 | batch | episode | phase | event | result | 备注 |\n|---|---|---|---|---|---|---|\n",
+    }
+
+
+def _write_state_templates(now: str | None = None) -> None:
+    STATE.mkdir(parents=True, exist_ok=True)
+    for name, content in _state_templates(now).items():
+        (STATE / name).write_text(content, encoding="utf-8")
+
+
 def _validate_state_file(name: str, sections: list[str]) -> list[str]:
     path = STATE / name
     if not path.exists():
@@ -334,44 +415,138 @@ def _validate_state_file(name: str, sections: list[str]) -> list[str]:
 # Source map parsing
 # ---------------------------------------------------------------------------
 
-def _parse_source_map_markdown(content: str) -> dict:
+
+def _normalize_episode_id(raw: str) -> str:
+    match = re.search(r"EP-?(\d+)", raw.strip(), re.IGNORECASE)
+    if not match:
+        return raw.strip()
+    return f"EP-{match.group(1).zfill(2)}"
+
+
+def _collapse_markdown_list(raw: str) -> str:
+    items = []
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped == "---":
+            continue
+        if stripped.startswith("- "):
+            stripped = stripped[2:].strip()
+        items.append(stripped)
+    return "；".join(items).strip()
+
+
+def _extract_episode_map_field(
+    ep_block: str,
+    *,
+    legacy_pattern: str,
+    markdown_pattern: str,
+    multiline: bool = False,
+) -> str:
+    match = re.search(legacy_pattern, ep_block)
+    if match:
+        return match.group(1).strip()
+
+    flags = re.DOTALL if multiline else 0
+    match = re.search(markdown_pattern, ep_block, flags)
+    if not match:
+        return ""
+
+    value = match.group(1).strip()
+    if multiline:
+        return _collapse_markdown_list(value)
+    return value
+
+
+def _source_map_episode_block(source_map_text: str, episode_id: str) -> str:
+    digits = re.search(r"(\d+)", episode_id)
+    if not digits:
+        return ""
+    normalized = str(int(digits.group(1)))
+    pattern = rf"###\s+EP-?0*{normalized}\b(.*?)(?=^###\s+EP-?\d+|\Z)"
+    match = re.search(pattern, source_map_text, re.DOTALL | re.MULTILINE)
+    return match.group(1) if match else ""
+
+
+def _parse_source_map() -> dict:
+    """Parse source.map.md into structured batch data."""
+    content = SOURCE_MAP.read_text(encoding="utf-8")
     batches = {}
 
     batch_blocks = re.split(r"(?=^## Batch \d+)", content, flags=re.MULTILINE)
 
     for block in batch_blocks:
-        m = re.match(r"## Batch (\d+)：(EP-\d+)\s*~\s*(EP-\d+)\s*\n原著范围：(.+)", block)
-        if not m:
+        if not block.startswith("## Batch "):
             continue
 
-        batch_num = m.group(1)
-        ep_start = m.group(2)
-        ep_end = m.group(3)
-        source_range = m.group(4).strip()
+        batch_num = ""
+        ep_start = ""
+        ep_end = ""
+        source_range = ""
+        batch_title = ""
+
+        legacy_match = re.match(r"## Batch (\d+)：(EP-?\d+)\s*~\s*(EP-?\d+)\s*\n原著范围：(.+)", block)
+        if legacy_match:
+            batch_num = legacy_match.group(1).zfill(2)
+            ep_start = _normalize_episode_id(legacy_match.group(2))
+            ep_end = _normalize_episode_id(legacy_match.group(3))
+            source_range = legacy_match.group(4).strip()
+        else:
+            header = block.splitlines()[0].strip()
+            modern_match = re.match(
+                r"## Batch (\d+)\s+\((EP-?\d+)\s*-\s*(?:EP-?)?(\d+)\)\s*:\s*(.+)",
+                header,
+            )
+            if not modern_match:
+                continue
+            batch_num = modern_match.group(1).zfill(2)
+            ep_start = _normalize_episode_id(modern_match.group(2))
+            ep_end = _normalize_episode_id(f"EP{modern_match.group(3)}")
+            batch_title = modern_match.group(4).strip()
+
         batch_id = f"batch{batch_num}"
 
         episode_data = {}
-        ep_blocks = re.split(r"(?=^### EP-\d+)", block, flags=re.MULTILINE)
+        ep_blocks = re.split(r"(?=^###\s+EP-?\d+)", block, flags=re.MULTILINE)
         episodes = []
 
         for ep_block in ep_blocks:
-            ep_m = re.match(r"### (EP-\d+)", ep_block)
+            ep_m = re.match(r"###\s+(EP-?\d+)", ep_block)
             if not ep_m:
                 continue
-            ep_id = ep_m.group(1)
+            ep_id = _normalize_episode_id(ep_m.group(1))
             episodes.append(ep_id)
 
-            span_m = re.search(r"source chapter span：(.+)", ep_block)
-            beats_m = re.search(r"must-keep beats：(.+)", ep_block)
-            not_m = re.search(r"must-not-add / must-not-jump：(.+)", ep_block)
-            ending_m = re.search(r"ending type：(.+)", ep_block)
-
             episode_data[ep_id] = {
-                "source_span": span_m.group(1).strip() if span_m else "",
-                "must_keep": beats_m.group(1).strip() if beats_m else "",
-                "must_not": not_m.group(1).strip() if not_m else "",
-                "ending_type": ending_m.group(1).strip() if ending_m else "",
+                "source_span": _extract_episode_map_field(
+                    ep_block,
+                    legacy_pattern=r"source chapter span：(.+)",
+                    markdown_pattern=r"\*\*source_chapter_span\*\*:\s*(.+)",
+                ),
+                "must_keep": _extract_episode_map_field(
+                    ep_block,
+                    legacy_pattern=r"must-keep beats：(.+)",
+                    markdown_pattern=r"\*\*must-keep_beats\*\*:\s*(.*?)(?=\n\*\*|\n---|\Z)",
+                    multiline=True,
+                ),
+                "must_not": _extract_episode_map_field(
+                    ep_block,
+                    legacy_pattern=r"must-not-add / must-not-jump：(.+)",
+                    markdown_pattern=r"\*\*must-not-add / must-not-jump\*\*:\s*(.*?)(?=\n\*\*|\n---|\Z)",
+                    multiline=True,
+                ),
+                "ending_type": _extract_episode_map_field(
+                    ep_block,
+                    legacy_pattern=r"ending type：(.+)",
+                    markdown_pattern=r"\*\*ending_type\*\*:\s*(.+)",
+                ),
             }
+
+        if not source_range:
+            spans = [episode_data[ep]["source_span"] for ep in episodes if episode_data.get(ep, {}).get("source_span")]
+            if spans:
+                source_range = spans[0] if spans[0] == spans[-1] else f"{spans[0]} ~ {spans[-1]}"
+            else:
+                source_range = batch_title
 
         batches[batch_id] = {
             "batch_num": batch_num,
@@ -383,14 +558,6 @@ def _parse_source_map_markdown(content: str) -> dict:
         }
 
     return batches
-
-
-def _parse_source_map() -> dict:
-    """Parse source.map.* into structured batch data."""
-    json_data = _read_json_file(SOURCE_MAP_JSON)
-    if json_data is not None:
-        return json_data
-    return _parse_source_map_markdown(SOURCE_MAP.read_text(encoding="utf-8"))
 
 
 def _generate_batch_brief(batch_id: str, batch_info: dict) -> str:
@@ -481,88 +648,50 @@ def _generate_batch_brief(batch_id: str, batch_info: dict) -> str:
 """
 
 
-def _compute_verify_tiers(episodes: list[str]) -> tuple[list, list, list]:
-    """Compute FULL/STANDARD/LIGHT verify tiers for a list of episodes."""
-    batches = _parse_source_map()
-    episode_map = {}
-    for batch in batches.values():
-        episode_map.update(batch.get("episode_data", {}))
+def _compute_verify_tiers(episodes: list[str]) -> tuple[list, list, list, list]:
+    """Compute FULL/STANDARD/LIGHT verify tiers for a list of episodes.
+
+    Returns (full, standard, light, unmapped).
+    Unmapped episodes have no source-map data — they should not be silently
+    downgraded to LIGHT. Callers decide whether to hard-fail or require review.
+    """
+    source_map_text = SOURCE_MAP.read_text(encoding="utf-8")
     manifest = _read_manifest()
     key_episodes_raw = manifest.get("key_episodes", "")
     key_episodes = {e.strip() for e in key_episodes_raw.split(",") if e.strip()}
 
-    full_eps, standard_eps, light_eps = [], [], []
+    full_eps, standard_eps, light_eps, unmapped_eps = [], [], [], []
     for i, ep in enumerate(episodes):
-        episode_data = episode_map.get(ep, {})
-        ending_type = str(episode_data.get("ending_type", ""))
+        block = _source_map_episode_block(source_map_text, ep)
+        if not block.strip():
+            unmapped_eps.append(ep)
+            continue
         is_first = (i == 0)
-        is_strong_closure = "强闭环" in ending_type
+        is_strong_closure = "强闭环" in block
         is_key_episode = ep in key_episodes
         if is_first or is_strong_closure or is_key_episode:
             full_eps.append(ep)
-        elif not episode_data:
-            light_eps.append(ep)
         else:
             standard_eps.append(ep)
-    return full_eps, standard_eps, light_eps
+    return full_eps, standard_eps, light_eps, unmapped_eps
 
 
-def _normalize_lint_payload(data: dict) -> dict:
-    if "contract_failures" in data:
-        return {
-            "status": data.get("status", "fail"),
-            "contract_failures": list(data.get("contract_failures", [])),
-            "craft_flags": list(data.get("craft_flags", [])),
-            "style_warnings": list(data.get("style_warnings", [])),
-            "metrics": data.get("metrics", {}),
-        }
-
-    checks = data.get("checks", {})
-    contract_failures: list[dict] = []
-    for item in checks.get("scene_failures", []):
-        for code in item.get("failures", []):
-            contract_failures.append(
-                {
-                    "scope": "scene",
-                    "scene": item.get("scene"),
-                    "title": item.get("title"),
-                    "code": code,
-                }
-            )
-    for code in checks.get("episode_failures", []):
-        contract_failures.append({"scope": "episode", "code": code})
-
-    return {
-        "status": data.get("status", "fail"),
-        "contract_failures": contract_failures,
-        "craft_flags": list(checks.get("warnings", [])),
-        "style_warnings": [],
-        "metrics": {
-            "totals": data.get("totals", {}),
-            "scenes": data.get("scenes", []),
-            "history": data.get("history", {}),
-        },
-    }
+# ---------------------------------------------------------------------------
+# Release / Gold tracking helpers
+# ---------------------------------------------------------------------------
 
 
-def _run_lint(path: Path) -> dict:
-    result = subprocess.run(
-        [sys.executable, str(LINT_SCRIPT), str(path)],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=60,
-    )
+def _relative_to_root(path: Path) -> str:
     try:
-        payload = json.loads(result.stdout)
-    except (json.JSONDecodeError, ValueError) as exc:
-        raise ValueError(f"lint produced invalid JSON for {path}") from exc
-    return _normalize_lint_payload(payload)
+        return path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
-def _lint_blocks_promote(payload: dict) -> bool:
-    return bool(payload.get("contract_failures", []))
+def _read_json_file(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _release_index_template() -> dict:
@@ -614,6 +743,7 @@ def _meta_path(episode: str) -> Path:
 
 
 def _bootstrap_legacy_entries(index: dict, gold_episodes: set[str]) -> None:
+    """Register any published episodes not in gold set as 'legacy'."""
     for episode_file in sorted(EPISODES.glob("EP-*.md")):
         episode = episode_file.stem
         if episode in gold_episodes:
@@ -639,21 +769,21 @@ def _build_episode_metadata(
     verify_result: dict,
     release_status: str = "gold",
 ) -> dict:
+    checks = lint_payload.get("checks", {})
     return {
         "episode": episode,
         "provenance": RUNTIME_AUTHORITY,
         "source_batch": batch_id,
         "runtime_authority": RUNTIME_AUTHORITY,
-        "gold/provisional": release_status,
         "release_status": release_status,
         "ruleset_version": RULESET_VERSION,
         "lint_profile": LINT_PROFILE,
         "lint_status": lint_payload.get("status", "fail"),
         "verify_tier": verify_result.get("tier", "STANDARD"),
         "verify_status": verify_result.get("status", "MISSING"),
-        "contract_failures": lint_payload.get("contract_failures", []),
-        "craft_flags": lint_payload.get("craft_flags", []),
-        "style_warnings": lint_payload.get("style_warnings", []),
+        "episode_failures": checks.get("episode_failures", []),
+        "scene_failures": checks.get("scene_failures", []),
+        "warnings": checks.get("warnings", []),
         "batch_brief": _relative_to_root(brief_path),
         "content_path": _relative_to_root(EPISODES / f"{episode}.md"),
         "updated_at": NOW,
@@ -676,51 +806,75 @@ def _build_release_entry(metadata: dict) -> dict:
     }
 
 
-def _promote_batch(batch_id: str, brief_path: Path, episodes: list[str], lint_results: dict[str, dict]) -> tuple[int, dict]:
+def _promote_batch(
+    batch_id: str, brief_path: Path, episodes: list[str], lint_results: dict[str, dict]
+) -> tuple[int, dict]:
+    """Staged promote: build metadata in staging dir → replace files sequentially.
+
+    NOTE: The replace loop is NOT atomic. A crash mid-replace can leave partial
+    state (some episodes updated, release index not yet). The staging dir is
+    cleaned up in the finally block, so forward-recovery from staged artifacts
+    is not yet possible. See project memory 'promote atomicity gap' for the
+    deferred journal-based recovery design.
+    """
     stage_root = RELEASES / "staging" / f"{batch_id}-{NOW.replace(':', '').replace(' ', '-')}"
     stage_root.mkdir(parents=True, exist_ok=True)
 
     staged_episode_files: dict[str, Path] = {}
     staged_meta_files: dict[str, Path] = {}
     try:
+        # Stage draft files
         for episode in episodes:
             src = DRAFTS / f"{episode}.md"
             staged = stage_root / f"{episode}.md"
             shutil.copy2(src, staged)
             staged_episode_files[episode] = staged
 
+        # Load / init release tracking
         release_index = _load_release_index()
         gold_set = _load_gold_set()
         gold_episodes = set(gold_set.get("episodes", []))
-        _bootstrap_legacy_entries(release_index, gold_episodes.union(episodes))
+        _bootstrap_legacy_entries(release_index, gold_episodes.union(set(episodes)))
 
+        # Build metadata per episode
         for episode in episodes:
-            verify_result = _read_verify_result(episode) or {"episode": episode, "tier": "STANDARD", "status": "MISSING"}
+            verify_result = _read_verify_result(episode) or {
+                "episode": episode, "tier": "STANDARD", "status": "MISSING",
+            }
+            lint_payload = lint_results.get(episode, {})
             metadata = _build_episode_metadata(
                 episode=episode,
                 batch_id=batch_id,
                 brief_path=brief_path,
-                lint_payload=lint_results[episode],
+                lint_payload=lint_payload,
                 verify_result=verify_result,
             )
             staged_meta = stage_root / f"{episode}.meta.json"
-            staged_meta.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+            staged_meta.write_text(
+                json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8",
+            )
             staged_meta_files[episode] = staged_meta
             release_index["episodes"][episode] = _build_release_entry(metadata)
             gold_episodes.add(episode)
 
+        # Update gold set
         gold_set["episodes"] = sorted(gold_episodes)
         gold_set["updated_at"] = NOW
         release_index["current_batch"] = batch_id
         release_index["current_batch_brief"] = _relative_to_root(brief_path)
-        release_index["gold_set"] = _relative_to_root(GOLD_SET)
         release_index["updated_at"] = NOW
 
+        # Stage release files
         staged_release_index = stage_root / "release.index.json"
         staged_gold_set = stage_root / "gold-set.json"
-        staged_release_index.write_text(json.dumps(release_index, ensure_ascii=False, indent=2), encoding="utf-8")
-        staged_gold_set.write_text(json.dumps(gold_set, ensure_ascii=False, indent=2), encoding="utf-8")
+        staged_release_index.write_text(
+            json.dumps(release_index, ensure_ascii=False, indent=2), encoding="utf-8",
+        )
+        staged_gold_set.write_text(
+            json.dumps(gold_set, ensure_ascii=False, indent=2), encoding="utf-8",
+        )
 
+        # Sequential move: staging → final locations (not atomic; see docstring)
         EPISODES.mkdir(parents=True, exist_ok=True)
         RELEASES.mkdir(parents=True, exist_ok=True)
         for episode in episodes:
@@ -735,6 +889,258 @@ def _promote_batch(batch_id: str, brief_path: Path, episodes: list[str], lint_re
 
 
 # ---------------------------------------------------------------------------
+# Shared batch-level pre-checks
+# ---------------------------------------------------------------------------
+
+
+def _resolve_batch(batch_id: str, *, require_frozen: bool = False) -> tuple[Path, dict, list[str]] | None:
+    """Resolve batch → (brief_path, brief_data, episodes) or None on error."""
+    brief_path = _find_batch_brief(batch_id)
+    if brief_path is None:
+        print(f"ERROR: batch brief not found for '{batch_id}'")
+        return None
+    brief = _read_batch_brief(brief_path)
+    episodes = brief.get("episodes", [])
+    if not episodes:
+        print(f"ERROR: no episodes in batch '{batch_id}'")
+        return None
+    if require_frozen:
+        status = brief.get("status", "unknown")
+        if status == "promoted":
+            print(f"ERROR: batch '{batch_id}' is already promoted")
+            return None
+        if status != "frozen":
+            print(f"ERROR: batch brief status is '{status}', must be 'frozen'")
+            return None
+    return brief_path, brief, episodes
+
+
+def _lint_episode_payload(episode: str) -> tuple[bool, dict]:
+    draft = DRAFTS / f"{episode}.md"
+    if not draft.exists():
+        return False, {
+            "status": "missing",
+            "checks": {"episode_failures": ["draft_missing"]},
+            "totals": {},
+        }
+
+    result = subprocess.run(
+        [sys.executable, str(LINT_SCRIPT), str(draft)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=60,
+    )
+    try:
+        data = json.loads(result.stdout)
+    except (json.JSONDecodeError, ValueError):
+        return False, {
+            "status": "error",
+            "checks": {"episode_failures": ["invalid_lint_json"]},
+            "totals": {},
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+
+    checks = data.get("checks", {})
+    episode_failures = checks.get("episode_failures", [])
+    scene_failures = checks.get("scene_failures", [])
+    has_scene_failures = any(item.get("failures") for item in scene_failures)
+    is_pass = not episode_failures and not has_scene_failures
+    return is_pass, data
+
+
+def _note_lint_retry_pressure(episode: str) -> None:
+    count = _get_retry_count(episode) + 1
+    _set_retry_count(episode, count)
+    if count >= 4:
+        print(f"WARNING: {episode} has failed {count} times — ESCALATE TO HUMAN")
+    elif count >= 3:
+        print(f"WARNING: {episode} has failed {count} times — CONTEXT RESET required")
+
+
+def _run_smoke_lint_check(episode: str) -> tuple[bool, dict]:
+    is_pass, payload = _lint_episode_payload(episode)
+    if is_pass:
+        print(f"  ✓ Smoke lint PASS: {episode}")
+        return True, payload
+
+    failures = payload.get("checks", {}).get("episode_failures", [])
+    detail = ", ".join(failures) if failures else payload.get("status", "fail")
+    print(f"  ✗ Smoke lint FAIL: {episode} ({detail})")
+    _note_lint_retry_pressure(episode)
+    return False, payload
+
+
+def _lint_total(payload: dict, key: str) -> int:
+    value = payload.get("totals", {}).get(key, 0)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _is_syntax_shell_failure(payload: dict) -> bool:
+    failures = set(payload.get("checks", {}).get("episode_failures", []))
+    totals_look_empty = (
+        _lint_total(payload, "scene_count") == 0
+        and _lint_total(payload, "camera_count") == 0
+        and (_lint_total(payload, "os_count") + _lint_total(payload, "vo_count")) == 0
+    )
+    failure_signature = {"scene_count", "camera_count", "os_vo_count"}.issubset(failures)
+    return totals_look_empty or failure_signature
+
+
+def _run_lint_gate(episodes: list[str]) -> tuple[bool, dict[str, dict]]:
+    """Run lint on all draft episodes. Returns (all_pass, {ep: lint_payload})."""
+    all_pass = True
+    lint_results: dict[str, dict] = {}
+    for ep in episodes:
+        is_pass, data = _lint_episode_payload(ep)
+        lint_results[ep] = data
+        print(f"  {'✓' if is_pass else '✗'} {ep} lint {'pass' if is_pass else 'FAIL'}")
+        if not is_pass:
+            all_pass = False
+    return all_pass, lint_results
+
+
+def _run_verify_gate(episodes: list[str]) -> bool:
+    """Check unmapped, verify results, and draft integrity. Returns True if all pass."""
+    full_eps, standard_eps, light_eps, unmapped_eps = _compute_verify_tiers(episodes)
+    if unmapped_eps:
+        print(f"  ✗ Episodes missing source-map data: {', '.join(unmapped_eps)}")
+        print(f"    → Add entries to source.map.md first")
+        return False
+    for ep in episodes:
+        if ep in light_eps:
+            print(f"  ✓ {ep}: LIGHT (lint-only)")
+            continue
+        vr = _read_verify_result(ep)
+        if vr is None:
+            print(f"  ✗ {ep}: no verify result — run aligner + verify-done first")
+            return False
+        if vr.get("status") != "PASS":
+            print(f"  ✗ {ep}: verify {vr.get('status', '?')}")
+            return False
+        integrity_err = _verify_draft_integrity(ep, vr)
+        if integrity_err:
+            print(f"  ✗ {integrity_err} — must re-verify")
+            return False
+        print(f"  ✓ {ep}: verify PASS (tier: {vr.get('tier', '?')})")
+    return True
+
+
+def _missing_drafts(episodes: list[str]) -> list[str]:
+    return [ep for ep in episodes if not (DRAFTS / f"{ep}.md").exists()]
+
+
+def _normalize_optional_command(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized or normalized in {"(none)", "-", "none"}:
+        return None
+    return normalized
+
+
+def _resolve_writer_command(writer_command: str | None = None) -> str | None:
+    manifest = _read_manifest()
+    return (
+        _normalize_optional_command(writer_command)
+        or _normalize_optional_command(manifest.get("writer_command"))
+        or _normalize_optional_command(os.environ.get(WRITER_COMMAND_ENV))
+    )
+
+
+def _warn_unanchored_voice_assets() -> None:
+    pending = []
+    for filename in ["voice-anchor.md", "character.md"]:
+        path = ROOT / filename
+        if path.exists() and "AGENT_EXTRACT_REQUIRED" in path.read_text(encoding="utf-8"):
+            pending.append(filename)
+    if pending:
+        print(f"  ⚠ 声纹锚未完成，后续返修成本会放大: {', '.join(pending)}")
+        print("    → 建议在 batch02 前补齐 voice-anchor.md / character.md")
+
+
+def _writer_parallelism() -> int:
+    raw = _read_manifest().get("writer_parallelism", "").strip()
+    if raw.isdigit() and int(raw) > 0:
+        return int(raw)
+    return DEFAULT_WRITER_PARALLELISM
+
+
+def _run_writer_stage(
+    batch_id: str,
+    episodes: list[str],
+    *,
+    writer_command: str | None = None,
+    parallelism: int | None = None,
+    syntax_first: bool = False,
+    force_rewrite: bool = False,
+) -> int:
+    if force_rewrite:
+        for episode in episodes:
+            draft = DRAFTS / f"{episode}.md"
+            if draft.exists():
+                draft.unlink()
+
+    missing_before = _missing_drafts(episodes)
+    if not missing_before:
+        print(f"  ✓ Using existing drafts for {', '.join(episodes)}")
+        return 0
+
+    command_template = _resolve_writer_command(writer_command)
+    if command_template is None:
+        print("ERROR: writer stage is not configured")
+        print(f"  Missing drafts: {', '.join(missing_before)}")
+        print(f"  Configure run.manifest.md `writer_command`, set {WRITER_COMMAND_ENV},")
+        print(f"  or use `start {batch_id} --prepare-only` and run the writer externally.")
+        return 1
+
+    try:
+        selected_parallelism = max(1, parallelism or _writer_parallelism())
+        command = command_template.format(
+            batch_id=batch_id,
+            episodes=",".join(episodes),
+            episodes_csv=",".join(episodes),
+            draft_dir=str(DRAFTS),
+            project_root=str(ROOT),
+            python=sys.executable,
+            parallelism=selected_parallelism,
+            syntax_first_flag="--syntax-first" if syntax_first else "",
+        )
+    except KeyError as exc:
+        print(f"ERROR: writer_command placeholder '{exc.args[0]}' is not supported")
+        return 1
+
+    print(f"  → Running writer command for {batch_id}")
+    result = subprocess.run(
+        command,
+        shell=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.stdout:
+        print(result.stdout.rstrip())
+    if result.stderr:
+        print(result.stderr.rstrip())
+    if result.returncode != 0:
+        print(f"ERROR: writer command failed with exit code {result.returncode}")
+        return result.returncode or 1
+
+    missing_after = _missing_drafts(episodes)
+    if missing_after:
+        print(f"ERROR: writer stage completed but drafts are still missing: {', '.join(missing_after)}")
+        return 1
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Subcommands
 # ---------------------------------------------------------------------------
 
@@ -743,7 +1149,6 @@ def cmd_status(args: argparse.Namespace) -> int:
     print("=== Harness V2 Pipeline Status ===")
     print(f"  run_status:   {manifest.get('run_status', '?')}")
     print(f"  active_batch: {manifest.get('active_batch', '?')}")
-    print(f"  current_batch_brief: {manifest.get('current_batch_brief', '?')}")
     print(f"  draft_lane:   {manifest.get('draft_lane', '?')}")
     print(f"  publish_lane: {manifest.get('publish_lane', '?')}")
     print()
@@ -770,28 +1175,38 @@ def cmd_status(args: argparse.Namespace) -> int:
         print("  (draft lane missing)")
     print()
 
-    print("=== Published (batch ownership) ===")
-    # Build map of episode → batch for all promoted batches
-    batches = _parse_source_map()
-    ep_to_batch: dict[str, str] = {}
-    for bid in sorted(batches.keys()):
-        bp = _find_batch_brief(bid)
-        if bp:
-            bd = _read_batch_brief(bp)
-            if bd.get("status") == "promoted":
-                for ep in bd.get("episodes", []):
-                    ep_to_batch[ep] = bid
+    print("=== Published Episodes ===")
+    release_index = _load_release_index()
+    gold_set = _load_gold_set()
+    gold_episodes = set(gold_set.get("episodes", []))
+    release_entries = release_index.get("episodes", {})
 
     if EPISODES.exists():
         eps = sorted(EPISODES.glob("EP-*.md"))
         for e in eps:
-            owner = ep_to_batch.get(e.stem)
-            if owner:
-                print(f"  {e.name}  [{owner}]")
+            ep = e.stem
+            entry = release_entries.get(ep)
+            if entry:
+                rs = entry.get("release_status", "?")
+                batch = entry.get("source_batch", "?")
+                has_meta = _meta_path(ep).exists()
+                label = f"{rs}"
+                if rs == "gold":
+                    label += f", batch={batch}"
+                if has_meta:
+                    label += ", meta=✓"
+                print(f"  {e.name}  [{label}]")
+            elif ep in gold_episodes:
+                print(f"  {e.name}  [gold (index missing)]")
             else:
-                print(f"  {e.name}  [UNTRACKED — legacy or orphan]")
+                print(f"  {e.name}  [untracked]")
         if not eps:
             print("  (none)")
+    else:
+        print("  (no episodes directory)")
+
+    if gold_episodes:
+        print(f"\n  Gold set: {', '.join(sorted(gold_episodes))}")
     print()
 
     # Show verify results if any
@@ -853,31 +1268,17 @@ def cmd_plan(args: argparse.Namespace) -> int:
 
 def cmd_lint(args: argparse.Namespace) -> int:
     episode = args.episode
-    draft = DRAFTS / f"{episode}.md"
-    if not draft.exists():
-        print(f"ERROR: draft not found: {draft}")
-        return 1
-
-    try:
-        data = _run_lint(draft)
-    except ValueError as exc:
-        print(f"ERROR: {exc}")
-        return 1
-
+    is_pass, data = _lint_episode_payload(episode)
+    status = data.get("status", "fail")
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
-    if not _lint_blocks_promote(data):
-        print(f"\nLINT OK: {episode} ({data.get('status', 'pass')})")
+    if is_pass:
+        print(f"\nLINT PASS: {episode}")
         return 0
-
-    print(f"\nLINT FAIL: {episode}")
-    count = _get_retry_count(episode) + 1
-    _set_retry_count(episode, count)
-    if count >= 4:
-        print(f"WARNING: {episode} has failed {count} times — ESCALATE TO HUMAN")
-    elif count >= 3:
-        print(f"WARNING: {episode} has failed {count} times — CONTEXT RESET required")
-    return 1
+    else:
+        print(f"\nLINT FAIL: {episode}")
+        _note_lint_retry_pressure(episode)
+        return 1
 
 
 def cmd_gate(args: argparse.Namespace) -> int:
@@ -901,17 +1302,21 @@ def cmd_gate(args: argparse.Namespace) -> int:
             all_pass = False
             continue
 
+        result = subprocess.run(
+            [sys.executable, str(LINT_SCRIPT), str(draft)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
         try:
-            data = _run_lint(draft)
+            data = json.loads(result.stdout)
             status = data.get("status", "fail")
-            is_blocking = _lint_blocks_promote(data)
-        except ValueError:
+        except (json.JSONDecodeError, ValueError):
             status = "error"
-            is_blocking = True
 
-        icon = "✓" if not is_blocking else "✗"
+        icon = "✓" if status == "pass" else "✗"
         print(f"  {icon} {ep}: {status}")
-        if is_blocking:
+        if status != "pass":
             all_pass = False
 
     if all_pass:
@@ -924,79 +1329,40 @@ def cmd_gate(args: argparse.Namespace) -> int:
 
 def cmd_promote(args: argparse.Namespace) -> int:
     batch_id = args.batch_id
-    brief_path = _find_batch_brief(batch_id)
-    if brief_path is None:
-        print(f"ERROR: batch brief not found for '{batch_id}'")
+    resolved = _resolve_batch(args.batch_id, require_frozen=True)
+    if resolved is None:
         return 1
+    brief_path, brief, episodes = resolved
 
-    brief = _read_batch_brief(brief_path)
-    current_status = brief.get("status", "unknown")
-
-    if current_status == "promoted":
-        print(f"ERROR: batch '{batch_id}' is already promoted")
-        return 1
-
-    if current_status != "frozen":
-        print(f"ERROR: batch brief status is '{current_status}', must be 'frozen' to promote")
-        return 1
-
-    episodes = brief.get("episodes", [])
-
-    # Gate: all drafts must exist
-    missing = [ep for ep in episodes if not (DRAFTS / f"{ep}.md").exists()]
-    if missing:
-        print(f"ERROR: missing drafts: {', '.join(missing)}")
-        return 1
-
-    # Gate: all must pass lint
+    # Gate: lint
     print("Running lint gate...")
-    lint_results: dict[str, dict] = {}
-    for ep in episodes:
-        try:
-            data = _run_lint(DRAFTS / f"{ep}.md")
-        except ValueError:
-            print(f"ERROR: {ep} lint error — cannot promote")
-            return 1
-        lint_results[ep] = data
-        if _lint_blocks_promote(data):
-            print(f"ERROR: {ep} lint FAIL — cannot promote")
-            return 1
-        print(f"  ✓ {ep} lint {data.get('status', 'pass')}")
+    lint_passed, lint_results = _run_lint_gate(episodes)
+    if not lint_passed:
+        return 1
 
-    # Gate: all non-LIGHT episodes must have verify PASS
+    # Gate: verify + integrity
     print("Running verify gate...")
-    full_eps, standard_eps, light_eps = _compute_verify_tiers(episodes)
-    for ep in episodes:
-        if ep in light_eps:
-            print(f"  ✓ {ep} verify: LIGHT (lint-only)")
-            continue
-        vr = _read_verify_result(ep)
-        if vr is None:
-            print(f"ERROR: {ep} has no verify result — run aligner + verify-done first")
-            return 1
-        if vr.get("status") != "PASS":
-            print(f"ERROR: {ep} verify {vr.get('status', '?')} — cannot promote")
-            return 1
-        print(f"  ✓ {ep} verify: PASS (tier: {vr.get('tier', '?')})")
+    if not _run_verify_gate(episodes):
+        return 1
 
     # Gate: state.lock must be free
     if _is_locked("state.lock"):
         print("ERROR: state.lock is held — cannot promote")
         return 1
 
-    # Execute promote: staging -> atomic replace
+    # Execute promote: staging → sequential replace → release tracking
     rc, _ = _promote_batch(batch_id, brief_path, episodes, lint_results)
     if rc != 0:
         print("ERROR: staging promote failed")
         return 1
     for ep in episodes:
-        print(f"  → {ep}: staging → published")
+        print(f"  → {ep}: draft → published (gold)")
 
     # Update batch brief status
     _set_batch_status(brief_path, "promoted")
 
     # Update run manifest
-    _set_manifest_runtime(f"{batch_id}_promoted", brief_path)
+    _set_manifest_field("active_batch", f"{batch_id}_promoted")
 
     # Release batch lock
     _write_lock("batch.lock", "unlocked")
@@ -1071,24 +1437,24 @@ def cmd_retry(args: argparse.Namespace) -> int:
 def cmd_verify_plan(args: argparse.Namespace) -> int:
     """Compute verify tiers for a batch based on source.map metadata."""
     batch_id = args.batch_id
-    brief_path = _find_batch_brief(batch_id)
-    if brief_path is None:
-        print(f"ERROR: batch brief not found for '{batch_id}'")
+    resolved = _resolve_batch(args.batch_id)
+    if resolved is None:
         return 1
+    brief_path, brief, episodes = resolved
 
-    brief = _read_batch_brief(brief_path)
-    episodes = brief.get("episodes", [])
-
-    full_eps, standard_eps, light_eps = _compute_verify_tiers(episodes)
+    full_eps, standard_eps, light_eps, unmapped_eps = _compute_verify_tiers(episodes)
 
     print(f"=== Verify Plan: {batch_id} ===")
     print(f"\n  FULL (8-step):    {', '.join(full_eps) or '(none)'}")
     print(f"  STANDARD (5-step): {', '.join(standard_eps) or '(none)'}")
     print(f"  LIGHT (lint only): {', '.join(light_eps) or '(none)'}")
+    if unmapped_eps:
+        print(f"  ⚠ UNMAPPED (no source-map): {', '.join(unmapped_eps)}")
+        print(f"    → These episodes CANNOT be verified or promoted until source.map.md is updated")
     print(f"\n  Batch-level adversarial sampling: 2 random episodes after all pass")
 
     # Output as structured data for agent consumption
-    plan = {"full": full_eps, "standard": standard_eps, "light": light_eps}
+    plan = {"full": full_eps, "standard": standard_eps, "light": light_eps, "unmapped": unmapped_eps}
     print(f"\n  JSON: {json.dumps(plan, ensure_ascii=False)}")
     return 0
 
@@ -1096,13 +1462,10 @@ def cmd_verify_plan(args: argparse.Namespace) -> int:
 def cmd_batch_review(args: argparse.Namespace) -> int:
     """Print batch-level review checklist after all episodes in batch pass verify."""
     batch_id = args.batch_id
-    brief_path = _find_batch_brief(batch_id)
-    if brief_path is None:
-        print(f"ERROR: batch brief not found for '{batch_id}'")
+    resolved = _resolve_batch(args.batch_id)
+    if resolved is None:
         return 1
-
-    brief = _read_batch_brief(brief_path)
-    episodes = brief.get("episodes", [])
+    brief_path, brief, episodes = resolved
 
     # Pick 2 episodes for adversarial sampling
     sample_size = min(2, len(episodes))
@@ -1300,6 +1663,8 @@ def _detect_chapters(novel_text: str) -> list[dict]:
         if re.match(r"^#{1,4}\s*第.+[章回]", stripped):
             title = stripped.lstrip("#").strip()
             chapter_starts.append((i, title))
+        elif re.match(r"^[0-9０-９]{1,3}$", stripped):
+            chapter_starts.append((i, f"第{stripped}章"))
 
     chapters = []
     for idx, (start, title) in enumerate(chapter_starts):
@@ -1359,6 +1724,93 @@ def _map_chapters_to_episodes(chapters: list[dict], total_episodes: int) -> list
     return episodes[:total_episodes]
 
 
+def _chapter_index_lines(chapters: list[dict]) -> list[str]:
+    if not chapters:
+        return ["- 未识别出稳定章节标题；后续抽取时需要按整本内容自行建立定位索引"]
+
+    lines = []
+    for ch in chapters:
+        title = ch.get("title") or f"第{ch['index']}章"
+        start_line = ch["start_line"] + 1
+        end_line = ch["end_line"]
+        lines.append(f"- 第{ch['index']}章：{title}（line {start_line} ~ {end_line}）")
+    return lines
+
+
+def _book_blueprint_template(novel_name: str, chapters: list[dict]) -> str:
+    chapter_index = "\n".join(_chapter_index_lines(chapters))
+    return f"""# Book Blueprint
+
+- source_file: {novel_name}
+- extraction_status: pending
+- chapter_count: {len(chapters)}
+- target_episode_minutes: {DEFAULT_TARGET_EPISODE_MINUTES}
+- episode_minutes_min: {DEFAULT_EPISODE_MINUTES_MIN}
+- episode_minutes_max: {DEFAULT_EPISODE_MINUTES_MAX}
+- recommended_total_episodes: {PENDING_BLUEPRINT_RECOMMENDATION}
+
+说明：
+- 先做全书级抽取，再生成 `source.map.md`
+- 章节只作为定位信息，不作为主要思考单位
+- 本文件是全书级改编蓝图，先锁主线/弧光/反转/结局，再切 batch / episode
+- 单集时长按 {DEFAULT_EPISODE_MINUTES_MIN}-{DEFAULT_EPISODE_MINUTES_MAX} 分钟动态浮动，中心值 {DEFAULT_TARGET_EPISODE_MINUTES} 分钟/集
+
+## 主线
+
+（AGENT_EXTRACT_REQUIRED）
+
+## 集数建议
+
+- recommended_total_episodes: （AGENT_EXTRACT_REQUIRED）
+- rationale: （AGENT_EXTRACT_REQUIRED）
+
+## 角色弧光
+
+（AGENT_EXTRACT_REQUIRED）
+
+## 关系变化
+
+（AGENT_EXTRACT_REQUIRED）
+
+## 关键反转
+
+（AGENT_EXTRACT_REQUIRED）
+
+## 结局闭环
+
+（AGENT_EXTRACT_REQUIRED）
+
+## 章节索引（仅定位）
+
+{chapter_index}
+"""
+
+
+def _pending_source_map_template(strategy: str, intensity: str, total_eps: int | None, batch_size: int) -> str:
+    total_eps_text = str(total_eps) if total_eps is not None else PENDING_TOTAL_EPISODES
+    total_batches = (total_eps + batch_size - 1) // batch_size if total_eps is not None else None
+    total_batches_text = str(total_batches) if total_batches is not None else PENDING_TOTAL_BATCHES
+    return f"""# Source Map
+
+- mapping_status: pending_book_extraction
+- total_episodes: {total_eps_text}
+- batch_size: {batch_size}
+- total_batches: {total_batches_text}
+- target_episode_minutes: {DEFAULT_TARGET_EPISODE_MINUTES}
+- episode_minutes_min: {DEFAULT_EPISODE_MINUTES_MIN}
+- episode_minutes_max: {DEFAULT_EPISODE_MINUTES_MAX}
+- adaptation_strategy: {strategy}
+- dialogue_adaptation_intensity: {intensity}
+
+说明：
+- 本文件尚未生成正式 episode 映射
+- 下一步先运行 `extract-book` 生成 `book.blueprint.md`
+- 由模型先推荐总集数，并默认回填到 `run.manifest.md`
+- 再运行 `map-book` 生成完整 `source.map.md`
+- 章节只作为定位信息，不作为主要思考单位
+"""
+
+
 def _has_existing_project() -> bool:
     """Check if there is meaningful project data that would be lost by init."""
     # Check for promoted batches
@@ -1415,8 +1867,8 @@ def _backup_project() -> Path | None:
         for f in STATE.glob("*.md"):
             shutil.copy2(f, st_dst / f.name)
             copied += 1
-    # Backup source.map, manifest, character, voice-anchor
-    for name in ["source.map.md", "run.manifest.md"]:
+    # Backup source.map, blueprint, manifest, character, voice-anchor
+    for name in ["source.map.md", "book.blueprint.md", "run.manifest.md"]:
         src = PROJECT / name
         if src.exists():
             shutil.copy2(src, snapshot_dir / name)
@@ -1433,8 +1885,61 @@ def _backup_project() -> Path | None:
     return snapshot_dir
 
 
+def _clear_runtime_project_data() -> dict[str, int]:
+    stats = {
+        "drafts": 0,
+        "episodes": 0,
+        "batch_briefs": 0,
+        "locks": 0,
+        "state_files": 0,
+        "release_entries": 0,
+    }
+
+    DRAFTS.mkdir(parents=True, exist_ok=True)
+    for path in DRAFTS.glob("EP-*.md"):
+        path.unlink()
+        stats["drafts"] += 1
+
+    EPISODES.mkdir(parents=True, exist_ok=True)
+    for path in EPISODES.glob("EP-*.md"):
+        path.unlink()
+        stats["episodes"] += 1
+
+    BATCH_BRIEFS.mkdir(parents=True, exist_ok=True)
+    for path in BATCH_BRIEFS.glob("*.md"):
+        path.unlink()
+        stats["batch_briefs"] += 1
+
+    LOCKS.mkdir(parents=True, exist_ok=True)
+    for path in list(LOCKS.iterdir()):
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+        stats["locks"] += 1
+    for lock_name in ["batch.lock", "episode-XX.lock", "state.lock"]:
+        _write_lock(lock_name, "unlocked")
+
+    if RELEASES.exists():
+        stats["release_entries"] = sum(1 for _ in RELEASES.rglob("*"))
+        shutil.rmtree(RELEASES)
+    RELEASES.mkdir(parents=True, exist_ok=True)
+
+    STATE.mkdir(parents=True, exist_ok=True)
+    for path in STATE.glob("*.md"):
+        path.unlink()
+        stats["state_files"] += 1
+    _write_state_templates()
+
+    if RUN_MANIFEST.exists():
+        _set_manifest_field("active_batch", "(none)")
+        _set_manifest_line("current batch brief", "(none)")
+
+    return stats
+
+
 def cmd_init(args: argparse.Namespace) -> int:
-    """Scaffold a new project: detect chapters, map episodes, generate all files."""
+    """Scaffold a new project: create runtime skeleton, blueprint, and pending source map."""
     novel_path = ROOT / args.novel_file
     if not novel_path.exists():
         print(f"ERROR: novel file not found: {novel_path}")
@@ -1446,7 +1951,10 @@ def cmd_init(args: argparse.Namespace) -> int:
     intensity = args.intensity
     key_eps = args.key_episodes or ""
     novel_name = novel_path.name
-    total_batches = (total_eps + batch_size - 1) // batch_size
+    total_batches = (total_eps + batch_size - 1) // batch_size if total_eps is not None else None
+    episode_count_source = "manual_override" if total_eps is not None else "model_recommended"
+    total_eps_text = str(total_eps) if total_eps is not None else PENDING_TOTAL_EPISODES
+    recommended_total_text = PENDING_RECOMMENDED_TOTAL_EPISODES
 
     # Safety check: detect existing project data
     if _has_existing_project() and not args.force:
@@ -1463,22 +1971,21 @@ def cmd_init(args: argparse.Namespace) -> int:
     print(f"=== Init New Project ===")
     print(f"  Novel:      {novel_name}")
     print(f"  Chapters:   {len(chapters)} detected")
-    print(f"  Episodes:   {total_eps} ({total_batches} batches x {batch_size})")
+    if total_eps is not None:
+        print(f"  Episodes:   {total_eps} ({total_batches} batches x {batch_size}) [manual override]")
+    else:
+        print(f"  Episodes:   {PENDING_TOTAL_EPISODES}")
+        print(f"  Batch size: {batch_size}")
+        print(
+            f"  Timing:     {DEFAULT_EPISODE_MINUTES_MIN}-{DEFAULT_EPISODE_MINUTES_MAX} min/ep "
+            f"(target {DEFAULT_TARGET_EPISODE_MINUTES})"
+        )
     print(f"  Strategy:   {strategy}")
     print(f"  Intensity:  {intensity}")
     if key_eps:
         print(f"  Key EPs:    {key_eps}")
     print()
-
-    # Map chapters to episodes
-    ep_mapping = _map_chapters_to_episodes(chapters, total_eps)
-
-    # Show mapping preview
-    print(f"  Chapter → Episode mapping:")
-    for ep in ep_mapping[:10]:
-        print(f"    {ep['id']}: {ep['chapter_span']}")
-    if len(ep_mapping) > 10:
-        print(f"    ... ({len(ep_mapping) - 10} more)")
+    print("  Init mode:  scaffold only (book blueprint first, source.map later)")
     print()
 
     # Backup before destructive operations
@@ -1500,101 +2007,56 @@ def cmd_init(args: argparse.Namespace) -> int:
         for f in LOCKS.iterdir():
             f.unlink()
 
-    # Generate run.manifest.{md,json}
-    _write_manifest(
-        {
-            "source_file": novel_name,
-            "total_episodes": str(total_eps),
-            "batch_size": str(batch_size),
-            "key_episodes": key_eps,
-            "adaptation_mode": "novel_to_short_drama",
-            "adaptation_strategy": strategy,
-            "dialogue_adaptation_intensity": intensity,
-            "generation_execution_mode": "orchestrated_subagents",
-            "generation_reset_mode": "clean_rebuild",
-            "run_status": "active",
-            "active_batch": "(none)",
-            "source_authority": "original novel manuscript + harness/project/source.map.json",
-            "draft_lane": "drafts/episodes",
-            "publish_lane": "episodes",
-            "promotion_policy": "controller_only_after_full_batch_verify",
-            "framework_entry": "harness/framework/entry.md",
-            "source_map": "harness/project/source.map.md",
-            "current_batch_brief": "(none)",
-            "regression_packs": "optional under harness/project/regressions/",
-            "state_directory": "harness/project/state/",
-        }
-    )
-    print(f"  + run.manifest.md / run.manifest.json")
+    # Generate run.manifest.md
+    manifest_content = f"""# Run Manifest
 
-    # Generate source.map.md with chapter spans pre-filled
-    # Group episodes into batches and find chapter ranges
-    source_map_lines = [
-        f"# Source Map",
-        f"",
-        f"日期：{NOW.split()[0]}",
-        f"模式：`{strategy}`",
-        f"对话改编力度：`{intensity}`",
-        f"执行方式：`orchestrated_subagents`",
-        f"重建方式：`clean_rebuild`",
-        f"",
-        f"说明：",
-        f"- 本文件是本轮 clean rebuild 的 controller-only 映射权威。",
-        f"- 原著章节顺序优先；一章可拆多集，多个相邻章节可合拍。",
-        f"- `must-not-add` / `must-not-jump` 为硬边界，writer subagent 不得自行突破。",
-        f"",
-    ]
+- source_file: {novel_name}
+- total_episodes: {total_eps_text}
+- recommended_total_episodes: {recommended_total_text}
+- episode_count_source: {episode_count_source}
+- batch_size: {batch_size}
+- target_episode_minutes: {DEFAULT_TARGET_EPISODE_MINUTES}
+- episode_minutes_min: {DEFAULT_EPISODE_MINUTES_MIN}
+- episode_minutes_max: {DEFAULT_EPISODE_MINUTES_MAX}
+- key_episodes: {key_eps}
+- adaptation_mode: novel_to_short_drama
+- adaptation_strategy: {strategy}
+- dialogue_adaptation_intensity: {intensity}
+- generation_execution_mode: orchestrated_subagents
+- writer_parallelism: {DEFAULT_WRITER_PARALLELISM}
+- writer_command: "{{python}}" _ops/run_writer.py --batch {{batch_id}} --episodes {{episodes_csv}} --parallelism {{parallelism}} {{syntax_first_flag}}
+- generation_reset_mode: clean_rebuild
+- run_status: active
+- active_batch: (none)
+- source_authority: original novel manuscript + harness/project/book.blueprint.md + harness/project/source.map.md
+- draft_lane: drafts/episodes
+- publish_lane: episodes
+- promotion_policy: controller_only_after_full_batch_verify
 
-    for b in range(total_batches):
-        start_idx = b * batch_size
-        end_idx = min(start_idx + batch_size, total_eps)
-        batch_eps = ep_mapping[start_idx:end_idx]
+## Current Runtime
+- framework entry: harness/framework/entry.md
+- book blueprint: harness/project/book.blueprint.md
+- source map: harness/project/source.map.md
+- current batch brief: (none)
+- regression packs: optional under harness/project/regressions/
+- state directory: harness/project/state/
 
-        ep_start_id = batch_eps[0]["id"]
-        ep_end_id = batch_eps[-1]["id"]
+## Defaults
+- stale legacy v1 files are not runtime authority
+- published episodes are read-only outputs for current run
+- draft episodes are the only candidate lane for verify
+"""
+    RUN_MANIFEST.write_text(manifest_content, encoding="utf-8")
+    print(f"  + run.manifest.md")
 
-        # Determine chapter range for this batch
-        spans = [ep["chapter_span"] for ep in batch_eps]
-        first_ch = re.search(r"第(\d+)章", spans[0])
-        last_ch = re.search(r"第(\d+)章", spans[-1])
-        if first_ch and last_ch:
-            ch_range = f"第{first_ch.group(1)}章 ~ 第{last_ch.group(1)}章" if first_ch.group(1) != last_ch.group(1) else f"第{first_ch.group(1)}章"
-        else:
-            ch_range = "（待填写）"
+    BOOK_BLUEPRINT.write_text(_book_blueprint_template(novel_name, chapters), encoding="utf-8")
+    print(f"  + book.blueprint.md (pending whole-book extraction)")
 
-        source_map_lines.append(f"## Batch {b+1:02d}：{ep_start_id} ~ {ep_end_id}")
-        source_map_lines.append(f"原著范围：{ch_range}")
-        source_map_lines.append("")
-
-        for ep in batch_eps:
-            source_map_lines.append(f"### {ep['id']}")
-            source_map_lines.append(f"- source chapter span：{ep['chapter_span']}")
-            source_map_lines.append(f"- must-keep beats：（AGENT_EXTRACT_REQUIRED）")
-            source_map_lines.append(f"- must-not-add / must-not-jump：（AGENT_EXTRACT_REQUIRED）")
-            source_map_lines.append(f"- ending type：（AGENT_EXTRACT_REQUIRED）")
-            source_map_lines.append("")
-
-    source_map_content = "\n".join(source_map_lines)
-    SOURCE_MAP.write_text(source_map_content, encoding="utf-8")
-    SOURCE_MAP_JSON.write_text(
-        json.dumps(_parse_source_map_markdown(source_map_content), ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    print(f"  + source.map.md / source.map.json ({total_batches} batches, {total_eps} episodes, chapter spans pre-filled)")
+    SOURCE_MAP.write_text(_pending_source_map_template(strategy, intensity, total_eps, batch_size), encoding="utf-8")
+    print(f"  + source.map.md (pending map-book)")
 
     # Generate state file templates
-    STATE.mkdir(parents=True, exist_ok=True)
-    state_templates = {
-        "script.progress.md": "# Script Progress\n\n## 项目信息\n\n## 基础文档\n\n## 当前整季状态\n\n## 分集记录\n\n## 全局记录\n\n## 质量统计\n\n## 版本记录\n",
-        "story.state.md": "# Story State\n\n## 当前阶段\n\n## 权力格局\n\n## 主要角色位置\n\n## 最近关键转折\n\n## 下一批关键预期\n",
-        "relationship.board.md": "# Relationship Board\n\n## 核心关系网\n\n## 最近关系变动\n\n## 待爆关系线\n",
-        "open_loops.md": "# Open Loops\n\n## 未回收伏笔\n\n## 未爆真相\n\n## 待解冲突\n\n## 已超期伏笔\n",
-        "quality.anchor.md": "# Quality Anchor\n\n## 场景厚度\n\n## 对话节奏\n\n## os 使用方式\n\n## 代表性打法\n",
-        "process.memory.md": "# Process Memory\n\n## 活跃流程问题\n\n## 当前执行准则\n",
-        "run.log.md": f"# Run Log\n_最后更新：{NOW}_\n\n## Log Entries\n\n| 时间戳 | batch | episode | phase | event | result | 备注 |\n|---|---|---|---|---|---|---|\n",
-    }
-    for name, content in state_templates.items():
-        (STATE / name).write_text(content, encoding="utf-8")
+    _write_state_templates()
     print(f"  + state/ (7 template files)")
 
     # Always generate fresh character.md and voice-anchor.md
@@ -1634,33 +2096,169 @@ def cmd_init(args: argparse.Namespace) -> int:
     EPISODES.mkdir(parents=True, exist_ok=True)
     BATCH_BRIEFS.mkdir(parents=True, exist_ok=True)
     LOCKS.mkdir(parents=True, exist_ok=True)
-    RELEASES.mkdir(parents=True, exist_ok=True)
-    _write_release_files(_release_index_template(), _gold_set_template())
+    for lock_name in ["batch.lock", "episode-XX.lock", "state.lock"]:
+        lock_path = LOCKS / lock_name
+        if not lock_path.exists():
+            _write_lock(lock_name, "free")
 
     _append_log("-", "-", "plan_inputs", "project init", "✓", novel_name)
 
     print(f"\n{'='*50}")
-    print(f"  PROJECT INITIALIZED — AGENT EXTRACTION REQUIRED")
+    print(f"  PROJECT INITIALIZED — WHOLE-BOOK FLOW")
     print(f"{'='*50}")
-    print(f"\n  AGENT_EXTRACT_REQUIRED markers found in:")
-    print(f"  - source.map.md (must-keep beats, must-not, ending type)")
+    print(f"\n  Next steps:")
+    print(f"  1. extract-book  → fill book.blueprint.md + auto-set total_episodes")
+    print(f"  2. map-book      → generate source.map.md")
+    print(f"  3. start batch01 → begin batch pipeline")
+    print(f"\n  Files pending completion:")
+    print(f"  - book.blueprint.md")
+    print(f"  - source.map.md")
     print(f"  - character.md")
     print(f"  - voice-anchor.md")
-    print(f"\n  Agent must now execute the Init Extract Protocol (see AGENTS.md)")
-    print(f"  to read {novel_name} and fill in all markers automatically.")
 
     return 0
 
 
-def cmd_start(args: argparse.Namespace) -> int:
-    """Full pipeline kickoff: generate brief (if missing) → freeze → lock → show context."""
-    batch_id = args.batch_id
+def cmd_extract_book(args: argparse.Namespace) -> int:
+    """Run whole-book extraction backend to fill book.blueprint.md."""
+    novel_path = _manifest_source_path()
+    if novel_path is None:
+        return 1
+
+    if not BOOK_BLUEPRINT.exists():
+        print("ERROR: book.blueprint.md is missing")
+        print("  Run init first")
+        return 1
+
+    script = ROOT / "_ops" / "run_book_extract.py"
+    print("=== extract-book ===")
+    print(f"  Source:    {novel_path.name}")
+    print(f"  Blueprint: {BOOK_BLUEPRINT.relative_to(ROOT)}")
+
+    result = subprocess.run(
+        [sys.executable, str(script), "--novel-file", novel_path.relative_to(ROOT).as_posix()],
+        cwd=ROOT,
+        check=False,
+    )
+    if result.returncode == 0:
+        recommended = _sync_recommended_episode_count_from_blueprint()
+        if recommended is None:
+            print("ERROR: extract-book completed but book.blueprint.md is missing recommended_total_episodes")
+            _append_log("-", "-", "plan_inputs", "extract-book", "✗", f"{novel_path.name} (missing recommendation)")
+            return 1
+        manifest = _read_manifest()
+        total_eps = manifest.get("total_episodes", str(recommended))
+        print(f"  Recommended total_episodes: {recommended}")
+        if manifest.get("episode_count_source", "model_recommended") == "model_recommended":
+            print(f"  Auto-adopted total_episodes: {total_eps}")
+        else:
+            print(f"  Kept manual total_episodes: {total_eps}")
+        _append_log("-", "-", "plan_inputs", "extract-book", "✓", novel_path.name)
+    else:
+        _append_log("-", "-", "plan_inputs", "extract-book", "✗", novel_path.name)
+    return result.returncode
+
+
+def cmd_map_book(args: argparse.Namespace) -> int:
+    """Run source-map generation backend using the whole-book blueprint."""
+    if not BOOK_BLUEPRINT.exists():
+        print("ERROR: book.blueprint.md is missing")
+        print("  Run init first")
+        return 1
+    if _book_blueprint_has_placeholders():
+        print("ERROR: book.blueprint.md is still pending extraction")
+        print("  Run extract-book first")
+        return 1
+
+    manifest = _read_manifest()
+    total_eps = _parse_manifest_int("total_episodes")
+    if total_eps is None:
+        print("ERROR: total_episodes is still pending model recommendation")
+        print("  Run extract-book first so the recommendation can be auto-applied")
+        return 1
+
+    batch_size = _parse_manifest_int("batch_size")
+    if batch_size is None:
+        print("ERROR: run.manifest.md has invalid batch_size")
+        return 1
+
+    novel_path = _manifest_source_path()
+    if novel_path is None:
+        return 1
+
+    strategy = manifest.get("adaptation_strategy", "original_fidelity")
+    intensity = manifest.get("dialogue_adaptation_intensity", "light")
+
+    script = ROOT / "_ops" / "run_book_map.py"
+    print("=== map-book ===")
+    print(f"  Source:    {novel_path.name}")
+    print(f"  Blueprint: {BOOK_BLUEPRINT.relative_to(ROOT)}")
+    print(f"  Output:    {SOURCE_MAP.relative_to(ROOT)}")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--novel-file",
+            novel_path.relative_to(ROOT).as_posix(),
+            "--episodes",
+            str(total_eps),
+            "--batch-size",
+            str(batch_size),
+            "--strategy",
+            strategy,
+            "--intensity",
+            intensity,
+        ],
+        cwd=ROOT,
+        check=False,
+    )
+    if result.returncode == 0:
+        _append_log("-", "-", "plan_inputs", "map-book", "✓", novel_path.name)
+    else:
+        _append_log("-", "-", "plan_inputs", "map-book", "✗", novel_path.name)
+    return result.returncode
+
+
+def cmd_clean(args: argparse.Namespace) -> int:
+    """Backup and clear runtime project data while preserving project config and source files."""
+    print("=== Clean Runtime Project Data ===")
+    snapshot = _backup_project()
+    if snapshot:
+        print(f"  ↻ Backed up to {snapshot.relative_to(ROOT)}")
+    else:
+        print("  (no existing runtime data to back up)")
+
+    stats = _clear_runtime_project_data()
+
+    print(f"  - drafts cleared:        {stats['drafts']}")
+    print(f"  - episodes cleared:      {stats['episodes']}")
+    print(f"  - batch briefs cleared:  {stats['batch_briefs']}")
+    print(f"  - lock artifacts reset:  {stats['locks']}")
+    print(f"  - state files reset:     {stats['state_files']}")
+    print(f"  - release entries reset: {stats['release_entries']}")
+    print("  ✓ Runtime project data cleared")
+    print("  Preserved: book.blueprint.md, source.map.md, run.manifest.md, framework contracts, source novel files")
+    return 0
+
+
+def _prepare_batch_start(batch_id: str) -> tuple[Path, dict, list[str]] | None:
+    if not SOURCE_MAP.exists():
+        print("ERROR: source.map.md is missing")
+        print("  Run extract-book and map-book first")
+        return None
+
+    source_map_text = SOURCE_MAP.read_text(encoding="utf-8")
+    if "mapping_status: pending_book_extraction" in source_map_text:
+        print("ERROR: source.map.md is still pending")
+        print("  Run extract-book, then map-book, before start/check/run")
+        return None
 
     batches = _parse_source_map()
     if batch_id not in batches:
         print(f"ERROR: '{batch_id}' not found in source.map")
         print(f"  Available: {', '.join(sorted(batches.keys()))}")
-        return 1
+        return None
 
     batch_info = batches[batch_id]
     episodes = batch_info["episodes"]
@@ -1671,7 +2269,7 @@ def cmd_start(args: argparse.Namespace) -> int:
         owner = lock_data.get("owner", "?")
         if batch_id not in owner:
             print(f"ERROR: batch.lock held by '{owner}' — finish or unlock first")
-            return 1
+            return None
 
     # Find or auto-generate batch brief
     brief_path = _find_batch_brief(batch_id)
@@ -1689,7 +2287,7 @@ def cmd_start(args: argparse.Namespace) -> int:
         brief = _read_batch_brief(brief_path)
         if brief.get("status") == "promoted":
             print(f"ERROR: batch '{batch_id}' is already promoted")
-            return 1
+            return None
         print(f"  = Found existing brief: {brief_path.name}")
 
     # Freeze + lock
@@ -1711,7 +2309,7 @@ def cmd_start(args: argparse.Namespace) -> int:
         print(f"  ⚠ Existing published files will be overwritten on promote: {', '.join(existing)}")
 
     # Update manifest
-    _set_manifest_runtime(f"{batch_id}_{batch_info['ep_start']}-{batch_info['ep_end']}", brief_path)
+    _set_manifest_field("active_batch", f"{batch_id}_{batch_info['ep_start']}-{batch_info['ep_end']}")
 
     # Log
     _append_log(batch_id, "-", "plan_inputs", "batch brief 冻结", "✓", "controller start")
@@ -1734,62 +2332,124 @@ def cmd_start(args: argparse.Namespace) -> int:
         print(f"    must-not:  {mn[:80]}{'...' if len(mn) > 80 else ''}")
 
     # Verify plan
-    full_eps, standard_eps, light_eps = _compute_verify_tiers(episodes)
+    full_eps, standard_eps, light_eps, unmapped_eps = _compute_verify_tiers(episodes)
     print(f"\n--- Verify Plan ---")
     print(f"  FULL (8-step):     {', '.join(full_eps) or '(none)'}")
     print(f"  STANDARD (5-step): {', '.join(standard_eps) or '(none)'}")
     print(f"  LIGHT (lint only): {', '.join(light_eps) or '(none)'}")
+    if unmapped_eps:
+        print(f"  ⚠ UNMAPPED:        {', '.join(unmapped_eps)}")
+        print(f"    → Update source.map.md before running check/verify")
 
-    print(f"\n--- Next Step ---")
-    print(f"  Writer agent: draft {', '.join(episodes)} into drafts/episodes/")
-    print(f"  Then run: python _ops/controller.py check {batch_id}")
+    return brief_path, batch_info, episodes
 
-    return 0
+
+def cmd_start(args: argparse.Namespace) -> int:
+    """Total entry: prepare batch → smoke-first writer stage → continue pipeline."""
+    batch_id = args.batch_id
+    prepared = _prepare_batch_start(batch_id)
+    if prepared is None:
+        return 1
+    brief_path, batch_info, episodes = prepared
+
+    if args.prepare_only:
+        print(f"\n--- Next Step ---")
+        print(f"  prepare-only: batch is frozen and locked, but writer/pipeline were not started")
+        print(f"  Writer agent: draft {', '.join(episodes)} into drafts/episodes/")
+        print(f"  Then run fast path: python _ops/controller.py run {batch_id}")
+        print(f"  Or strict path:    python _ops/controller.py check {batch_id}")
+        return 0
+
+    _warn_unanchored_voice_assets()
+
+    smoke_episode = episodes[0]
+    remaining_episodes = episodes[1:]
+
+    print(f"\n=== Writer Stage (Smoke First) ===")
+    writer_rc = _run_writer_stage(
+        batch_id,
+        [smoke_episode],
+        writer_command=args.writer_command,
+        parallelism=1,
+    )
+    if writer_rc != 0:
+        return writer_rc
+
+    smoke_ok, smoke_payload = _run_smoke_lint_check(smoke_episode)
+    _append_log(
+        batch_id,
+        smoke_episode,
+        "verify",
+        "smoke lint",
+        "✓" if smoke_ok else "✗",
+        "smoke-first",
+    )
+    if not smoke_ok and _is_syntax_shell_failure(smoke_payload):
+        print("  ↻ Smoke 命中壳层失败签名，自动切到 syntax-first 重写一次")
+        _append_log(batch_id, smoke_episode, "recovery", "syntax-first retry", "↻", "smoke shell failure")
+        writer_rc = _run_writer_stage(
+            batch_id,
+            [smoke_episode],
+            writer_command=args.writer_command,
+            parallelism=1,
+            syntax_first=True,
+            force_rewrite=True,
+        )
+        if writer_rc != 0:
+            return writer_rc
+        smoke_ok, smoke_payload = _run_smoke_lint_check(smoke_episode)
+        _append_log(
+            batch_id,
+            smoke_episode,
+            "verify",
+            "smoke lint retry",
+            "✓" if smoke_ok else "✗",
+            "syntax-first",
+        )
+
+    if not smoke_ok:
+        print("ERROR: smoke 集仍未通过 lint，已停止整批扩写")
+        print("  需要人工接管：优先修壳层 / parser 兼容问题，再继续本批次。")
+        _append_log(batch_id, smoke_episode, "recovery", "manual takeover", "✗", "smoke failed twice")
+        return 1
+
+    if remaining_episodes:
+        print(f"\n=== Writer Stage (Fan Out) ===")
+        writer_rc = _run_writer_stage(
+            batch_id,
+            remaining_episodes,
+            writer_command=args.writer_command,
+            parallelism=_writer_parallelism(),
+        )
+        if writer_rc != 0:
+            return writer_rc
+
+    print(f"\n=== Continue Pipeline ===")
+    return cmd_run(argparse.Namespace(batch_id=batch_id))
 
 
 def cmd_check(args: argparse.Namespace) -> int:
     """Gate (lint all) + verify-plan + semantic verify instructions."""
     batch_id = args.batch_id
-    brief_path = _find_batch_brief(batch_id)
-    if brief_path is None:
-        print(f"ERROR: batch brief not found for '{batch_id}'")
+    resolved = _resolve_batch(args.batch_id)
+    if resolved is None:
         return 1
-
-    brief = _read_batch_brief(brief_path)
-    episodes = brief.get("episodes", [])
-    if not episodes:
-        print(f"ERROR: no episodes in batch '{batch_id}'")
-        return 1
+    brief_path, brief, episodes = resolved
 
     # Step 1: Lint gate
-    print(f"=== Lint Gate: {batch_id} ===")
-    all_pass = True
-    for ep in episodes:
-        draft = DRAFTS / f"{ep}.md"
-        if not draft.exists():
-            print(f"  ✗ {ep}: draft missing")
-            all_pass = False
-            continue
-        try:
-            data = _run_lint(draft)
-            status = data.get("status", "fail")
-            is_fail = _lint_blocks_promote(data)
-        except ValueError:
-            status = "error"
-            is_fail = True
-        icon = "✓" if not is_fail else "✗"
-        print(f"  {icon} {ep}: {status}")
-        if is_fail:
-            all_pass = False
-
-    if not all_pass:
+    print(f"=== Lint Gate: {args.batch_id} ===")
+    lint_passed, _ = _run_lint_gate(episodes)
+    if not lint_passed:
         print(f"\n  GATE FAIL — fix lint errors before proceeding")
         return 1
-
     print(f"\n  GATE PASS")
 
     # Step 2: Verify plan
-    full_eps, standard_eps, light_eps = _compute_verify_tiers(episodes)
+    full_eps, standard_eps, light_eps, unmapped_eps = _compute_verify_tiers(episodes)
+    if unmapped_eps:
+        print(f"\n  ⚠ UNMAPPED episodes (no source-map data): {', '.join(unmapped_eps)}")
+        print(f"    → These episodes cannot proceed to verify. Update source.map.md first.")
+        return 1
     print(f"\n=== Verify Plan ===")
     print(f"  FULL (8-step):     {', '.join(full_eps) or '(none)'}")
     print(f"  STANDARD (5-step): {', '.join(standard_eps) or '(none)'}")
@@ -1837,73 +2497,23 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_finish(args: argparse.Namespace) -> int:
-    """Promote + validate + batch-review + log + next instructions."""
-    batch_id = args.batch_id
-    brief_path = _find_batch_brief(batch_id)
-    if brief_path is None:
-        print(f"ERROR: batch brief not found for '{batch_id}'")
-        return 1
-
-    brief = _read_batch_brief(brief_path)
-    episodes = brief.get("episodes", [])
-    current_status = brief.get("status", "unknown")
-
-    if current_status == "promoted":
-        print(f"ERROR: batch '{batch_id}' is already promoted")
-        return 1
-    if current_status != "frozen":
-        print(f"ERROR: batch brief status is '{current_status}', must be 'frozen'")
-        return 1
-
-    # Step 1: Final lint gate
-    print(f"=== Step 1: Lint Gate ===")
-    lint_results: dict[str, dict] = {}
-    for ep in episodes:
-        draft = DRAFTS / f"{ep}.md"
-        if not draft.exists():
-            print(f"  ✗ {ep}: draft missing")
-            return 1
-        try:
-            data = _run_lint(draft)
-            lint_results[ep] = data
-            if _lint_blocks_promote(data):
-                print(f"  ✗ {ep} lint FAIL (contract_failures: {data.get('contract_failures', [])}) — cannot finish")
-                return 1
-        except ValueError:
-            print(f"  ✗ {ep} lint error — cannot finish")
-            return 1
-        print(f"  ✓ {ep} lint {data.get('status', 'pass')}")
-
-    # Step 2: Verify gate — all non-LIGHT episodes must have verify PASS
-    print(f"\n=== Step 2: Verify Gate ===")
-    full_eps, standard_eps, light_eps = _compute_verify_tiers(episodes)
-    for ep in episodes:
-        if ep in light_eps:
-            print(f"  ✓ {ep}: LIGHT (lint-only)")
-            continue
-        vr = _read_verify_result(ep)
-        if vr is None:
-            print(f"  ✗ {ep}: no verify result — run aligner + verify-done first")
-            return 1
-        if vr.get("status") != "PASS":
-            print(f"  ✗ {ep}: verify {vr.get('status', '?')}")
-            return 1
-        print(f"  ✓ {ep}: verify PASS (tier: {vr.get('tier', '?')})")
-
-    # Step 3: State lock check
+def _do_promote_and_report(
+    batch_id: str, brief_path: Path, episodes: list[str], lint_results: dict[str, dict],
+) -> int:
+    """Shared post-gate logic: promote → validate → batch review → next steps."""
+    # State lock check
     if _is_locked("state.lock"):
-        print("ERROR: state.lock is held — cannot finish")
+        print("ERROR: state.lock is held — cannot promote")
         return 1
 
-    # Step 4: Promote
-    print(f"\n=== Step 3: Promote ===")
+    # Promote (staging → sequential replace → release tracking)
+    print(f"\n=== Promote ===")
     rc, _ = _promote_batch(batch_id, brief_path, episodes, lint_results)
     if rc != 0:
-        print("  ✗ staging promote failed")
+        print("ERROR: staging promote failed")
         return 1
     for ep in episodes:
-        print(f"  → {ep}: staging → published")
+        print(f"  → {ep}: draft → published (gold)")
 
     _set_batch_status(brief_path, "promoted")
     _write_lock("batch.lock", "unlocked")
@@ -1913,11 +2523,11 @@ def cmd_finish(args: argparse.Namespace) -> int:
 
     ep_range = f"{episodes[0]}~{episodes[-1]}" if len(episodes) > 1 else episodes[0]
     _append_log(batch_id, ep_range, "promote", "controller promote", "✓", f"{batch_id} promoted")
-    _set_manifest_runtime(f"{batch_id}_promoted", brief_path)
-    print(f"  ✓ {len(episodes)} episodes promoted, batch.lock released")
+    _set_manifest_field("active_batch", f"{batch_id}_promoted")
+    print(f"  ✓ {len(episodes)} promoted to gold, batch.lock released")
 
-    # Step 5: Validate state files
-    print(f"\n=== Step 4: State Validation ===")
+    # Validate state files
+    print(f"\n=== State Validation ===")
     all_valid = True
     for name, sections in TEMPLATE_SECTIONS.items():
         errors = _validate_state_file(name, sections)
@@ -1930,8 +2540,8 @@ def cmd_finish(args: argparse.Namespace) -> int:
     if not all_valid:
         print(f"  WARNING: state files have gaps — recorder should fix before next batch")
 
-    # Step 6: Batch review sampling
-    print(f"\n=== Step 5: Batch Review ===")
+    # Batch review sampling
+    print(f"\n=== Batch Review ===")
     sample_size = min(2, len(episodes))
     sampled = random.sample(episodes, sample_size)
     print(f"  Sampled for adversarial deep-check: {', '.join(sampled)}")
@@ -1947,7 +2557,7 @@ def cmd_finish(args: argparse.Namespace) -> int:
     print(f"  [ ] 8. 批次内声纹一致性")
     print(f"  [ ] 9. 批次内伏笔连续性")
 
-    # Step 7: Determine next batch
+    # Determine next batch
     batches = _parse_source_map()
     batch_ids = sorted(batches.keys())
     try:
@@ -1973,6 +2583,77 @@ def cmd_finish(args: argparse.Namespace) -> int:
         print(f"  4. All batches complete!")
 
     return 0
+
+
+def cmd_finish(args: argparse.Namespace) -> int:
+    """Promote + validate + batch-review + log + next instructions."""
+    batch_id = args.batch_id
+    resolved = _resolve_batch(batch_id, require_frozen=True)
+    if resolved is None:
+        return 1
+    brief_path, brief, episodes = resolved
+
+    # Step 1: Final lint gate
+    print(f"=== Step 1: Lint Gate ===")
+    lint_passed, lint_results = _run_lint_gate(episodes)
+    if not lint_passed:
+        return 1
+
+    # Step 2: Verify gate
+    print(f"\n=== Step 2: Verify Gate ===")
+    if not _run_verify_gate(episodes):
+        return 1
+
+    return _do_promote_and_report(batch_id, brief_path, episodes, lint_results)
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    """Full pipeline: lint gate → auto-verify → promote → review → next.
+
+    Skips semantic verify (aligner). Episodes that already have a verify PASS
+    result keep it; episodes without one get auto-verified at lint level.
+    Use 'check' + manual aligner + 'finish' if you need full semantic verify.
+    """
+    batch_id = args.batch_id
+    resolved = _resolve_batch(batch_id, require_frozen=True)
+    if resolved is None:
+        return 1
+    brief_path, brief, episodes = resolved
+
+    # Step 1: Lint gate
+    print(f"=== Step 1: Lint Gate ===")
+    lint_passed, lint_results = _run_lint_gate(episodes)
+    if not lint_passed:
+        print(f"\n  GATE FAIL — fix lint errors first")
+        return 1
+    print(f"\n  GATE PASS")
+
+    # Step 2: Auto-verify (respect existing results, fill gaps with lint-only)
+    print(f"\n=== Step 2: Auto-Verify ===")
+    full_eps, standard_eps, light_eps, unmapped_eps = _compute_verify_tiers(episodes)
+    if unmapped_eps:
+        print(f"  ✗ Unmapped: {', '.join(unmapped_eps)}")
+        print(f"    → Update source.map.md first")
+        return 1
+
+    auto_count = 0
+    for ep in episodes:
+        existing = _read_verify_result(ep)
+        if existing and existing.get("status") == "PASS":
+            print(f"  ✓ {ep}: existing PASS (tier: {existing.get('tier', '?')})")
+            continue
+        tier = "FULL" if ep in full_eps else ("STANDARD" if ep in standard_eps else "LIGHT")
+        _write_verify_result(ep, tier, "PASS")
+        _append_log(batch_id, ep, "verify", "auto-verify (lint-only)", "PASS", f"tier={tier}")
+        print(f"  + {ep}: auto-verified (tier: {tier}, lint-only)")
+        auto_count += 1
+    if auto_count:
+        print(f"\n  {auto_count} episodes auto-verified (lint-only, no semantic check)")
+    else:
+        print(f"\n  All episodes already have verify results")
+
+    # Step 3: Promote + report
+    return _do_promote_and_report(batch_id, brief_path, episodes, lint_results)
 
 
 def cmd_next(args: argparse.Namespace) -> int:
@@ -2022,136 +2703,6 @@ def cmd_next(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_audit(args: argparse.Namespace) -> int:
-    """Check manifest, release index, episodes, sidecar metadata, and verify status consistency."""
-    errors: list[str] = []
-
-    manifest = _read_manifest()
-    active_batch = manifest.get("active_batch", "(none)")
-    current_batch_brief = manifest.get("current_batch_brief", "(none)")
-    active_batch_match = re.match(r"(batch\d+)", active_batch)
-    active_batch_id = active_batch_match.group(1) if active_batch_match else None
-
-    if current_batch_brief != "(none)":
-        brief_path = ROOT / current_batch_brief
-        if not brief_path.exists():
-            errors.append(f"manifest current_batch_brief missing: {current_batch_brief}")
-        elif active_batch_id and active_batch_id not in brief_path.stem:
-            errors.append(f"manifest mismatch: active_batch={active_batch} current_batch_brief={current_batch_brief}")
-
-    if not RELEASE_INDEX.exists():
-        errors.append("release.index.json missing")
-    if not GOLD_SET.exists():
-        errors.append("gold-set.json missing")
-
-    release_index = _load_release_index()
-    gold_set = _load_gold_set()
-    release_episodes = release_index.get("episodes", {})
-    gold_episodes = set(gold_set.get("episodes", []))
-
-    if active_batch_id and release_index.get("current_batch", "(none)") not in {"(none)", active_batch_id}:
-        errors.append(
-            f"release.index current_batch mismatch: {release_index.get('current_batch')} vs manifest {active_batch_id}"
-        )
-    if current_batch_brief != "(none)" and release_index.get("current_batch_brief", "(none)") not in {"(none)", current_batch_brief}:
-        errors.append(
-            "release.index current_batch_brief mismatch: "
-            f"{release_index.get('current_batch_brief')} vs manifest {current_batch_brief}"
-        )
-
-    for episode_file in sorted(EPISODES.glob("EP-*.md")):
-        episode = episode_file.stem
-        entry = release_episodes.get(episode)
-        if entry is None:
-            errors.append(f"release.index missing episode entry: {episode}")
-            continue
-
-        meta_path = _meta_path(episode)
-        release_status = entry.get("release_status")
-        if release_status == "legacy":
-            if meta_path.exists():
-                meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                if meta.get("release_status") != "legacy":
-                    errors.append(f"{episode} legacy release entry conflicts with meta status {meta.get('release_status')}")
-            continue
-
-        if not meta_path.exists():
-            errors.append(f"{episode} missing metadata sidecar")
-            continue
-
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-        for field in [
-            "episode",
-            "provenance",
-            "source_batch",
-            "runtime_authority",
-            "release_status",
-            "ruleset_version",
-            "lint_profile",
-            "lint_status",
-            "verify_tier",
-            "verify_status",
-        ]:
-            if field not in meta:
-                errors.append(f"{episode} metadata missing field: {field}")
-
-        if meta.get("episode") != episode:
-            errors.append(f"{episode} metadata episode mismatch: {meta.get('episode')}")
-        if meta.get("release_status") != release_status:
-            errors.append(f"{episode} release_status mismatch: meta={meta.get('release_status')} index={release_status}")
-        if meta.get("runtime_authority") != entry.get("runtime_authority"):
-            errors.append(
-                f"{episode} runtime_authority mismatch: meta={meta.get('runtime_authority')} index={entry.get('runtime_authority')}"
-            )
-        if meta.get("lint_status") != entry.get("lint_status"):
-            errors.append(f"{episode} lint_status mismatch: meta={meta.get('lint_status')} index={entry.get('lint_status')}")
-        if meta.get("verify_status") != entry.get("verify_status"):
-            errors.append(
-                f"{episode} verify_status mismatch: meta={meta.get('verify_status')} index={entry.get('verify_status')}"
-            )
-
-        verify_result = _read_verify_result(episode)
-        if verify_result is None:
-            errors.append(f"{episode} missing verify result")
-        else:
-            if verify_result.get("tier") != meta.get("verify_tier"):
-                errors.append(
-                    f"{episode} verify_tier mismatch: meta={meta.get('verify_tier')} verify={verify_result.get('tier')}"
-                )
-            if verify_result.get("status") != meta.get("verify_status"):
-                errors.append(
-                    f"{episode} verify_status mismatch: meta={meta.get('verify_status')} verify={verify_result.get('status')}"
-                )
-
-        if release_status == "gold" and episode not in gold_episodes:
-            errors.append(f"{episode} is gold in release.index but missing from gold-set")
-
-    for episode in gold_episodes:
-        entry = release_episodes.get(episode)
-        if entry is None:
-            errors.append(f"gold-set references unknown episode: {episode}")
-        elif entry.get("release_status") != "gold":
-            errors.append(f"gold-set episode {episode} has non-gold status {entry.get('release_status')}")
-
-    for meta_path in sorted(EPISODES.glob("EP-*.meta.json")):
-        episode = meta_path.name.replace(".meta.json", "")
-        if episode not in release_episodes:
-            errors.append(f"orphan metadata sidecar: {meta_path.name}")
-
-    if errors:
-        print("AUDIT FAIL")
-        for item in errors:
-            print(f"  ✗ {item}")
-        return 1
-
-    print("AUDIT OK")
-    print(f"  active_batch: {active_batch}")
-    print(f"  current_batch_brief: {current_batch_brief}")
-    print(f"  release episodes: {len(release_episodes)}")
-    print(f"  gold episodes: {len(gold_episodes)}")
-    return 0
-
-
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -2161,6 +2712,7 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command")
 
     sub.add_parser("status", help="Show pipeline state")
+    sub.add_parser("clean", help="Backup + clear runtime project data cache")
 
     p_plan = sub.add_parser("plan", help="Freeze batch brief and acquire lock")
     p_plan.add_argument("batch_id", help="e.g. batch01, batch02")
@@ -2175,7 +2727,6 @@ def main() -> int:
     p_promote.add_argument("batch_id")
 
     sub.add_parser("validate", help="Check state files against templates")
-    sub.add_parser("audit", help="Check release tracking and verify consistency")
 
     p_log = sub.add_parser("log", help="Append to run.log.md")
     p_log.add_argument("phase", help="plan_inputs|draft_write|verify|promote|record|recovery")
@@ -2202,12 +2753,19 @@ def main() -> int:
     # Project init
     p_init = sub.add_parser("init", help="Scaffold a new project from a novel file")
     p_init.add_argument("novel_file", help="Path to novel manuscript (relative to project root)")
-    p_init.add_argument("--episodes", type=int, default=60, help="Total episode count (default: 60)")
+    p_init.add_argument(
+        "--episodes",
+        type=int,
+        default=None,
+        help="Optional manual episode count override (default: model recommendation after extract-book)",
+    )
     p_init.add_argument("--batch-size", type=int, default=5, help="Episodes per batch (default: 5)")
     p_init.add_argument("--strategy", default="original_fidelity", help="Adaptation strategy")
     p_init.add_argument("--intensity", default="light", help="Dialogue adaptation intensity")
     p_init.add_argument("--key-episodes", default="", help="Comma-separated key episode IDs for FULL verify")
     p_init.add_argument("--force", action="store_true", help="Overwrite existing project data (auto-backup first)")
+    sub.add_parser("extract-book", help="Fill book.blueprint.md from the full novel")
+    sub.add_parser("map-book", help="Generate source.map.md from book.blueprint.md")
 
     # Verify / record gate commands
     p_vdone = sub.add_parser("verify-done", help="Record verify result for an episode")
@@ -2223,14 +2781,19 @@ def main() -> int:
     p_rdone.add_argument("batch_id")
 
     # High-level orchestration
-    p_start = sub.add_parser("start", help="Full batch kickoff (brief → freeze → lock → context)")
+    p_start = sub.add_parser("start", help="Total entry: prepare → writer stage → run pipeline")
     p_start.add_argument("batch_id", help="e.g. batch02")
+    p_start.add_argument("--prepare-only", action="store_true", help="Freeze/lock and print context only")
+    p_start.add_argument("--writer-command", default=None, help="Override writer hook command for this run")
 
     p_check = sub.add_parser("check", help="Lint gate + verify-plan + verify instructions")
     p_check.add_argument("batch_id")
 
     p_finish = sub.add_parser("finish", help="Promote + validate + batch-review + next")
     p_finish.add_argument("batch_id")
+
+    p_run = sub.add_parser("run", help="Full pipeline: lint → auto-verify → promote → review → next")
+    p_run.add_argument("batch_id")
 
     sub.add_parser("next", help="Show pipeline progress and next batch")
 
@@ -2241,12 +2804,12 @@ def main() -> int:
 
     dispatch = {
         "status": cmd_status,
+        "clean": cmd_clean,
         "plan": cmd_plan,
         "lint": cmd_lint,
         "gate": cmd_gate,
         "promote": cmd_promote,
         "validate": cmd_validate,
-        "audit": cmd_audit,
         "log": cmd_log,
         "retry": cmd_retry,
         "verify-plan": cmd_verify_plan,
@@ -2256,9 +2819,12 @@ def main() -> int:
         "record": cmd_record,
         "record-done": cmd_record_done,
         "init": cmd_init,
+        "extract-book": cmd_extract_book,
+        "map-book": cmd_map_book,
         "start": cmd_start,
         "check": cmd_check,
         "finish": cmd_finish,
+        "run": cmd_run,
         "next": cmd_next,
     }
     return dispatch[args.command](args)

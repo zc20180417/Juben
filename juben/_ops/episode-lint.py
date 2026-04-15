@@ -50,6 +50,13 @@ OS_POLISHED_PATTERNS = [
     re.compile(r"不是.+而是"),
     re.compile(r"既.+也"),
 ]
+QUOTED_TEXT_RE = re.compile(r"“[^”]*”|\"[^\"]*\"|「[^」]*」|『[^』]*』")
+FIRST_PERSON_NARRATION_PATTERNS = [
+    re.compile(r"(^|[，。！？；、：\s])我(?!们)(?=[的在把将正刚便就又也都只还仍已先没不想要会能敢得该心眼手脚身头脸嘴推抬转退走看听盯按扶攥咬收停觉得知道明白一下一阵])"),
+    re.compile(r"(^|[，。！？；、：\s])我的(?=\S)"),
+    re.compile(r"(^|[，。！？；、：\s])我们(?=[在把将正刚便就又也都只还仍已先没不想要会能敢得该心眼手脚身头脸嘴推抬转退走看听盯按扶攥咬收停觉得知道明白])"),
+    re.compile(r"(^|[，。！？；、：\s])咱们(?=[在把将正刚便就又也都只还仍已先没不想要会能敢得该])"),
+]
 
 
 @dataclass
@@ -140,6 +147,11 @@ def polished_os(text: str) -> bool:
     return any(pattern.search(text) for pattern in OS_POLISHED_PATTERNS)
 
 
+def has_first_person_narration(text: str) -> bool:
+    cleaned = QUOTED_TEXT_RE.sub("", text)
+    return any(pattern.search(cleaned) for pattern in FIRST_PERSON_NARRATION_PATTERNS)
+
+
 def collect_history_files(current: Path) -> list[Path]:
     match = re.search(r"EP-(\d+)\.md$", current.name)
     if not match:
@@ -172,6 +184,7 @@ def build_scene_metrics(scene: Scene) -> dict:
     interrupted = True
     last_speaker: str | None = None
     polished_os_count = 0
+    first_person_narration_count = 0
 
     for raw in scene.lines[1:]:
         line = normalize_line(raw)
@@ -185,6 +198,8 @@ def build_scene_metrics(scene: Scene) -> dict:
             metaphor_count += count_metaphors(content)
             if has_psychological_comment(content):
                 psychological_comment_count += 1
+            if has_first_person_narration(content):
+                first_person_narration_count += 1
             if between_dialogues:
                 action_inserts += 1
                 between_dialogues = False
@@ -217,8 +232,12 @@ def build_scene_metrics(scene: Scene) -> dict:
                 os_count += 1
                 if polished_os(content):
                     polished_os_count += 1
+                if has_first_person_narration(content):
+                    first_person_narration_count += 1
             if "（vo）" in speaker:
                 vo_count += 1
+                if has_first_person_narration(content):
+                    first_person_narration_count += 1
             if interrupted or speaker != last_speaker:
                 dialogue_rounds += 1
             last_speaker = speaker
@@ -255,6 +274,7 @@ def build_scene_metrics(scene: Scene) -> dict:
         "metaphor_count": metaphor_count,
         "psychological_comment_count": psychological_comment_count,
         "polished_os_count": polished_os_count,
+        "first_person_narration_count": first_person_narration_count,
         "ending_has_hook": has_hook(ending_text),
         "line_count": len(scene.lines),
     }
@@ -288,8 +308,8 @@ def history_repetition(current_lines: list[str], history_files: list[Path]) -> d
     return {"reactions": reaction_hits, "imagery": imagery_hits}
 
 
-def build_contract_failures(scenes: list[dict], totals: dict) -> list[dict]:
-    contract_failures = []
+def build_checks(scenes: list[dict], totals: dict, history: dict) -> dict:
+    scene_failures = []
     total_scenes = len(scenes)
     for idx, scene in enumerate(scenes, 1):
         failures = []
@@ -311,23 +331,27 @@ def build_contract_failures(scenes: list[dict], totals: dict) -> list[dict]:
             failures.append("sfx")
         if scene["metaphor_count"] > 2:
             failures.append("metaphor_count")
-        for code in failures:
-            contract_failures.append({"scope": "scene", "scene": idx, "title": scene["title"], "code": code})
+        if scene["first_person_narration_count"] > 0:
+            failures.append("first_person_narration")
+        scene_failures.append({"scene": idx, "title": scene["title"], "failures": failures})
 
+    episode_failures = []
     if totals["scene_count"] < 1 or totals["scene_count"] > 3:
-        contract_failures.append({"scope": "episode", "code": "scene_count"})
+        episode_failures.append("scene_count")
     if totals["triangle_count"] < 8:
-        contract_failures.append({"scope": "episode", "code": "triangle_count"})
+        episode_failures.append("triangle_count")
     if totals["os_count"] + totals["vo_count"] < 1:
-        contract_failures.append({"scope": "episode", "code": "os_vo_count"})
+        episode_failures.append("os_vo_count")
     if totals["camera_count"] < 2:
-        contract_failures.append({"scope": "episode", "code": "camera_count"})
+        episode_failures.append("camera_count")
     if totals["sfx_count"] < totals["scene_count"]:
-        contract_failures.append({"scope": "episode", "code": "sfx_total"})
+        episode_failures.append("sfx_total")
     if totals["metaphor_count"] > 5:
-        contract_failures.append({"scope": "episode", "code": "metaphor_count"})
+        episode_failures.append("metaphor_count")
     if totals["psychological_comment_count"] >= 2:
-        contract_failures.append({"scope": "episode", "code": "psychological_comment_count"})
+        episode_failures.append("psychological_comment_count")
+    if totals["first_person_narration_count"] > 0:
+        episode_failures.append("first_person_narration")
 
     # Non-final scenes without hooks: allow 1 for pacing, fail if ≥ 2
     hookless_non_final = sum(
@@ -335,45 +359,39 @@ def build_contract_failures(scenes: list[dict], totals: dict) -> list[dict]:
         if i < total_scenes and not scene["ending_has_hook"]
     )
     if hookless_non_final >= 2:
-        contract_failures.append({"scope": "episode", "code": "too_many_hookless_scenes"})
+        episode_failures.append("too_many_hookless_scenes")
 
-    return contract_failures
-
-
-def build_warning_buckets(scenes: list[dict], totals: dict, history: dict) -> tuple[list[str], list[str]]:
-    craft_flags = []
-    style_warnings = []
-    total_scenes = len(scenes)
-    hookless_non_final = sum(
-        1 for i, scene in enumerate(scenes, 1)
-        if i < total_scenes and not scene["ending_has_hook"]
-    )
+    warnings = []
     if total_scenes >= 1 and not scenes[-1]["ending_has_hook"]:
-        craft_flags.append("hookless_final_scene")
+        warnings.append("hookless_final_scene")
     if hookless_non_final == 1:
-        craft_flags.append("hookless_non_final_scene")
+        warnings.append("hookless_non_final_scene")
     if totals["line_count"] < 70:
-        style_warnings.append("line_count")
+        warnings.append("line_count")
     if any(scene["line_count"] < 18 for scene in scenes):
-        craft_flags.append("scene_line_count")
+        warnings.append("scene_line_count")
     if totals["psychological_comment_count"] == 1:
-        craft_flags.append("psychological_comment_count")
+        warnings.append("psychological_comment_count")
     if totals["all_os_polished"] and totals["os_count"] > 0:
-        craft_flags.append("os_polished")
+        warnings.append("os_polished")
     if totals["scene_tail_melodrama_run"] >= 3:
-        craft_flags.append("melodramatic_endings")
+        warnings.append("melodramatic_endings")
     for label, entry in history["reactions"].items():
         if entry["current_hit"] and entry["hits_in_previous_4_episodes"] >= 1:
-            craft_flags.append(f"reaction_repeat:{label}")
+            warnings.append(f"reaction_repeat:{label}")
     for label, entry in history["imagery"].items():
         if entry["current_count"] > 3:
-            craft_flags.append(f"imagery_dense:{label}")
+            warnings.append(f"imagery_dense:{label}")
         if entry["current_count"] > 0 and entry["hits_in_previous_2_episodes"] >= 2:
-            craft_flags.append(f"imagery_repeat:{label}")
-    if len(set(craft_flags)) >= 3:
-        craft_flags.append("warning_bundle")
+            warnings.append(f"imagery_repeat:{label}")
+    if len(set(warnings)) >= 3:
+        warnings.append("warning_bundle")
 
-    return sorted(set(craft_flags)), sorted(set(style_warnings))
+    return {
+        "scene_failures": scene_failures,
+        "episode_failures": episode_failures,
+        "warnings": sorted(set(warnings)),
+    }
 
 
 def main() -> int:
@@ -403,6 +421,7 @@ def main() -> int:
         "sfx_count": sum(scene["sfx_count"] for scene in scene_metrics),
         "metaphor_count": sum(scene["metaphor_count"] for scene in scene_metrics),
         "psychological_comment_count": sum(scene["psychological_comment_count"] for scene in scene_metrics),
+        "first_person_narration_count": sum(scene["first_person_narration_count"] for scene in scene_metrics),
         "line_count": len(lines),
         "all_os_polished": all_os_polished,
         "scene_tail_melodrama_run": scene_tail_melodrama_run,
@@ -410,23 +429,18 @@ def main() -> int:
     }
 
     history = history_repetition(lines, history_files)
-    contract_failures = build_contract_failures(scene_metrics, totals)
-    craft_flags, style_warnings = build_warning_buckets(scene_metrics, totals, history)
-    has_failures = bool(contract_failures)
-    has_warnings = bool(craft_flags or style_warnings)
+    checks = build_checks(scene_metrics, totals, history)
+    has_failures = any(item["failures"] for item in checks["scene_failures"]) or bool(checks["episode_failures"])
+    has_warnings = bool(checks["warnings"])
     status = "fail" if has_failures else "warn" if has_warnings else "pass"
 
     result = {
         "file": str(path),
         "status": status,
-        "contract_failures": contract_failures,
-        "craft_flags": craft_flags,
-        "style_warnings": style_warnings,
-        "metrics": {
-            "totals": totals,
-            "scenes": scene_metrics,
-            "history": history,
-        },
+        "totals": totals,
+        "scenes": scene_metrics,
+        "history": history,
+        "checks": checks,
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0

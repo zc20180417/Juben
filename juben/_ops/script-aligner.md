@@ -36,9 +36,10 @@
 3. 原著概述性信息是否被擅自扩成具体事故
 4. 原著强闭环是否被只为造钩子硬切断
 5. 即时动作钩子是否在相邻下一集第一场未兑现
-6. draft 是否直写了 publish lane
+6. 第一人称原著是否仍保留小说式“我”叙述腔，而没有改成第三人称可拍视角
+7. draft 是否直写了 publish lane
 
-检查方法：读取 `source.map.md` 对应集的 `must-keep beats` / `must-not-add` / `must-not-jump` / `ending type`，逐项比对 draft 正文。
+检查方法：读取 `source.map.md` 对应集的 `must-keep beats` / `must-not-add` / `must-not-jump` / `ending type`，逐项比对 draft 正文；同时抽查 `△` / `os` / `vo` 是否仍保留小说式第一人称“我如何看见 / 我如何觉得 / 我如何走进去”的叙述腔。
 任一命中 → FAIL，附具体位置和违反条目。
 
 ### Step 3：对抗性检查（6 项）
@@ -146,4 +147,3 @@
 - 违反：<规则条目>
 - 方向：<修改建议>
 ```
-
