@@ -30,8 +30,12 @@ class RunBookMapTests(unittest.TestCase):
             novel.write_text("小说正文", encoding="utf-8")
             blueprint = project / "book.blueprint.md"
             blueprint.write_text("# Book Blueprint\n\n## 主线\n已填写\n", encoding="utf-8")
+            source_map = project / "source.map.md"
+            source_map.write_text("# Source Map\n", encoding="utf-8")
 
             with mock.patch.object(self.module, "ROOT", root), \
+                 mock.patch.object(self.module, "BOOK_BLUEPRINT", blueprint), \
+                 mock.patch.object(self.module, "SOURCE_MAP", source_map), \
                  mock.patch.object(
                      self.module,
                      "build_agent_command",

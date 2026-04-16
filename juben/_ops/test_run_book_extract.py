@@ -32,6 +32,7 @@ class RunBookExtractTests(unittest.TestCase):
             blueprint.write_text("# Book Blueprint\n", encoding="utf-8")
 
             with mock.patch.object(self.module, "ROOT", root), \
+                 mock.patch.object(self.module, "BOOK_BLUEPRINT", blueprint), \
                  mock.patch.object(
                      self.module,
                      "build_agent_command",
