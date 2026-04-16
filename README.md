@@ -17,7 +17,7 @@
 flowchart TD
     A["原著小说<br/>source_file"] --> B["source.map / character / voice-anchor"]
     B --> C["run.manifest<br/>运行总线"]
-    C --> D["controller.py start/check/finish/record"]
+    C --> D["controller.py start/check/run/record"]
 
     D --> E["Writer<br/>写入 drafts/episodes"]
     E --> F["episode-lint.py<br/>机械规则检查"]
@@ -51,7 +51,7 @@ sequenceDiagram
     alt FAIL
         C->>W: 打回修改
     else PASS
-        C->>E: finish / promote
+        C->>E: run / promote
         C->>S: record / record-done
     end
 ```
@@ -74,7 +74,7 @@ sequenceDiagram
 2. Writer 只允许把候选稿写到 `drafts/episodes/`。
 3. `episode-lint.py` 先做硬性计数校验。
 4. Verifier/aligner 再做语义和风格校验。
-5. `controller.py finish <batch>` 统一 promote 到 `episodes/`。
+5. `controller.py run <batch>` 作为唯一正式发布入口，统一执行 lint gate、verify gate、promote 与发布后检查。
 6. `controller.py record <batch>` / `record-done <batch>` 更新状态文件。
 
 ## 适合怎么理解它

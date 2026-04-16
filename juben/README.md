@@ -64,7 +64,7 @@ flowchart TD
     D --> E["recommended total_episodes"]
     E --> F["controller map-book"]
     F --> G["source.map.md"]
-    G --> H["controller start/run"]
+    G --> H["controller start/check/run"]
     H --> I["Writer -> drafts/episodes"]
     I --> J["episode-lint.py + script-aligner.md"]
     J --> K{"PASS?"}
@@ -117,9 +117,8 @@ python _ops/controller.py extract-book
 python _ops/controller.py map-book
 python _ops/controller.py start batch01
 python _ops/controller.py start batch01 --prepare-only
-python _ops/controller.py run batch01
 python _ops/controller.py check batch01
-python _ops/controller.py finish batch01
+python _ops/controller.py run batch01
 python _ops/controller.py record batch01
 python _ops/controller.py record-done batch01
 ```
@@ -136,12 +135,13 @@ python _ops/controller.py record-done batch01
   - `extract-book`：先做全书级抽取，产出主线、角色弧光、关系变化、关键反转、结局闭环，并给出推荐总集数
   - `extract-book` 成功后，推荐总集数会默认直接写回 `run.manifest.md`
   - `map-book`：再基于全书蓝图 + 推荐总集数生成 `source.map.md`
-  - `start`：最后才进入 batch/episode 生产
+  - `start`：最后才进入 prepare + writer stage，并在 writer 完成后停住等待 verify
 - `init --episodes <n>`：可选人工覆盖；只在你明确想固定总集数时使用
 - `clean`：自动备份当前 runtime 数据后，清空 draft/published/batch brief/releases/verify/retry，并重置 lock/state；保留 `source.map.md`、`run.manifest.md` 和小说源文件
-- `start <batch>`：默认总入口，执行 prepare → writer stage → run pipeline
+- `start <batch>`：默认总入口，执行 prepare → writer stage；完成后输出下一步：`check` → aligner verify → `verify-done` → `run`
 - `start <batch> --prepare-only`：只 freeze/lock 并打印上下文，保留手动写稿路径
-- `run <batch>`：草稿已存在时的快路径，执行 lint → auto-verify → promote → review → next
+- `run <batch>`：唯一正式发布入口，执行 lint gate → verify gate → promote → validate / review / next
+- `finish <batch>`：deprecated alias；兼容旧入口，但文档与日常使用都应改成 `run <batch>`
 - writer hook 配置优先级：`--writer-command` > `run.manifest.md` 的 `writer_command` > 环境变量 `JUBEN_WRITER_COMMAND`
 - `writer_command` 可用占位符：`{batch_id}`、`{episodes}`、`{episodes_csv}`、`{draft_dir}`、`{project_root}`、`{python}`
 - 默认 writer backend：`"{python}" _ops/run_writer.py --batch {batch_id} --episodes {episodes_csv}`，内部调用本机 `claude -p --dangerously-skip-permissions`
