@@ -4,7 +4,14 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 import re
 import subprocess
+import sys
 from pathlib import Path
+
+OPS_DIR = Path(__file__).resolve().parent
+if str(OPS_DIR) not in sys.path:
+    sys.path.insert(0, str(OPS_DIR))
+
+from agent_backend import AgentBackendError, build_agent_command, resolve_agent_backend
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -115,16 +122,24 @@ def _build_writer_prompt(batch_id: str, episode: str, brief_path: Path, *, synta
 """
 
 
-def _run_writer_task(batch_id: str, episode: str, brief_path: Path, *, syntax_first: bool = False) -> tuple[str, int]:
+def _run_writer_task(
+    batch_id: str,
+    episode: str,
+    brief_path: Path,
+    *,
+    syntax_first: bool = False,
+    agent_backend: str = "auto",
+) -> tuple[str, int]:
     prompt = _build_writer_prompt(batch_id, episode, brief_path, syntax_first=syntax_first)
     try:
+        _, command = build_agent_command(prompt, agent_backend)
         result = subprocess.run(
-            ["claude", "-p", "--dangerously-skip-permissions", prompt],
+            command,
             cwd=ROOT,
             check=False,
         )
-    except FileNotFoundError:
-        print("ERROR: `claude` CLI is not installed or not on PATH")
+    except AgentBackendError as exc:
+        print(f"ERROR: {exc}")
         return episode, 1
     return episode, result.returncode
 
@@ -135,6 +150,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--episodes", required=True, help="Comma-separated episode ids")
     parser.add_argument("--parallelism", type=int, default=DEFAULT_WRITER_PARALLELISM)
     parser.add_argument("--syntax-first", action="store_true")
+    parser.add_argument("--agent-backend", choices=["auto", "claude", "codex"], default="auto")
     args = parser.parse_args(argv)
 
     episodes = _parse_episodes(args.episodes)
@@ -153,7 +169,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     parallelism = max(1, min(args.parallelism, len(targets)))
-    print(f"  → Claude writer target: {', '.join(targets)}")
+    try:
+        backend_label = str(resolve_agent_backend(args.agent_backend)["label"])
+    except AgentBackendError as exc:
+        print(f"ERROR: {exc}")
+        return 1
+
+    print(f"  → {backend_label} writer target: {', '.join(targets)}")
     print(f"  → Batch brief: {_rel(brief_path)}")
     print(f"  → Parallelism: {parallelism}")
     if args.syntax_first:
@@ -161,7 +183,14 @@ def main(argv: list[str] | None = None) -> int:
 
     with ThreadPoolExecutor(max_workers=parallelism) as pool:
         futures = [
-            pool.submit(_run_writer_task, args.batch_id, episode, brief_path, syntax_first=args.syntax_first)
+            pool.submit(
+                _run_writer_task,
+                args.batch_id,
+                episode,
+                brief_path,
+                syntax_first=args.syntax_first,
+                agent_backend=args.agent_backend,
+            )
             for episode in targets
         ]
         results = [future.result() for future in futures]

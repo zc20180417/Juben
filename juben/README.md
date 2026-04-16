@@ -155,7 +155,9 @@ python _ops/controller.py record-done batch01
 - `finish <batch>`：deprecated alias；兼容旧入口，但文档与日常使用都应改成 `run <batch>`
 - writer hook 配置优先级：`--writer-command` > `run.manifest.md` 的 `writer_command` > 环境变量 `JUBEN_WRITER_COMMAND`
 - `writer_command` 可用占位符：`{batch_id}`、`{episodes}`、`{episodes_csv}`、`{draft_dir}`、`{project_root}`、`{python}`
-- 默认 writer backend：`"{python}" _ops/run_writer.py --batch {batch_id} --episodes {episodes_csv}`，内部调用本机 `claude -p --dangerously-skip-permissions`
+- `extract-book` / `map-book` / 默认 `writer backend` 会自动探测本机 agent CLI：优先 `claude`，缺失时回退 `codex`
+- 如需强制指定 backend，可设置环境变量 `JUBEN_AGENT_BACKEND=claude|codex`；直接运行 `_ops/run_book_extract.py`、`_ops/run_book_map.py`、`_ops/run_writer.py` 时也支持 `--agent-backend`
+- 默认 writer backend：`"{python}" _ops/run_writer.py --batch {batch_id} --episodes {episodes_csv}`，由 `_ops/run_writer.py` 内部探测并调用本机可用 agent CLI
 
 ## 历史说明
 

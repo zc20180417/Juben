@@ -51,7 +51,7 @@ class RunWriterTests(unittest.TestCase):
         self.assertEqual(rc, 1)
         mock_subprocess.assert_not_called()
 
-    def test_main_invokes_claude_for_missing_drafts_only(self) -> None:
+    def test_main_invokes_selected_backend_for_missing_drafts_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             drafts = root / "drafts" / "episodes"
@@ -62,6 +62,12 @@ class RunWriterTests(unittest.TestCase):
             (drafts / "EP-11.md").write_text("existing", encoding="utf-8")
 
             with mock.patch.object(self.run_writer, "ROOT", root), \
+                 mock.patch.object(
+                     self.run_writer,
+                     "build_agent_command",
+                     return_value=("Codex", ["codex", "exec", "PROMPT"]),
+                     create=True,
+                 ) as mock_build, \
                  mock.patch.object(self.run_writer.subprocess, "run") as mock_subprocess:
                 mock_subprocess.return_value.returncode = 0
                 rc = self.run_writer.main(["--batch", "batch03", "--episodes", "EP-11,EP-12"])
@@ -69,8 +75,8 @@ class RunWriterTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         mock_subprocess.assert_called_once()
         command = mock_subprocess.call_args.args[0]
-        prompt = command[-1]
-        self.assertEqual(command[:3], ["claude", "-p", "--dangerously-skip-permissions"])
+        prompt = mock_build.call_args.args[0]
+        self.assertEqual(command, ["codex", "exec", "PROMPT"])
         self.assertIn("EP-12", prompt)
         self.assertNotIn("EP-11.md", prompt)
         self.assertIn("drafts/episodes/EP-12.md", prompt)

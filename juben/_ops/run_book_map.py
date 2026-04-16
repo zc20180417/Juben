@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import sys
 from pathlib import Path
+
+OPS_DIR = Path(__file__).resolve().parent
+if str(OPS_DIR) not in sys.path:
+    sys.path.insert(0, str(OPS_DIR))
+
+from agent_backend import AgentBackendError, build_agent_command
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -91,6 +98,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--batch-size", required=True, type=int)
     parser.add_argument("--strategy", required=True)
     parser.add_argument("--intensity", required=True)
+    parser.add_argument("--agent-backend", choices=["auto", "claude", "codex"], default="auto")
     args = parser.parse_args(argv)
 
     novel_path = ROOT / args.novel_file
@@ -108,17 +116,17 @@ def main(argv: list[str] | None = None) -> int:
         strategy=args.strategy,
         intensity=args.intensity,
     )
-    print(f"  → Claude map-book target: {_rel(SOURCE_MAP)}")
-    print(f"  → Blueprint: {_rel(BOOK_BLUEPRINT)}")
-
     try:
+        backend_label, command = build_agent_command(prompt, args.agent_backend)
+        print(f"  → {backend_label} map-book target: {_rel(SOURCE_MAP)}")
+        print(f"  → Blueprint: {_rel(BOOK_BLUEPRINT)}")
         result = subprocess.run(
-            ["claude", "-p", "--dangerously-skip-permissions", prompt],
+            command,
             cwd=ROOT,
             check=False,
         )
-    except FileNotFoundError:
-        print("ERROR: `claude` CLI is not installed or not on PATH")
+    except AgentBackendError as exc:
+        print(f"ERROR: {exc}")
         return 1
 
     return result.returncode

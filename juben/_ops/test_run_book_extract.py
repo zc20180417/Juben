@@ -21,7 +21,7 @@ class RunBookExtractTests(unittest.TestCase):
     def setUp(self) -> None:
         self.module = _load_module()
 
-    def test_main_invokes_claude_with_blueprint_prompt(self) -> None:
+    def test_main_invokes_selected_backend_with_blueprint_prompt(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             project = root / "harness" / "project"
@@ -32,14 +32,20 @@ class RunBookExtractTests(unittest.TestCase):
             blueprint.write_text("# Book Blueprint\n", encoding="utf-8")
 
             with mock.patch.object(self.module, "ROOT", root), \
+                 mock.patch.object(
+                     self.module,
+                     "build_agent_command",
+                     return_value=("Codex", ["codex", "exec", "PROMPT"]),
+                     create=True,
+                 ) as mock_build, \
                  mock.patch.object(self.module.subprocess, "run") as mock_run:
                 mock_run.return_value.returncode = 0
                 rc = self.module.main(["--novel-file", "novel.md"])
 
         self.assertEqual(rc, 0)
         command = mock_run.call_args.args[0]
-        prompt = command[-1]
-        self.assertEqual(command[:3], ["claude", "-p", "--dangerously-skip-permissions"])
+        prompt = mock_build.call_args.args[0]
+        self.assertEqual(command, ["codex", "exec", "PROMPT"])
         self.assertIn("book.blueprint.md", prompt)
         self.assertIn("主线", prompt)
         self.assertIn("集数建议", prompt)
