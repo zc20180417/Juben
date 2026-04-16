@@ -456,6 +456,26 @@ class StartCommandTests(unittest.TestCase):
         self.assertIn("python _ops/controller.py check batch03", text)
         self.assertIn("python _ops/controller.py run batch03", text)
 
+    def test_start_skips_verify_done_examples_for_unmapped_episodes(self) -> None:
+        args = argparse.Namespace(batch_id="batch03", prepare_only=False, writer_command="writer --batch {batch_id}")
+        output = io.StringIO()
+
+        with contextlib.redirect_stdout(output), \
+             mock.patch.object(self.controller, "_prepare_batch_start",
+                               return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])), \
+             mock.patch.object(self.controller, "_compute_verify_tiers",
+                               return_value=(["EP-11"], [], [], ["EP-12"])), \
+             mock.patch.object(self.controller, "_warn_unanchored_voice_assets"), \
+             mock.patch.object(self.controller, "_run_smoke_lint_check", return_value=(True, {})), \
+             mock.patch.object(self.controller, "_run_writer_stage", return_value=0):
+            result = self.controller.cmd_start(args)
+
+        self.assertEqual(result, 0)
+        text = output.getvalue()
+        self.assertIn("python _ops/controller.py verify-done EP-11 PASS --tier FULL --batch batch03", text)
+        self.assertNotIn("python _ops/controller.py verify-done EP-12", text)
+        self.assertIn("⚠ Unmapped episodes: EP-12", text)
+
     def test_start_retries_smoke_once_in_syntax_first_mode(self) -> None:
         args = argparse.Namespace(batch_id="batch03", prepare_only=False, writer_command="writer --batch {batch_id}")
         shell_fail = {

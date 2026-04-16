@@ -688,6 +688,45 @@ def _verify_tier_for_episode(
     return "STANDARD"
 
 
+def _print_start_next_steps(
+    batch_id: str,
+    episodes: list[str],
+    full_eps: list[str],
+    standard_eps: list[str],
+    light_eps: list[str],
+    unmapped_eps: list[str],
+    *,
+    include_writer_instruction: bool,
+) -> None:
+    step_no = 1
+    if include_writer_instruction:
+        print(f"  {step_no}. Writer agent:    draft {', '.join(episodes)} into drafts/episodes/")
+        step_no += 1
+
+    print(f"  {step_no}. Check batch:     python _ops/controller.py check {batch_id}")
+    step_no += 1
+
+    mapped_eps = [ep for ep in episodes if ep not in unmapped_eps]
+    if unmapped_eps:
+        print(f"  ⚠ Unmapped episodes: {', '.join(unmapped_eps)}")
+        print(f"    → Update source.map.md before running check.")
+
+    if mapped_eps:
+        print(f"  {step_no}. Aligner verify:  follow _ops/script-aligner.md for {', '.join(mapped_eps)}")
+        step_no += 1
+        print(f"  {step_no}. Report verify:")
+        for ep in mapped_eps:
+            tier = _verify_tier_for_episode(ep, full_eps, standard_eps, light_eps)
+            print(f"     python _ops/controller.py verify-done {ep} PASS --tier {tier} --batch {batch_id}")
+        print(f"     python _ops/controller.py verify-done <EP-XX> FAIL --tier <tier> --batch {batch_id}")
+        step_no += 1
+    else:
+        print(f"  {step_no}. No verify commands yet: fix source.map for the unmapped episodes above.")
+        step_no += 1
+
+    print(f"  {step_no}. Formal release:  python _ops/controller.py run {batch_id}")
+
+
 # ---------------------------------------------------------------------------
 # Release / Gold tracking helpers
 # ---------------------------------------------------------------------------
@@ -2366,18 +2405,15 @@ def cmd_start(args: argparse.Namespace) -> int:
     if args.prepare_only:
         print(f"\n--- Next Step ---")
         print(f"  prepare-only: batch is frozen and locked, but writer stage was not started")
-        print(f"  1. Writer agent:    draft {', '.join(episodes)} into drafts/episodes/")
-        print(f"  2. Check batch:     python _ops/controller.py check {batch_id}")
-        print(f"  3. Aligner verify:  follow _ops/script-aligner.md for {', '.join(episodes)}")
-        print(f"  4. Report verify:")
-        for ep in episodes:
-            tier = _verify_tier_for_episode(ep, full_eps, standard_eps, light_eps)
-            print(f"     python _ops/controller.py verify-done {ep} PASS --tier {tier} --batch {batch_id}")
-        print(f"     python _ops/controller.py verify-done <EP-XX> FAIL --tier <tier> --batch {batch_id}")
-        print(f"  5. Formal release:  python _ops/controller.py run {batch_id}")
-        if unmapped_eps:
-            print(f"  ⚠ Unmapped episodes: {', '.join(unmapped_eps)}")
-            print(f"    → Update source.map.md before running check.")
+        _print_start_next_steps(
+            batch_id,
+            episodes,
+            full_eps,
+            standard_eps,
+            light_eps,
+            unmapped_eps,
+            include_writer_instruction=True,
+        )
         return 0
 
     _warn_unanchored_voice_assets()
@@ -2447,17 +2483,15 @@ def cmd_start(args: argparse.Namespace) -> int:
     print(f"\n=== Writer Stage Complete ===")
     print(f"  Drafts ready: {', '.join(episodes)}")
     print(f"\n--- Next Steps ---")
-    print(f"  1. Check batch:     python _ops/controller.py check {batch_id}")
-    print(f"  2. Aligner verify:  follow _ops/script-aligner.md for {', '.join(episodes)}")
-    print(f"  3. Report verify:")
-    for ep in episodes:
-        tier = _verify_tier_for_episode(ep, full_eps, standard_eps, light_eps)
-        print(f"     python _ops/controller.py verify-done {ep} PASS --tier {tier} --batch {batch_id}")
-    print(f"     python _ops/controller.py verify-done <EP-XX> FAIL --tier <tier> --batch {batch_id}")
-    print(f"  4. Formal release:  python _ops/controller.py run {batch_id}")
-    if unmapped_eps:
-        print(f"  ⚠ Unmapped episodes: {', '.join(unmapped_eps)}")
-        print(f"    → Update source.map.md before running check.")
+    _print_start_next_steps(
+        batch_id,
+        episodes,
+        full_eps,
+        standard_eps,
+        light_eps,
+        unmapped_eps,
+        include_writer_instruction=False,
+    )
     return 0
 
 
