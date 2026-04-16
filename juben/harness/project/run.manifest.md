@@ -21,7 +21,7 @@
 - source_authority: original novel manuscript + harness/project/book.blueprint.md + harness/project/source.map.md
 - draft_lane: drafts/episodes
 - publish_lane: episodes
-- promotion_policy: controller_only_after_full_batch_verify
+- promotion_policy: controller_only_after_batch_verify_gate
 
 ## Current Runtime
 - framework entry: harness/framework/entry.md

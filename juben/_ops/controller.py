@@ -8,10 +8,10 @@ Project setup:
   map-book              Generate source.map.md from book.blueprint.md
 
 Orchestration commands:
-  start <batch_id>       Total entry: prepare → writer stage → run pipeline
-  run <batch_id>         Full pipeline: lint → auto-verify → promote → review → next
+  start <batch_id>       Total entry: prepare → writer stage
+  run <batch_id>         Formal release entry: lint → verify → promote → review → next
   check <batch_id>       Lint gate + verify-plan + verify instructions
-  finish <batch_id>      Lint gate + verify gate + promote + validate + batch-review
+  finish <batch_id>      Deprecated alias for run
   next                   Show pipeline progress and next batch to start
 
 Verify / record gate commands:
@@ -676,6 +676,57 @@ def _compute_verify_tiers(episodes: list[str]) -> tuple[list, list, list, list]:
     return full_eps, standard_eps, light_eps, unmapped_eps
 
 
+def _verify_tier_for_episode(
+    episode: str, full_eps: list[str], standard_eps: list[str], light_eps: list[str],
+) -> str:
+    if episode in full_eps:
+        return "FULL"
+    if episode in standard_eps:
+        return "STANDARD"
+    if episode in light_eps:
+        return "LIGHT"
+    return "STANDARD"
+
+
+def _print_start_next_steps(
+    batch_id: str,
+    episodes: list[str],
+    full_eps: list[str],
+    standard_eps: list[str],
+    light_eps: list[str],
+    unmapped_eps: list[str],
+    *,
+    include_writer_instruction: bool,
+) -> None:
+    step_no = 1
+    if include_writer_instruction:
+        print(f"  {step_no}. Writer agent:    draft {', '.join(episodes)} into drafts/episodes/")
+        step_no += 1
+
+    print(f"  {step_no}. Check batch:     python _ops/controller.py check {batch_id}")
+    step_no += 1
+
+    mapped_eps = [ep for ep in episodes if ep not in unmapped_eps]
+    if unmapped_eps:
+        print(f"  ⚠ Unmapped episodes: {', '.join(unmapped_eps)}")
+        print(f"    → Update source.map.md before running check.")
+
+    if mapped_eps:
+        print(f"  {step_no}. Aligner verify:  follow _ops/script-aligner.md for {', '.join(mapped_eps)}")
+        step_no += 1
+        print(f"  {step_no}. Report verify:")
+        for ep in mapped_eps:
+            tier = _verify_tier_for_episode(ep, full_eps, standard_eps, light_eps)
+            print(f"     python _ops/controller.py verify-done {ep} PASS --tier {tier} --batch {batch_id}")
+        print(f"     python _ops/controller.py verify-done <EP-XX> FAIL --tier <tier> --batch {batch_id}")
+        step_no += 1
+    else:
+        print(f"  {step_no}. No verify commands yet: fix source.map for the unmapped episodes above.")
+        step_no += 1
+
+    print(f"  {step_no}. Formal release:  python _ops/controller.py run {batch_id}")
+
+
 # ---------------------------------------------------------------------------
 # Release / Gold tracking helpers
 # ---------------------------------------------------------------------------
@@ -1007,18 +1058,15 @@ def _run_lint_gate(episodes: list[str]) -> tuple[bool, dict[str, dict]]:
 
 def _run_verify_gate(episodes: list[str]) -> bool:
     """Check unmapped, verify results, and draft integrity. Returns True if all pass."""
-    full_eps, standard_eps, light_eps, unmapped_eps = _compute_verify_tiers(episodes)
+    _full_eps, _standard_eps, _light_eps, unmapped_eps = _compute_verify_tiers(episodes)
     if unmapped_eps:
         print(f"  ✗ Episodes missing source-map data: {', '.join(unmapped_eps)}")
         print(f"    → Add entries to source.map.md first")
         return False
     for ep in episodes:
-        if ep in light_eps:
-            print(f"  ✓ {ep}: LIGHT (lint-only)")
-            continue
         vr = _read_verify_result(ep)
         if vr is None:
-            print(f"  ✗ {ep}: no verify result — run aligner + verify-done first")
+            print(f"  ✗ {ep}: no verify result — run check + aligner + verify-done first")
             return False
         if vr.get("status") != "PASS":
             print(f"  ✗ {ep}: verify {vr.get('status', '?')}")
@@ -2031,7 +2079,7 @@ def cmd_init(args: argparse.Namespace) -> int:
 - source_authority: original novel manuscript + harness/project/book.blueprint.md + harness/project/source.map.md
 - draft_lane: drafts/episodes
 - publish_lane: episodes
-- promotion_policy: controller_only_after_full_batch_verify
+- promotion_policy: controller_only_after_batch_verify_gate
 
 ## Current Runtime
 - framework entry: harness/framework/entry.md
@@ -2268,7 +2316,7 @@ def _prepare_batch_start(batch_id: str) -> tuple[Path, dict, list[str]] | None:
         lock_data = _read_lock("batch.lock")
         owner = lock_data.get("owner", "?")
         if batch_id not in owner:
-            print(f"ERROR: batch.lock held by '{owner}' — finish or unlock first")
+            print(f"ERROR: batch.lock held by '{owner}' — run or unlock first")
             return None
 
     # Find or auto-generate batch brief
@@ -2345,19 +2393,27 @@ def _prepare_batch_start(batch_id: str) -> tuple[Path, dict, list[str]] | None:
 
 
 def cmd_start(args: argparse.Namespace) -> int:
-    """Total entry: prepare batch → smoke-first writer stage → continue pipeline."""
+    """Total entry: prepare batch → smoke-first writer stage → stop for verify."""
     batch_id = args.batch_id
     prepared = _prepare_batch_start(batch_id)
     if prepared is None:
         return 1
     brief_path, batch_info, episodes = prepared
 
+    full_eps, standard_eps, light_eps, unmapped_eps = _compute_verify_tiers(episodes)
+
     if args.prepare_only:
         print(f"\n--- Next Step ---")
-        print(f"  prepare-only: batch is frozen and locked, but writer/pipeline were not started")
-        print(f"  Writer agent: draft {', '.join(episodes)} into drafts/episodes/")
-        print(f"  Then run fast path: python _ops/controller.py run {batch_id}")
-        print(f"  Or strict path:    python _ops/controller.py check {batch_id}")
+        print(f"  prepare-only: batch is frozen and locked, but writer stage was not started")
+        _print_start_next_steps(
+            batch_id,
+            episodes,
+            full_eps,
+            standard_eps,
+            light_eps,
+            unmapped_eps,
+            include_writer_instruction=True,
+        )
         return 0
 
     _warn_unanchored_voice_assets()
@@ -2424,8 +2480,19 @@ def cmd_start(args: argparse.Namespace) -> int:
         if writer_rc != 0:
             return writer_rc
 
-    print(f"\n=== Continue Pipeline ===")
-    return cmd_run(argparse.Namespace(batch_id=batch_id))
+    print(f"\n=== Writer Stage Complete ===")
+    print(f"  Drafts ready: {', '.join(episodes)}")
+    print(f"\n--- Next Steps ---")
+    _print_start_next_steps(
+        batch_id,
+        episodes,
+        full_eps,
+        standard_eps,
+        light_eps,
+        unmapped_eps,
+        include_writer_instruction=False,
+    )
+    return 0
 
 
 def cmd_check(args: argparse.Namespace) -> int:
@@ -2453,7 +2520,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     print(f"\n=== Verify Plan ===")
     print(f"  FULL (8-step):     {', '.join(full_eps) or '(none)'}")
     print(f"  STANDARD (5-step): {', '.join(standard_eps) or '(none)'}")
-    print(f"  LIGHT (lint only): {', '.join(light_eps) or '(none)'}")
+    print(f"  LIGHT (manual):    {', '.join(light_eps) or '(none)'}")
 
     # Step 3: Semantic verify instructions
     print(f"\n=== Semantic Verify Instructions (for Aligner agent) ===")
@@ -2478,21 +2545,19 @@ def cmd_check(args: argparse.Namespace) -> int:
         print(f"    8. Judgment & Output")
     if light_eps:
         print(f"\n  LIGHT episodes ({', '.join(light_eps)}):")
-        print(f"  Lint only — already passed above")
+        print(f"  Use an explicit LIGHT verify pass, then record verify-done (lint alone is insufficient)")
 
     # Step 4: Show verify result reporting instructions
     print(f"\n=== Report Verify Results ===")
     print(f"  After aligner completes each episode, report:")
     for ep in episodes:
-        if ep in light_eps:
-            continue
-        tier = "FULL" if ep in full_eps else "STANDARD"
+        tier = _verify_tier_for_episode(ep, full_eps, standard_eps, light_eps)
         print(f"    python _ops/controller.py verify-done {ep} PASS --tier {tier} --batch {batch_id}")
     print(f"\n  If an episode fails:")
     print(f"    python _ops/controller.py verify-done <EP-XX> FAIL --tier <tier> --batch {batch_id}")
 
     print(f"\n--- Next Step ---")
-    print(f"  After all verify PASS: python _ops/controller.py finish {batch_id}")
+    print(f"  After all verify PASS: python _ops/controller.py run {batch_id}")
 
     return 0
 
@@ -2586,34 +2651,14 @@ def _do_promote_and_report(
 
 
 def cmd_finish(args: argparse.Namespace) -> int:
-    """Promote + validate + batch-review + log + next instructions."""
-    batch_id = args.batch_id
-    resolved = _resolve_batch(batch_id, require_frozen=True)
-    if resolved is None:
-        return 1
-    brief_path, brief, episodes = resolved
-
-    # Step 1: Final lint gate
-    print(f"=== Step 1: Lint Gate ===")
-    lint_passed, lint_results = _run_lint_gate(episodes)
-    if not lint_passed:
-        return 1
-
-    # Step 2: Verify gate
-    print(f"\n=== Step 2: Verify Gate ===")
-    if not _run_verify_gate(episodes):
-        return 1
-
-    return _do_promote_and_report(batch_id, brief_path, episodes, lint_results)
+    """Deprecated alias for cmd_run()."""
+    print("WARNING: 'finish' is deprecated; use 'run' as the only formal release entry.")
+    print(f"  Re-run with: python _ops/controller.py run {args.batch_id}")
+    return cmd_run(args)
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    """Full pipeline: lint gate → auto-verify → promote → review → next.
-
-    Skips semantic verify (aligner). Episodes that already have a verify PASS
-    result keep it; episodes without one get auto-verified at lint level.
-    Use 'check' + manual aligner + 'finish' if you need full semantic verify.
-    """
+    """Formal release entry: lint gate → verify gate → promote → review → next."""
     batch_id = args.batch_id
     resolved = _resolve_batch(batch_id, require_frozen=True)
     if resolved is None:
@@ -2628,29 +2673,12 @@ def cmd_run(args: argparse.Namespace) -> int:
         return 1
     print(f"\n  GATE PASS")
 
-    # Step 2: Auto-verify (respect existing results, fill gaps with lint-only)
-    print(f"\n=== Step 2: Auto-Verify ===")
-    full_eps, standard_eps, light_eps, unmapped_eps = _compute_verify_tiers(episodes)
-    if unmapped_eps:
-        print(f"  ✗ Unmapped: {', '.join(unmapped_eps)}")
-        print(f"    → Update source.map.md first")
+    # Step 2: Verify gate
+    print(f"\n=== Step 2: Verify Gate ===")
+    if not _run_verify_gate(episodes):
+        print(f"\n  GATE FAIL — complete aligner verify before formal release")
         return 1
-
-    auto_count = 0
-    for ep in episodes:
-        existing = _read_verify_result(ep)
-        if existing and existing.get("status") == "PASS":
-            print(f"  ✓ {ep}: existing PASS (tier: {existing.get('tier', '?')})")
-            continue
-        tier = "FULL" if ep in full_eps else ("STANDARD" if ep in standard_eps else "LIGHT")
-        _write_verify_result(ep, tier, "PASS")
-        _append_log(batch_id, ep, "verify", "auto-verify (lint-only)", "PASS", f"tier={tier}")
-        print(f"  + {ep}: auto-verified (tier: {tier}, lint-only)")
-        auto_count += 1
-    if auto_count:
-        print(f"\n  {auto_count} episodes auto-verified (lint-only, no semantic check)")
-    else:
-        print(f"\n  All episodes already have verify results")
+    print(f"\n  GATE PASS")
 
     # Step 3: Promote + report
     return _do_promote_and_report(batch_id, brief_path, episodes, lint_results)
@@ -2781,7 +2809,7 @@ def main() -> int:
     p_rdone.add_argument("batch_id")
 
     # High-level orchestration
-    p_start = sub.add_parser("start", help="Total entry: prepare → writer stage → run pipeline")
+    p_start = sub.add_parser("start", help="Total entry: prepare → writer stage → stop for verify")
     p_start.add_argument("batch_id", help="e.g. batch02")
     p_start.add_argument("--prepare-only", action="store_true", help="Freeze/lock and print context only")
     p_start.add_argument("--writer-command", default=None, help="Override writer hook command for this run")
@@ -2789,10 +2817,10 @@ def main() -> int:
     p_check = sub.add_parser("check", help="Lint gate + verify-plan + verify instructions")
     p_check.add_argument("batch_id")
 
-    p_finish = sub.add_parser("finish", help="Promote + validate + batch-review + next")
+    p_finish = sub.add_parser("finish", help="Deprecated alias for run")
     p_finish.add_argument("batch_id")
 
-    p_run = sub.add_parser("run", help="Full pipeline: lint → auto-verify → promote → review → next")
+    p_run = sub.add_parser("run", help="Formal release entry: lint → verify → promote → review → next")
     p_run.add_argument("batch_id")
 
     sub.add_parser("next", help="Show pipeline progress and next batch")

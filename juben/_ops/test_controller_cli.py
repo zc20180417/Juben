@@ -268,120 +268,109 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
         mock_clear_retry.assert_called_once_with("EP-01")
         self.assertEqual(mock_append_log.call_args.args[0], "batch01")
 
-    def test_finish_uses_batch_id_for_manifest_log_and_next_steps(self) -> None:
+    def test_finish_aliases_run(self) -> None:
         args = argparse.Namespace(batch_id="batch01")
         output = io.StringIO()
 
         with contextlib.redirect_stdout(output), \
-             mock.patch.object(self.controller, "_resolve_batch", return_value=(Path("brief.md"), {}, ["EP-01"])), \
-             mock.patch.object(self.controller, "_run_lint_gate", return_value=(True, {"EP-01": {}})), \
-             mock.patch.object(self.controller, "_run_verify_gate", return_value=True), \
-             mock.patch.object(self.controller, "_is_locked", return_value=False), \
-             mock.patch.object(self.controller, "_promote_batch", return_value=(0, {})) as mock_promote, \
-             mock.patch.object(self.controller, "_set_batch_status") as mock_set_status, \
-             mock.patch.object(self.controller, "_write_lock") as mock_write_lock, \
-             mock.patch.object(self.controller, "_clear_retry_count") as mock_clear_retry, \
-             mock.patch.object(self.controller, "_append_log") as mock_append_log, \
-             mock.patch.object(self.controller, "_set_manifest_field") as mock_set_manifest, \
-             mock.patch.object(self.controller, "_validate_state_file", return_value=[]), \
-             mock.patch.object(self.controller.random, "sample", return_value=["EP-01"]), \
-             mock.patch.object(
-                 self.controller,
-                 "_parse_source_map",
-                 return_value={
-                     "batch01": {"ep_start": "EP-01", "ep_end": "EP-01", "source_range": "ch1"},
-                     "batch02": {"ep_start": "EP-02", "ep_end": "EP-02", "source_range": "ch2"},
-                 },
-             ):
+             mock.patch.object(self.controller, "cmd_run", return_value=0) as mock_run:
             result = self.controller.cmd_finish(args)
 
         self.assertEqual(result, 0)
-        mock_promote.assert_called_once_with("batch01", Path("brief.md"), ["EP-01"], {"EP-01": {}})
-        mock_set_status.assert_called_once_with(Path("brief.md"), "promoted")
-        mock_write_lock.assert_called_once_with("batch.lock", "unlocked")
-        mock_clear_retry.assert_called_once_with("EP-01")
-        self.assertEqual(mock_append_log.call_args.args[0], "batch01")
-        mock_set_manifest.assert_called_once_with("active_batch", "batch01_promoted")
-        self.assertIn("BATCH FINISHED: batch01", output.getvalue())
-        self.assertIn("python _ops/controller.py record batch01", output.getvalue())
+        mock_run.assert_called_once_with(args)
+        self.assertIn("deprecated", output.getvalue().lower())
+        self.assertIn("python _ops/controller.py run batch01", output.getvalue())
 
 
 class RunCommandTests(unittest.TestCase):
-    """cmd_run: lint → auto-verify → promote pipeline."""
+    """cmd_run: strict release path with lint + verify gates."""
 
     def setUp(self) -> None:
         self.controller = _load_controller_module()
 
-    def test_run_auto_verifies_and_promotes(self) -> None:
+    def test_run_missing_verify_fails(self) -> None:
         args = argparse.Namespace(batch_id="batch03")
         output = io.StringIO()
-        verify_store: dict[str, dict] = {}
-
-        def fake_write_vr(ep, tier, status):
-            verify_store[ep] = {"episode": ep, "tier": tier, "status": status}
-
-        def fake_read_vr(ep):
-            return verify_store.get(ep)
 
         with contextlib.redirect_stdout(output), \
              mock.patch.object(self.controller, "_resolve_batch",
-                               return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])), \
+                                return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])), \
              mock.patch.object(self.controller, "_run_lint_gate",
-                               return_value=(True, {"EP-11": {"status": "pass"}, "EP-12": {"status": "pass"}})), \
+                                return_value=(True, {"EP-11": {"status": "pass"}, "EP-12": {"status": "pass"}})), \
              mock.patch.object(self.controller, "_compute_verify_tiers",
-                               return_value=(["EP-11"], ["EP-12"], [], [])), \
-             mock.patch.object(self.controller, "_write_verify_result", side_effect=fake_write_vr), \
-             mock.patch.object(self.controller, "_read_verify_result", side_effect=fake_read_vr), \
-             mock.patch.object(self.controller, "_append_log"), \
-             mock.patch.object(self.controller, "_promote_batch", return_value=(0, {})) as mock_promote, \
-             mock.patch.object(self.controller, "_is_locked", return_value=False), \
-             mock.patch.object(self.controller, "_set_batch_status"), \
-             mock.patch.object(self.controller, "_write_lock"), \
-             mock.patch.object(self.controller, "_clear_retry_count"), \
-             mock.patch.object(self.controller, "_set_manifest_field"), \
-             mock.patch.object(self.controller, "_validate_state_file", return_value=[]), \
-             mock.patch.object(self.controller.random, "sample", return_value=["EP-11"]), \
-             mock.patch.object(self.controller, "_parse_source_map", return_value={
-                 "batch03": {"ep_start": "EP-11", "ep_end": "EP-12", "source_range": "ch9"},
-             }):
+                                return_value=(["EP-11"], ["EP-12"], [], [])), \
+             mock.patch.object(self.controller, "_read_verify_result", return_value=None), \
+             mock.patch.object(self.controller, "_promote_batch") as mock_promote:
             result = self.controller.cmd_run(args)
 
-        self.assertEqual(result, 0)
+        self.assertEqual(result, 1)
         text = output.getvalue()
-        # Both episodes auto-verified
-        self.assertIn("EP-11: auto-verified (tier: FULL", text)
-        self.assertIn("EP-12: auto-verified (tier: STANDARD", text)
-        # Promote was called
-        mock_promote.assert_called_once()
-        # Batch finished message
-        self.assertIn("BATCH FINISHED: batch03", text)
+        self.assertIn("no verify result", text)
+        mock_promote.assert_not_called()
 
-    def test_run_respects_existing_verify_results(self) -> None:
+    def test_run_verify_fail_fails(self) -> None:
         args = argparse.Namespace(batch_id="batch03")
         output = io.StringIO()
-        existing_vr = {"episode": "EP-11", "tier": "FULL", "status": "PASS"}
+        verify_result = {"episode": "EP-11", "tier": "FULL", "status": "FAIL"}
 
-        def fake_read_vr(ep):
-            if ep == "EP-11":
-                return existing_vr
-            return None
+        with contextlib.redirect_stdout(output), \
+             mock.patch.object(self.controller, "_resolve_batch",
+                               return_value=(Path("brief.md"), {}, ["EP-11"])), \
+             mock.patch.object(self.controller, "_run_lint_gate",
+                               return_value=(True, {"EP-11": {}})), \
+             mock.patch.object(self.controller, "_compute_verify_tiers",
+                               return_value=(["EP-11"], [], [], [])), \
+             mock.patch.object(self.controller, "_read_verify_result", return_value=verify_result), \
+             mock.patch.object(self.controller, "_promote_batch") as mock_promote:
+            result = self.controller.cmd_run(args)
 
-        written = []
+        self.assertEqual(result, 1)
+        self.assertIn("verify FAIL", output.getvalue())
+        mock_promote.assert_not_called()
 
-        def fake_write_vr(ep, tier, status):
-            written.append(ep)
+    def test_run_stale_verify_hash_fails(self) -> None:
+        args = argparse.Namespace(batch_id="batch03")
+        output = io.StringIO()
+        verify_result = {
+            "episode": "EP-11",
+            "tier": "FULL",
+            "status": "PASS",
+            "draft_sha256": "stale",
+        }
+
+        with contextlib.redirect_stdout(output), \
+             mock.patch.object(self.controller, "_resolve_batch",
+                               return_value=(Path("brief.md"), {}, ["EP-11"])), \
+             mock.patch.object(self.controller, "_run_lint_gate",
+                               return_value=(True, {"EP-11": {}})), \
+             mock.patch.object(self.controller, "_compute_verify_tiers",
+                               return_value=(["EP-11"], [], [], [])), \
+             mock.patch.object(self.controller, "_read_verify_result", return_value=verify_result), \
+             mock.patch.object(
+                 self.controller,
+                 "_verify_draft_integrity",
+                 return_value="EP-11 draft modified after verify",
+             ), \
+             mock.patch.object(self.controller, "_promote_batch") as mock_promote:
+            result = self.controller.cmd_run(args)
+
+        self.assertEqual(result, 1)
+        self.assertIn("must re-verify", output.getvalue())
+        mock_promote.assert_not_called()
+
+    def test_run_does_not_write_verify_pass(self) -> None:
+        args = argparse.Namespace(batch_id="batch03")
+        output = io.StringIO()
 
         with contextlib.redirect_stdout(output), \
              mock.patch.object(self.controller, "_resolve_batch",
                                return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])), \
              mock.patch.object(self.controller, "_run_lint_gate",
                                return_value=(True, {"EP-11": {}, "EP-12": {}})), \
-             mock.patch.object(self.controller, "_compute_verify_tiers",
-                               return_value=(["EP-11"], ["EP-12"], [], [])), \
-             mock.patch.object(self.controller, "_write_verify_result", side_effect=fake_write_vr), \
-             mock.patch.object(self.controller, "_read_verify_result", side_effect=fake_read_vr), \
-             mock.patch.object(self.controller, "_append_log"), \
-             mock.patch.object(self.controller, "_promote_batch", return_value=(0, {})), \
+             mock.patch.object(self.controller, "_run_verify_gate", return_value=True), \
+             mock.patch.object(self.controller, "_write_verify_result") as mock_write_verify, \
+             mock.patch.object(self.controller, "_append_log") as mock_append_log, \
+             mock.patch.object(self.controller, "_promote_batch", return_value=(0, {})) as mock_promote, \
              mock.patch.object(self.controller, "_is_locked", return_value=False), \
              mock.patch.object(self.controller, "_set_batch_status"), \
              mock.patch.object(self.controller, "_write_lock"), \
@@ -395,11 +384,12 @@ class RunCommandTests(unittest.TestCase):
             result = self.controller.cmd_run(args)
 
         self.assertEqual(result, 0)
-        text = output.getvalue()
-        # EP-11 should keep existing result, not be overwritten
-        self.assertIn("EP-11: existing PASS (tier: FULL)", text)
-        # Only EP-12 should be auto-verified
-        self.assertEqual(written, ["EP-12"])
+        mock_promote.assert_called_once()
+        mock_write_verify.assert_not_called()
+        self.assertFalse(
+            any(call.args[2] == "verify" and call.args[5] == "PASS" for call in mock_append_log.call_args_list)
+        )
+        self.assertNotIn("auto-verify", output.getvalue())
 
     def test_run_fails_on_lint_failure(self) -> None:
         args = argparse.Namespace(batch_id="batch03")
@@ -413,7 +403,7 @@ class RunCommandTests(unittest.TestCase):
 
 
 class StartCommandTests(unittest.TestCase):
-    """cmd_start: prepare-only escape hatch + merged entry into writer/run."""
+    """cmd_start: prepare-only escape hatch + writer-stage stop."""
 
     def setUp(self) -> None:
         self.controller = _load_controller_module()
@@ -434,11 +424,15 @@ class StartCommandTests(unittest.TestCase):
         mock_writer.assert_not_called()
         mock_run.assert_not_called()
         self.assertIn("prepare-only", output.getvalue())
+        self.assertIn("python _ops/controller.py check batch03", output.getvalue())
+        self.assertIn("python _ops/controller.py run batch03", output.getvalue())
 
-    def test_start_runs_writer_then_run(self) -> None:
+    def test_start_no_longer_auto_promotes(self) -> None:
         args = argparse.Namespace(batch_id="batch03", prepare_only=False, writer_command="writer --batch {batch_id}")
+        output = io.StringIO()
 
-        with mock.patch.object(self.controller, "_prepare_batch_start",
+        with contextlib.redirect_stdout(output), \
+             mock.patch.object(self.controller, "_prepare_batch_start",
                                return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])) as mock_prepare, \
              mock.patch.object(self.controller, "_warn_unanchored_voice_assets"), \
              mock.patch.object(self.controller, "_run_smoke_lint_check", return_value=(True, {})) as mock_smoke, \
@@ -456,8 +450,31 @@ class StartCommandTests(unittest.TestCase):
             ],
         )
         mock_smoke.assert_called_once_with("EP-11")
-        run_args = mock_run.call_args.args[0]
-        self.assertEqual(run_args.batch_id, "batch03")
+        mock_run.assert_not_called()
+        text = output.getvalue()
+        self.assertIn("=== Writer Stage Complete ===", text)
+        self.assertIn("python _ops/controller.py check batch03", text)
+        self.assertIn("python _ops/controller.py run batch03", text)
+
+    def test_start_skips_verify_done_examples_for_unmapped_episodes(self) -> None:
+        args = argparse.Namespace(batch_id="batch03", prepare_only=False, writer_command="writer --batch {batch_id}")
+        output = io.StringIO()
+
+        with contextlib.redirect_stdout(output), \
+             mock.patch.object(self.controller, "_prepare_batch_start",
+                               return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])), \
+             mock.patch.object(self.controller, "_compute_verify_tiers",
+                               return_value=(["EP-11"], [], [], ["EP-12"])), \
+             mock.patch.object(self.controller, "_warn_unanchored_voice_assets"), \
+             mock.patch.object(self.controller, "_run_smoke_lint_check", return_value=(True, {})), \
+             mock.patch.object(self.controller, "_run_writer_stage", return_value=0):
+            result = self.controller.cmd_start(args)
+
+        self.assertEqual(result, 0)
+        text = output.getvalue()
+        self.assertIn("python _ops/controller.py verify-done EP-11 PASS --tier FULL --batch batch03", text)
+        self.assertNotIn("python _ops/controller.py verify-done EP-12", text)
+        self.assertIn("⚠ Unmapped episodes: EP-12", text)
 
     def test_start_retries_smoke_once_in_syntax_first_mode(self) -> None:
         args = argparse.Namespace(batch_id="batch03", prepare_only=False, writer_command="writer --batch {batch_id}")
@@ -465,8 +482,10 @@ class StartCommandTests(unittest.TestCase):
             "checks": {"episode_failures": ["scene_count", "camera_count", "os_vo_count"]},
             "totals": {"scene_count": 0, "camera_count": 0, "os_count": 0, "vo_count": 0},
         }
+        output = io.StringIO()
 
-        with mock.patch.object(self.controller, "_prepare_batch_start",
+        with contextlib.redirect_stdout(output), \
+             mock.patch.object(self.controller, "_prepare_batch_start",
                                return_value=(Path("brief.md"), {}, ["EP-11", "EP-12", "EP-13"])), \
              mock.patch.object(self.controller, "_warn_unanchored_voice_assets"), \
              mock.patch.object(self.controller, "_run_smoke_lint_check", side_effect=[(False, shell_fail), (True, shell_fail)]) as mock_smoke, \
@@ -491,7 +510,8 @@ class StartCommandTests(unittest.TestCase):
             ],
         )
         self.assertEqual(mock_smoke.call_count, 2)
-        mock_run.assert_called_once()
+        mock_run.assert_not_called()
+        self.assertIn("python _ops/controller.py check batch03", output.getvalue())
 
     def test_start_stops_after_second_smoke_failure(self) -> None:
         args = argparse.Namespace(batch_id="batch03", prepare_only=False, writer_command="writer --batch {batch_id}")
