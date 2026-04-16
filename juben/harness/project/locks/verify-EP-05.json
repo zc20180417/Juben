@@ -1,0 +1,9 @@
+{
+  "episode": "EP-05",
+  "tier": "STANDARD",
+  "status": "PASS",
+  "timestamp": "2026-04-15 17:00",
+  "draft_sha256": "341f3a1820c9fa1a9506f967785a1d9771ee7fa7d05f19e0014a9895d302fe64",
+  "brief_sha256": "83a957a878439b65b59f0de7357ce1fd3cf04a726e4ea551172bd41e5f864bf8",
+  "source_map_sha256": "f1e2b863bee174d29e644593820cbbff26e2dbc959130eccc35364888754020f"
+}

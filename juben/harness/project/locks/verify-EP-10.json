@@ -2,5 +2,8 @@
   "episode": "EP-10",
   "tier": "STANDARD",
   "status": "PASS",
-  "timestamp": "2026-04-12T17:40:00"
+  "timestamp": "2026-04-15 18:42",
+  "draft_sha256": "cf5e17c48aaf9df6bff6c52e82d32ce628fe5a5a93d8fc4253ffc190091fb60c",
+  "brief_sha256": "d6f8327709655a813446dcb672c28f24b60a47b60ca8831e2315027f2592d715",
+  "source_map_sha256": "d81a39a187f8e1075b2881124a67948e20da07e8ec695b6a57090ef983ed35a0"
 }
