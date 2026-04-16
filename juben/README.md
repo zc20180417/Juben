@@ -14,7 +14,8 @@ Juben 现在只保留一套现行 workflow：`Harness V2`。
 - `_ops/script-aligner.md`
 - `_ops/script-recorder.md`
 
-根目录的 `AGENTS.md`、`OPENAI.md`、`CLAUDE.md` 只做薄路由，不定义独立流程。
+根目录的 `AGENTS.md`、`OPENAI.md`、`CLAUDE.md` 只做薄路由；
+小说源文件、`character.md` / `voice-anchor.md` 与 `~*.cmd` 只作为运行输入或便捷入口，不定义独立流程。
 
 ## 当前结构
 
@@ -23,10 +24,17 @@ juben/
 ├── AGENTS.md
 ├── OPENAI.md
 ├── CLAUDE.md
+├── README.md
+├── 首辅白月光回京后，我主动让位，他却只要我.md
 ├── character.md
 ├── voice-anchor.md
-├── drafts/episodes/
-├── episodes/
+├── ~start.cmd / ~run.cmd / ~record.cmd / ~clean.cmd
+├── _ops/
+│   ├── controller.py
+│   ├── episode-lint.py
+│   ├── script-aligner.md
+│   ├── script-recorder.md
+│   └── tests
 ├── harness/
 │   ├── framework/
 │   │   ├── entry.md
@@ -38,20 +46,23 @@ juben/
 │   │   ├── memory-contract.md
 │   │   └── regression-contract.md
 │   └── project/
-│       ├── run.manifest.md / run.manifest.json
+│       ├── run.manifest.md
 │       ├── book.blueprint.md
-│       ├── source.map.md / source.map.json
+│       ├── source.map.md
 │       ├── batch-briefs/
 │       ├── locks/
 │       ├── releases/
 │       ├── regressions/
 │       └── state/
-└── _ops/
-    ├── controller.py
-    ├── episode-lint.py
-    ├── script-aligner.md
-    ├── script-recorder.md
-    └── tests
+├── drafts/episodes/
+├── episodes/
+├── profiles/
+│   └── revenge_palace.md
+├── versions/
+│   └── rebuild_snapshots/
+└── docs/archive/
+    ├── README_v2_history.md
+    └── legacy-root/
 ```
 
 ## Harness V2 流程
@@ -149,4 +160,13 @@ python _ops/controller.py record-done batch01
 ## 历史说明
 
 旧版流程设计记录已经移出运行面。
-如果需要查历史演进，只看 `docs/archive/README_v2_history.md`，不要把归档内容当作现行 workflow 规则重新引用。
+根目录遗留旧稿与旧风格卡已统一归档到 `docs/archive/legacy-root/`，包括：
+
+- `outline.md`
+- `episode_index.md`
+- `short-drama-cn.md`
+- `harness-engineering.md`
+- `versions/changelog.md`
+- `versions/v001_outline.md`
+
+如果需要查历史演进，只看 `docs/archive/README_v2_history.md` 与 `docs/archive/legacy-root/`，不要把归档内容当作现行 workflow 规则重新引用。
