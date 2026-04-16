@@ -415,6 +415,8 @@ class StartCommandTests(unittest.TestCase):
         with contextlib.redirect_stdout(output), \
              mock.patch.object(self.controller, "_prepare_batch_start",
                                return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])) as mock_prepare, \
+             mock.patch.object(self.controller, "_compute_verify_tiers",
+                               return_value=(["EP-11"], ["EP-12"], [], [])), \
              mock.patch.object(self.controller, "_run_writer_stage") as mock_writer, \
              mock.patch.object(self.controller, "cmd_run") as mock_run:
             result = self.controller.cmd_start(args)
@@ -434,6 +436,8 @@ class StartCommandTests(unittest.TestCase):
         with contextlib.redirect_stdout(output), \
              mock.patch.object(self.controller, "_prepare_batch_start",
                                return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])) as mock_prepare, \
+             mock.patch.object(self.controller, "_compute_verify_tiers",
+                               return_value=(["EP-11"], ["EP-12"], [], [])), \
              mock.patch.object(self.controller, "_warn_unanchored_voice_assets"), \
              mock.patch.object(self.controller, "_run_smoke_lint_check", return_value=(True, {})) as mock_smoke, \
              mock.patch.object(self.controller, "_run_writer_stage", return_value=0) as mock_writer, \
@@ -487,6 +491,8 @@ class StartCommandTests(unittest.TestCase):
         with contextlib.redirect_stdout(output), \
              mock.patch.object(self.controller, "_prepare_batch_start",
                                return_value=(Path("brief.md"), {}, ["EP-11", "EP-12", "EP-13"])), \
+             mock.patch.object(self.controller, "_compute_verify_tiers",
+                               return_value=(["EP-11"], ["EP-12", "EP-13"], [], [])), \
              mock.patch.object(self.controller, "_warn_unanchored_voice_assets"), \
              mock.patch.object(self.controller, "_run_smoke_lint_check", side_effect=[(False, shell_fail), (True, shell_fail)]) as mock_smoke, \
              mock.patch.object(self.controller, "_run_writer_stage", return_value=0) as mock_writer, \
@@ -522,6 +528,8 @@ class StartCommandTests(unittest.TestCase):
 
         with mock.patch.object(self.controller, "_prepare_batch_start",
                                return_value=(Path("brief.md"), {}, ["EP-11", "EP-12", "EP-13"])), \
+             mock.patch.object(self.controller, "_compute_verify_tiers",
+                               return_value=(["EP-11"], ["EP-12", "EP-13"], [], [])), \
              mock.patch.object(self.controller, "_warn_unanchored_voice_assets"), \
              mock.patch.object(self.controller, "_run_smoke_lint_check", side_effect=[(False, shell_fail), (False, shell_fail)]), \
              mock.patch.object(self.controller, "_run_writer_stage", return_value=0) as mock_writer, \

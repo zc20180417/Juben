@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import sys
 from pathlib import Path
+
+OPS_DIR = Path(__file__).resolve().parent
+if str(OPS_DIR) not in sys.path:
+    sys.path.insert(0, str(OPS_DIR))
+
+from agent_backend import AgentBackendError, build_agent_command
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -74,6 +81,7 @@ def _build_extract_prompt(novel_path: Path) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run whole-book extraction backend")
     parser.add_argument("--novel-file", required=True)
+    parser.add_argument("--agent-backend", choices=["auto", "claude", "codex"], default="auto")
     args = parser.parse_args(argv)
 
     novel_path = ROOT / args.novel_file
@@ -85,17 +93,17 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     prompt = _build_extract_prompt(novel_path)
-    print(f"  → Claude extract-book target: {_rel(BOOK_BLUEPRINT)}")
-    print(f"  → Source novel: {_rel(novel_path)}")
-
     try:
+        backend_label, command = build_agent_command(prompt, args.agent_backend)
+        print(f"  → {backend_label} extract-book target: {_rel(BOOK_BLUEPRINT)}")
+        print(f"  → Source novel: {_rel(novel_path)}")
         result = subprocess.run(
-            ["claude", "-p", "--dangerously-skip-permissions", prompt],
+            command,
             cwd=ROOT,
             check=False,
         )
-    except FileNotFoundError:
-        print("ERROR: `claude` CLI is not installed or not on PATH")
+    except AgentBackendError as exc:
+        print(f"ERROR: {exc}")
         return 1
 
     return result.returncode

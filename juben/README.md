@@ -14,7 +14,8 @@ Juben 现在只保留一套现行 workflow：`Harness V2`。
 - `_ops/script-aligner.md`
 - `_ops/script-recorder.md`
 
-根目录的 `AGENTS.md`、`OPENAI.md`、`CLAUDE.md` 只做薄路由，不定义独立流程。
+根目录的 `AGENTS.md`、`OPENAI.md`、`CLAUDE.md` 只做薄路由；
+小说源文件、`character.md` / `voice-anchor.md` 与 `~*.cmd` 只作为运行输入或便捷入口，不定义独立流程。
 
 ## 当前结构
 
@@ -23,10 +24,17 @@ juben/
 ├── AGENTS.md
 ├── OPENAI.md
 ├── CLAUDE.md
+├── README.md
+├── 首辅白月光回京后，我主动让位，他却只要我.md
 ├── character.md
 ├── voice-anchor.md
-├── drafts/episodes/
-├── episodes/
+├── ~start.cmd / ~run.cmd / ~record.cmd / ~clean.cmd
+├── _ops/
+│   ├── controller.py
+│   ├── episode-lint.py
+│   ├── script-aligner.md
+│   ├── script-recorder.md
+│   └── tests
 ├── harness/
 │   ├── framework/
 │   │   ├── entry.md
@@ -38,20 +46,23 @@ juben/
 │   │   ├── memory-contract.md
 │   │   └── regression-contract.md
 │   └── project/
-│       ├── run.manifest.md / run.manifest.json
+│       ├── run.manifest.md
 │       ├── book.blueprint.md
-│       ├── source.map.md / source.map.json
+│       ├── source.map.md
 │       ├── batch-briefs/
 │       ├── locks/
 │       ├── releases/
 │       ├── regressions/
 │       └── state/
-└── _ops/
-    ├── controller.py
-    ├── episode-lint.py
-    ├── script-aligner.md
-    ├── script-recorder.md
-    └── tests
+├── drafts/episodes/
+├── episodes/
+├── profiles/
+│   └── revenge_palace.md
+├── versions/
+│   └── rebuild_snapshots/
+└── docs/archive/
+    ├── README_v2_history.md
+    └── legacy-root/
 ```
 
 ## Harness V2 流程
@@ -144,9 +155,20 @@ python _ops/controller.py record-done batch01
 - `finish <batch>`：deprecated alias；兼容旧入口，但文档与日常使用都应改成 `run <batch>`
 - writer hook 配置优先级：`--writer-command` > `run.manifest.md` 的 `writer_command` > 环境变量 `JUBEN_WRITER_COMMAND`
 - `writer_command` 可用占位符：`{batch_id}`、`{episodes}`、`{episodes_csv}`、`{draft_dir}`、`{project_root}`、`{python}`
-- 默认 writer backend：`"{python}" _ops/run_writer.py --batch {batch_id} --episodes {episodes_csv}`，内部调用本机 `claude -p --dangerously-skip-permissions`
+- `extract-book` / `map-book` / 默认 `writer backend` 会自动探测本机 agent CLI：优先 `claude`，缺失时回退 `codex`
+- 如需强制指定 backend，可设置环境变量 `JUBEN_AGENT_BACKEND=claude|codex`；直接运行 `_ops/run_book_extract.py`、`_ops/run_book_map.py`、`_ops/run_writer.py` 时也支持 `--agent-backend`
+- 默认 writer backend：`"{python}" _ops/run_writer.py --batch {batch_id} --episodes {episodes_csv}`，由 `_ops/run_writer.py` 内部探测并调用本机可用 agent CLI
 
 ## 历史说明
 
 旧版流程设计记录已经移出运行面。
-如果需要查历史演进，只看 `docs/archive/README_v2_history.md`，不要把归档内容当作现行 workflow 规则重新引用。
+根目录遗留旧稿与旧风格卡已统一归档到 `docs/archive/legacy-root/`，包括：
+
+- `outline.md`
+- `episode_index.md`
+- `short-drama-cn.md`
+- `harness-engineering.md`
+- `versions/changelog.md`
+- `versions/v001_outline.md`
+
+如果需要查历史演进，只看 `docs/archive/README_v2_history.md` 与 `docs/archive/legacy-root/`，不要把归档内容当作现行 workflow 规则重新引用。

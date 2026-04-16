@@ -21,7 +21,7 @@ class RunBookMapTests(unittest.TestCase):
     def setUp(self) -> None:
         self.module = _load_module()
 
-    def test_main_invokes_claude_with_source_map_prompt(self) -> None:
+    def test_main_invokes_selected_backend_with_source_map_prompt(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             project = root / "harness" / "project"
@@ -30,8 +30,18 @@ class RunBookMapTests(unittest.TestCase):
             novel.write_text("小说正文", encoding="utf-8")
             blueprint = project / "book.blueprint.md"
             blueprint.write_text("# Book Blueprint\n\n## 主线\n已填写\n", encoding="utf-8")
+            source_map = project / "source.map.md"
+            source_map.write_text("# Source Map\n", encoding="utf-8")
 
             with mock.patch.object(self.module, "ROOT", root), \
+                 mock.patch.object(self.module, "BOOK_BLUEPRINT", blueprint), \
+                 mock.patch.object(self.module, "SOURCE_MAP", source_map), \
+                 mock.patch.object(
+                     self.module,
+                     "build_agent_command",
+                     return_value=("Codex", ["codex", "exec", "PROMPT"]),
+                     create=True,
+                 ) as mock_build, \
                  mock.patch.object(self.module.subprocess, "run") as mock_run:
                 mock_run.return_value.returncode = 0
                 rc = self.module.main(
@@ -51,8 +61,8 @@ class RunBookMapTests(unittest.TestCase):
 
         self.assertEqual(rc, 0)
         command = mock_run.call_args.args[0]
-        prompt = command[-1]
-        self.assertEqual(command[:3], ["claude", "-p", "--dangerously-skip-permissions"])
+        prompt = mock_build.call_args.args[0]
+        self.assertEqual(command, ["codex", "exec", "PROMPT"])
         self.assertIn("source.map.md", prompt)
         self.assertIn("book.blueprint.md", prompt)
         self.assertIn("章节只作为定位信息", prompt)
