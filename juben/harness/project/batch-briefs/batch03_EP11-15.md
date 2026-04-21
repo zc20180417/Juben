@@ -1,9 +1,8 @@
 # Batch Brief: EP-11 ~ EP-15
 
-- batch status: promoted
 - owned episodes: EP-11, EP-12, EP-13, EP-14, EP-15
-- source excerpt range: 首辅白月光回京后，我主动让位，他却只要我.md 第18章（"宗庙大殿，庄严肃穆"）至"裴砚亭走到我的面前"前 ~ 第18章全部结尾（"朝阳照耀整个京城"之后）
-- adjacent continuity: 沈从梁柱后走出，举起虎符，全场瞬间静默 -> 天边鱼肚白，沈与裴砚亭站在宫墙之上，手相握 -> 宗庙事件后，朝局的正式宣布与权力重组 -> 沈回首辅府，下人的态度与言行的转变（从暗讽到敬畏） -> 春日清晨，沈在花园中梳妆，裴砚亭在后相伴
+- source excerpt range: 被弃真千金：总裁不好惹.md 第6章前半 ~ 第7章后半
+- adjacent continuity: 【动作】傅斯年换下锋利总裁壳子，拎着食盒和白桔梗独自上门，姿态要明显转成温柔追求。 -> 【动作】傅斯年送出真正对时鸢有用的定制裁剪刀，证明他记得她工作里的细枝末节。 -> 【信息】时鸢的新品发布会是她事业高光场，必须先立住“这是她真正的主场”。 -> 【动作】大屏幕放出苏雨柔潜入后台划坏礼裙的完整监控，让她的恶意无法抵赖。 -> 【动作】苏振宏当众扇苏雨柔一巴掌并解除收养关系，彻底把她从苏家踢出去。
 - draft output paths:
   - drafts/episodes/EP-11.md
   - drafts/episodes/EP-12.md
@@ -17,50 +16,51 @@
 - generation_execution_mode: orchestrated_subagents
 - generation_reset_mode: clean_rebuild
 
-## Source Priority
-1. `harness/project/run.manifest.md`
-2. `harness/project/source.map.md`
-3. `harness/framework/write-contract.md`
-4. 原著正文 `首辅白月光回京后，我主动让位，他却只要我.md`
-5. `voice-anchor.md`
-6. `character.md`
+## Writer Authority
+- 当前 batch brief：决定本批每集的任务、beats、功能目标与 ending function
+- `harness/project/source.map.md`：决定 source 顺序、must-not-add、must-not-jump 边界
+- `harness/project/run.manifest.md`：只提供运行参数，不裁决内容冲突
+- `voice-anchor.md` / `character.md`：仅作气质、禁区与称谓参考，不覆盖当前集任务
+
+## Function Policy
+- 场次数由功能完成决定，不得为了压场数省略功能槽位。
+- 首集和强冲突集必须补齐适用的强功能，不得把多个强功能糊成总结场。
 
 ## Episode Mapping
-- EP-11：第18章（"宗庙大殿，庄严肃穆"）至"裴砚亭走到我的面前"前
-  - 沈从梁柱后走出，举起虎符，全场瞬间静默 -> "我奉陛下之命而来"，沈递呈李氏的账本与信件 -> 宗亲长老们脸色变化（白→青→黑），罪证铁板钉钉 -> 沈宣读真相：天花之说子虚乌有，引蛇出洞之局 -> 话音刚落，宗庙殿门轰然大开
-  - 集尾类型：victory_moment - 阴谋破灭，权力转手
-- EP-12：第18章（"漫长的一夜，终于过去了"）至末尾
-  - 天边鱼肚白，沈与裴砚亭站在宫墙之上，手相握 -> 沈问"为什么要绕这么大一个圈子" -> 裴澄清：命格之说是真的、相士预言也是真的，但不是全部理由 -> 裴拿出泛黄童年画：小沈递糖人给小裴 -> 裴讲述：父亲被害、妹妹被杀、他的复仇、对沈的三十年记忆
-  - 集尾类型：emotional_resolution - 恨消融为爱，真爱的共同誓约
-- EP-13：第18章（"新政开始推行"之后 / 补充完整故事线）
-  - 宗庙事件后，朝局的正式宣布与权力重组 -> 沈对自己在权谋中所做选择的理解与反思 -> 裴砚亭在皇帝与陛下面前对沈的公开确认与褒奖 -> 沈从"隐形参与者"变成"被官方承认的贡献者" -> 新旧派的权力平衡，国家秩序的初步稳定
-  - 集尾类型：status_consolidation - 权力的转移确认，沈的新身份定格
-- EP-14：第18章（"大事已毕，沈如月回到首辅府"及后续原文扩展场景）
-  - 沈回首辅府，下人的态度与言行的转变（从暗讽到敬畏） -> 沈进入主院书房，裴砚亭在等她，第一次名正言顺的拥抱 -> 沈看到书房的柳清言画像已被撤下，取而代之的是她与裴砚亭的合绘画 -> 沈在裴的怀中，既感受到胜利的满足，也感受到失去"被保护者身份"的失落感 -> 两人探讨新政的执行、权力的维护、以及他们共同的未来
-  - 集尾类型：domestic_transition - 从权力中心回到家庭中心，新的"首辅夫人"定义
-- EP-15：第18章全部结尾（"朝阳照耀整个京城"之后）
-  - 春日清晨，沈在花园中梳妆，裴砚亭在后相伴 -> 沈回顾整个觉醒之路：从"摆设"到"棋手"再到"皇后"，每一步都是血泪 -> 沈与裴在花厅晨光中的对话：不是权力的讨论，而是生活与未来的规划 -> 沈的最后独白：我曾想逃离，现在我选择留下，不是因为被困，而是因为爱 -> 镜头拉开，京城在新朝的秩序中展开新的一天，沈与裴的身影消失在晨光中
-  - 集尾类型：narrative_closure - 完整的故事闭环，个人与时代的新生
+- EP-11：第6章前半
+  - 【动作】傅斯年换下锋利总裁壳子，拎着食盒和白桔梗独自上门，姿态要明显转成温柔追求。 -> 【关系】他不再强拉强拽，而是承认“我知道你不需要，但我还是想照顾你”，追妻方式必须降压。 -> 【信息】他从时鸢的工作状态里看见她长期独撑的生活面，开始把照顾落到具体细节。 -> 【钩子】定制礼物还没拿出来，时鸢对他的防线也还没真正松动。
+  - 功能目标：opening=escalation；middle=escalation；ending=confrontation_pending；irreversibility=medium
+  - 强功能补齐：escalation, confrontation_or_reversal, hook
+- EP-12：第6章后半
+  - 【动作】傅斯年送出真正对时鸢有用的定制裁剪刀，证明他记得她工作里的细枝末节。 -> 【权力】苏家打来电话求恢复合作时，他必须当着时鸢面冷硬回绝，明确“合作永远终止”。 -> 【关系】他把“别人都可以不管你，但我不行”落到实处，让时鸢第一次感到被稳定护着。 -> 【钩子】时鸢终于坐下吃他带来的饭，表示心防被撬开了第一道缝。
+  - 功能目标：opening=reversal；middle=escalation, escalation；ending=confrontation_pending；irreversibility=medium
+  - 强功能补齐：escalation, confrontation_or_reversal, hook
+- EP-13：第7章前半
+  - 【信息】时鸢的新品发布会是她事业高光场，必须先立住“这是她真正的主场”。 -> 【动作】苏雨柔混进现场，对压轴礼裙下手，把高定礼裙当众划坏。 -> 【权力】全场舆论瞬间要把事故算到时鸢头上，形成短暂失控。 -> 【钩子】时鸢只说一句“调监控”，把主动权硬生生拽回来。
+  - 功能目标：opening=setup；middle=escalation, escalation；ending=confrontation_pending；irreversibility=medium
+  - 强功能补齐：escalation, confrontation_or_reversal, hook
+- EP-14：第7章中段
+  - 【动作】大屏幕放出苏雨柔潜入后台划坏礼裙的完整监控，让她的恶意无法抵赖。 -> 【权力】傅斯年带着律师和证据进场，把她买通工作人员、造谣、抄袭的账一次性砸下去。 -> 【关系】时鸢明确按法律程序追责，和过去那种被动受气彻底切开。 -> 【钩子】苏家必须在“继续护她”还是“彻底割席”之间作出选择。
+  - 功能目标：opening=setup；middle=escalation, escalation；ending=reveal_pending；irreversibility=hard
+  - 强功能补齐：escalation, hook
+- EP-15：第7章后半
+  - 【动作】苏振宏当众扇苏雨柔一巴掌并解除收养关系，彻底把她从苏家踢出去。 -> 【权力】苏雨柔从“被偏爱的养女”翻成人人唾弃的过街老鼠，彻底失去上流立足点。 -> 【关系】发布会风波平息后，时鸢第一次没有躲开傅斯年的守护，关系再往前推一步。 -> 【钩子】苏家门口出现一位与时鸢眉眼相似的陌生女人，直接把“姐姐归来”推到门前。
+  - 功能目标：opening=setup；middle=escalation, escalation；ending=confrontation_pending；irreversibility=medium
+  - 强功能补齐：escalation, confrontation_or_reversal, hook
 
 ## Hard Constraints
-- 不能跳过虎符的视觉冲击与权力象征
-- 不能减弱宗亲长老们从怀疑到确信的转变过程
-- 不能削弱裴砚亭出现时的"神将"气质（映照沈的"神女"角色）
-- 不能跳过童年画的出现与讲述（整个逻辑闭环的钥匙）
-- 不能削弱裴对妹妹与复仇的情感记忆（解释他的执念）
-- 不能模糊沈的最终选择：不是被逼，而是主动拥吻、主动承诺
-- 不能跳过官方层面对沈的认可（身份的正式转变）
-- 不能减弱沈对自己行动道德性的思考（她是否做对了？）
-- 不能跳过新朝秩序对"女性参政"的微妙态度转变
-- 不能跳过下人态度的转变（体现沈新身份的社会确认）
-- 不能削弱画像更换的象征意义（过去的执念被现在的爱所取代）
-- 不能模糊沈对新身份的复杂情感（胜利与失落并存）
-- 不能跳过沈的回顾与反思（整个觉醒之路的确认）
-- 不能削弱"选择"与"爱"的最终确认（不是被迫，而是心甘情愿）
-- 不能丢失整部故事的最终主题：女性的觉醒与蜕变
-
-## verify checklist
-- `_ops/episode-lint.py` on each draft: PASS
-- `verify-contract.md` high-severity gates: PASS
-- `harness/project/regressions/` active pack items: no active hit
-- batch ready for promote: yes
+- 不写成油腻表白局
+- 不让时鸢当场给恋爱承诺
+- 不让苏家抢主功能
+- 不直接跳到正式在一起
+- 不把追妻写成重复送礼
+- 不提前引出姐姐回归
+- 不把破坏写成意外
+- 不让傅斯年先于监控解决
+- 不提前赶出苏雨柔
+- 不让苏雨柔继续维持白莲形象
+- 不把时鸢写成只靠傅斯年
+- 不提前出现姐姐相认
+- 不让苏雨柔这一集就彻底坐牢
+- 不把姐妹关系写成无缝亲密
+- 不让傅斯年和时鸢直接定情

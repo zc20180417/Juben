@@ -1,8 +1,8 @@
 # Run Manifest
 
-- source_file: 首辅白月光回京后，我主动让位，他却只要我.md
-- total_episodes: 15
-- recommended_total_episodes: 15
+- source_file: 被弃真千金：总裁不好惹.md
+- total_episodes: 40
+- recommended_total_episodes: 40
 - episode_count_source: model_recommended
 - batch_size: 5
 - target_episode_minutes: 2
@@ -13,11 +13,11 @@
 - adaptation_strategy: original_fidelity
 - dialogue_adaptation_intensity: light
 - generation_execution_mode: orchestrated_subagents
-- writer_parallelism: 3
+- writer_parallelism: 1
 - writer_command: "{python}" _ops/run_writer.py --batch {batch_id} --episodes {episodes_csv} --parallelism {parallelism} {syntax_first_flag}
 - generation_reset_mode: clean_rebuild
 - run_status: active
-- active_batch: batch03_promoted
+- active_batch: batch01_EP-01-EP-05
 - source_authority: original novel manuscript + harness/project/book.blueprint.md + harness/project/source.map.md
 - draft_lane: drafts/episodes
 - publish_lane: episodes

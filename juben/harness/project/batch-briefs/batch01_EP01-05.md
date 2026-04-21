@@ -1,9 +1,8 @@
 # Batch Brief: EP-01 ~ EP-05
 
-- batch status: promoted
 - owned episodes: EP-01, EP-02, EP-03, EP-04, EP-05
-- source excerpt range: 首辅白月光回京后，我主动让位，他却只要我.md 第1-2章开头（第01章全部，第02章至"缓缓开口"前） ~ 第8章（从马场段落开始）至第9章"我骑着踏雪，回到了城外马场"
-- adjacent continuity: 沈如月三年名义夫妻的现状：冷漠、画像、喊着柳清言的名字 -> 柳清言首次登门拜访的温柔伪装（白莲花人设完整展现） -> 搬入主院、第一次同床而眠的尴尬与战栗 -> 沈如月主动向春桃打听柳家三年前的风波 -> 裴砚亭突然提议学骑马（既解禁又是陷阱）
+- source excerpt range: 被弃真千金：总裁不好惹.md 第1章前半 ~ 第3章前半
+- adjacent continuity: 【信息】夜色街头，傅斯年把时鸢错认成失踪的苏清月。 -> 【信息】到苏家后，苏家父母第一反应是审视与盘问，不是心疼。 -> 【信息】亲子鉴定报告送到苏家并当场确认：时鸢确实是苏家失散多年的亲生女儿。 -> 【信息】苏振宏与刘美兰延续嫌恶姿态，继续拿“学规矩、别给苏家丢人”来规训时鸢，认亲后的冷酷彻底坐实。 -> 【信息】苏家为攀附商圈名流举办晚宴，对外只拿苏雨柔充门面。
 - draft output paths:
   - drafts/episodes/EP-01.md
   - drafts/episodes/EP-02.md
@@ -17,50 +16,51 @@
 - generation_execution_mode: orchestrated_subagents
 - generation_reset_mode: clean_rebuild
 
-## Source Priority
-1. `harness/project/run.manifest.md`
-2. `harness/project/source.map.md`
-3. `harness/framework/write-contract.md`
-4. 原著正文 `首辅白月光回京后，我主动让位，他却只要我.md`
-5. `voice-anchor.md`
-6. `character.md`
+## Writer Authority
+- 当前 batch brief：决定本批每集的任务、beats、功能目标与 ending function
+- `harness/project/source.map.md`：决定 source 顺序、must-not-add、must-not-jump 边界
+- `harness/project/run.manifest.md`：只提供运行参数，不裁决内容冲突
+- `voice-anchor.md` / `character.md`：仅作气质、禁区与称谓参考，不覆盖当前集任务
+
+## Function Policy
+- 场次数由功能完成决定，不得为了压场数省略功能槽位。
+- 首集和强冲突集必须补齐适用的强功能，不得把多个强功能糊成总结场。
 
 ## Episode Mapping
-- EP-01：第1-2章开头（第01章全部，第02章至"缓缓开口"前）
-  - 沈如月三年名义夫妻的现状：冷漠、画像、喊着柳清言的名字 -> 白月光回京的消息与沈如月的喜悦转折 -> 主动起草离书、逐客令的细节与心理 -> 宫里听到"俸禄微薄，只够养一个夫人"的反问句 -> 和离书被销毁的关键转折
-  - 集尾类型：cliffhanger - 离书被销毁，心理崩溃与困局加深
-- EP-02：第2章（"缓缓开口"之后）- 第3章全部
-  - 柳清言首次登门拜访的温柔伪装（白莲花人设完整展现） -> 沈如月与柳清言的对话博弈——"我很快就会还给你"的挑衅 -> 裴砚亭在海棠树下的出现与威胁警告 -> 沈如月的激烈反驳：权衡柳清言还是要我 -> 沈潜入书房摘画像、脚下一滑被抱住的身体接触
-  - 集尾类型：plot_turn - 被抱入主院，局面反向，身心俱陷
-- EP-03：第4章全部
-  - 搬入主院、第一次同床而眠的尴尬与战栗 -> 柳清言送紫檀木匣（砚台、墨锭）的示威 -> 磨墨时被抓住手腕、被迫联笔书"沈"字的亲密 -> 砚台被扔进火盆的绝情毁弃 -> 沈如月的心理转折："他的每一件事，都和我认识的他完全不一样"
-  - 集尾类型：emotional_pivot - 从被动承受到主动探寻真相
-- EP-04：第6章全部
-  - 沈如月主动向春桃打听柳家三年前的风波 -> 春桃揭露：科举舞弊大案，非贪墨小事 -> 沈推理出：裴砚亭暗中出手摆平，为了柳清言 -> 沈进一步推测：政敌借柳清言逼迫赐婚 -> 沈决定进宫查档、找表哥、查起居注
-  - 集尾类型：action_escalation - 真相逼近，禁锢加深
-- EP-05：第8章（从马场段落开始）至第9章"我骑着踏雪，回到了城外马场"
-  - 裴砚亭突然提议学骑马（既解禁又是陷阱） -> 马场教骑马的温暖与缱绻（第一次看到他真心笑） -> 沈如月被信任放在"踏雪"上骑向京城的刹那抉择 -> 城门口与柳清言的相遇（对方以此示威） -> 沈冒死潜入静心堂、贿赂常公公的真相碎片
-  - 集尾类型：revelation - 线索汇聚，父亲牵涉其中
+- EP-01：第1章前半
+  - 【信息】夜色街头，傅斯年把时鸢错认成失踪的苏清月。 -> 【关系】时鸢被强行带上车，始终冷静拒认，不演受惊失措。 -> 【动作】点出时鸢隐藏的设计师身份与强硬底色，但不能让苏家知晓。 -> 【钩子】埋下“同脸误认会把她卷进苏家漩涡”的总钩子。
+  - 功能目标：opening=intrusion；middle=confrontation, reveal；ending=locked_in；irreversibility=hard
+  - 强功能补齐：intrusion, escalation, confrontation_or_reversal, hook
+- EP-02：第1章后半
+  - 【信息】到苏家后，苏家父母第一反应是审视与盘问，不是心疼。 -> 【关系】苏雨柔柔弱插话，把“真千金回归”导向自己受威胁的局面。 -> 【动作】时鸢当场看清亲情凉薄，同意做鉴定但明确表示不认这个家。 -> 【钩子】傅斯年第一次察觉，时鸢与苏清月性格完全不同。
+  - 功能目标：opening=setup；middle=escalation, reveal；ending=confrontation_pending；irreversibility=medium
+  - 强功能补齐：escalation, confrontation_or_reversal, hook
+- EP-03：第2章前半
+  - 【信息】亲子鉴定报告送到苏家并当场确认：时鸢确实是苏家失散多年的亲生女儿。 -> 【关系】结果落地后，刘美兰与苏振宏仍先要求她激动、感恩、懂事，苏雨柔继续假意圆场、实则加深偏心。 -> 【动作】时鸢明确说出“既然确认了，那我就不打扰了”，并指出自己从未享受过苏家千金的待遇，谈不上感恩。 -> 【钩子】苏家在认亲刚落定的当口，就继续拿苏雨柔的懂事体面压她，把“确认血缘不等于接纳回家”的寒意钉死。
+  - 功能目标：opening=reveal；middle=escalation；ending=reveal_pending；irreversibility=hard
+  - 强功能补齐：intrusion, escalation, hook
+- EP-04：第2章后半
+  - 【信息】苏振宏与刘美兰延续嫌恶姿态，继续拿“学规矩、别给苏家丢人”来规训时鸢，认亲后的冷酷彻底坐实。 -> 【关系】时鸢正式与苏家切断情感期待，苏家则把她视作碍眼的亲生女儿而非失而复得的孩子。 -> 【动作】时鸢正面说出“生而不养，何以为父母”，留下“从此我与苏家，两不相干”后转身离开。 -> 【钩子】傅斯年在一旁彻底看清苏家的短视与失格，落下“你们会后悔的”的判断。
+  - 功能目标：opening=setup；middle=escalation, escalation；ending=confrontation_pending；irreversibility=medium
+  - 强功能补齐：escalation, confrontation_or_reversal, hook
+- EP-05：第3章前半
+  - 【信息】苏家为攀附商圈名流举办晚宴，对外只拿苏雨柔充门面。 -> 【关系】苏家完全不提时鸢，进一步坐实他们的短视与功利，也把“亲生女儿被无视”推到最满。 -> 【动作】主持人必须在本集直接介绍“鸢设计创始人，时鸢女士”，时鸢当场从后台走出，不得再拖成“即将出场”。 -> 【权力】刘美兰、苏振宏、苏雨柔必须在现场完成“怎么是你 / 你就是鸢 / 全场哗然”的即时翻车。 -> 【钩子】时鸢必须在台上直接落下“很意外吗”或同等强度的公开身份反打，把掉马写成本集闭环而不是前夜。
+  - 功能目标：opening=setup；middle=escalation, escalation, reversal；ending=reversal_triggered；irreversibility=hard
+  - 强功能补齐：escalation, confrontation_or_reversal, hook
 
 ## Hard Constraints
-- 不能跳过沈如月的自嘲与绝望感
-- 不能跳过裴砚亭销毁离书的冷酷姿态（"你是我的夫人，这辈子都是"）
-- 不能改弱沈对裴的初期误解（完全不爱她）
-- 不能跳过沈与柳的暗示较量（权力游戏的开始）
-- 不能改弱裴砚亭摘画像时"如你所愿"的暧昧与危险
-- 不能减弱沈对这一切的困惑与心理摇晃
-- 不能跳过沈与裴初次的身体接近与心理涟漪
-- 不能减弱裴对柳清言过往的彻底否定（不是爱，是决裂的信号）
-- 不能模糊沈对真相需求的紧迫感
-- 不能跳过春桃的警告与沈的坚持
-- 不能减弱沈的推理过程（从表面事件到深层算计）
-- 不能丢失软禁的象征意义（他知道了什么？）
-- 不能跳过马场的温暖对比（让她有一瞬想放弃真相追求）
-- 不能减弱沈背叛他信任的内疚（"对不起，裴砚亭，我骗了你"）
-- 不能削弱常公公那句"您的父亲"的震撼
-
-## verify checklist
-- `_ops/episode-lint.py` on each draft: PASS
-- `verify-contract.md` high-severity gates: PASS
-- `harness/project/regressions/` active pack items: no active hit
-- batch ready for promote: yes
+- 不提前出亲子鉴定
+- 不提前公开设计师身份
+- 不把傅斯年直接写成真爱已定
+- 不让父母立刻后悔
+- 不提前进晚宴打脸
+- 不让时鸢马上心软
+- 不把已发生的鉴定结果继续后拖
+- 不提前给时鸢外部强援
+- 不让苏家先求和
+- 不提前公开身份反打
+- 不让傅斯年当场追求成功
+- 不让父母一集洗白
+- 不把原文片段里已经发生的公开掉马继续拖到 EP06
+- 不提前让傅斯年公开站队
+- 不让苏家提前认错
