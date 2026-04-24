@@ -13,6 +13,7 @@
 - `total_episodes`
 - `recommended_total_episodes`
 - `episode_count_source`
+- `target_total_minutes`
 - `target_episode_minutes`
 - `episode_minutes_min`
 - `episode_minutes_max`

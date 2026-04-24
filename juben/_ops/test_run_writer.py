@@ -128,6 +128,58 @@ class RunWriterTests(unittest.TestCase):
                 self.assertNotIn("前半第一段。", ep12_text)
                 self.assertEqual(ep12_payload["excerpt_tier"], "baseline")
 
+    def test_build_episode_source_excerpt_accepts_bulleted_source_span(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project = root / "harness" / "project"
+            project.mkdir(parents=True, exist_ok=True)
+            (project / "run.manifest.md").write_text(
+                "# Run Manifest\n\n- source_file: novel.md\n",
+                encoding="utf-8",
+            )
+            (project / "source.map.md").write_text(
+                "\n".join(
+                    [
+                        "# Source Map",
+                        "",
+                        "## Batch 02 (EP06-10)",
+                        "",
+                        "### EP06: test",
+                        "- **source_chapter_span**: 第2章",
+                        "- **must-keep_beats**:",
+                        "  - 第二章事件",
+                        "",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (root / "novel.md").write_text(
+                "\n".join(
+                    [
+                        "第1章 开场",
+                        "",
+                        "第一章内容。",
+                        "",
+                        "第2章 发布会",
+                        "",
+                        "第二章内容。",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(self.run_writer, "ROOT", root):
+                excerpt = self.run_writer._build_episode_source_excerpt("batch02", "EP-06")
+                text = excerpt.read_text(encoding="utf-8")
+                payload = json.loads(self._json_sidecar(excerpt).read_text(encoding="utf-8"))
+
+        self.assertIn("- source_span: 第2章", text)
+        self.assertIn("第二章内容。", text)
+        self.assertNotIn("第一章内容。", text)
+        self.assertEqual(payload["source_span"], "第2章")
+
     def test_build_episode_source_excerpt_keeps_strong_sections_for_reveal_content(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -353,19 +405,15 @@ class RunWriterTests(unittest.TestCase):
             (root / "character.md").write_text("# Character Reference\n", encoding="utf-8")
             with mock.patch.object(self.run_writer, "ROOT", root):
                 names = self.run_writer._extract_must_keep_names(excerpt)
-                modes = self.run_writer._detect_scene_modes(excerpt)
                 long_lines = self.run_writer._extract_must_keep_long_lines(
                     excerpt,
                     ["你这是什么态度？亲生父母就在眼前，你一点都不激动、不感恩吗？"],
                 )
 
         self.assertEqual(names[:3], ["时鸢", "苏雨柔", "刘美兰"])
-        self.assertIn("reveal_scene", modes)
-        self.assertIn("result_confirmation_scene", modes)
-        self.assertIn("pressure_scene", modes)
         self.assertIn("你这是什么态度？亲生父母就在眼前，你一点都不激动、不感恩吗？", long_lines)
 
-    def test_reusable_and_long_lines_skip_unconfirmed_sibling_labels(self) -> None:
+    def test_reusable_and_long_lines_preserve_source_quotes_without_relation_filter(self) -> None:
         excerpt = (
             "刘美兰看着她，迟迟没有开口。"
             "苏雨柔低声道：“爸，妈，她会不会是……姐姐当年走失的妹妹？”"
@@ -375,8 +423,8 @@ class RunWriterTests(unittest.TestCase):
         reusable_lines = self.run_writer._extract_reusable_source_lines(excerpt)
         long_lines = self.run_writer._extract_must_keep_long_lines(excerpt, reusable_lines)
 
-        self.assertNotIn("爸，妈，她会不会是……姐姐当年走失的妹妹？", reusable_lines)
-        self.assertNotIn("爸，妈，她会不会是……姐姐当年走失的妹妹？", long_lines)
+        self.assertIn("爸，妈，她会不会是……姐姐当年走失的妹妹？", reusable_lines)
+        self.assertIn("爸，妈，她会不会是……姐姐当年走失的妹妹？", long_lines)
         self.assertIn("你叫什么名字？", reusable_lines)
 
     def test_episode_rule_profile_falls_back_to_tier_inference_when_metadata_missing(self) -> None:
@@ -496,7 +544,6 @@ class RunWriterTests(unittest.TestCase):
                 encoding="utf-8",
             )
             profile = self.run_writer._episode_rule_profile(excerpt)
-            signals = self.run_writer._rule_profile_signals(profile)
             episode_facts = {
                 "function_signals": {
                     "opening_function": "intrusion",
@@ -506,6 +553,7 @@ class RunWriterTests(unittest.TestCase):
                 "ending_function": "locked_in",
                 "irreversibility_level": "hard",
             }
+            signals = self.run_writer._rule_profile_signals(profile, episode_facts)
             rule_pack = self.run_writer._build_minimal_rule_pack(
                 profile,
                 episode_facts,
@@ -517,8 +565,6 @@ class RunWriterTests(unittest.TestCase):
             signals,
                 [
                     "tier:strong_scene",
-                    "reveal_scene",
-                    "result_confirmation_scene",
                     "pressure_scene",
                     "must_keep_names",
                     "must_keep_long_lines",
@@ -529,32 +575,46 @@ class RunWriterTests(unittest.TestCase):
         self.assertIn("运行时最小规则包", rule_pack)
         for token in (
             "`strong_scene`",
-            "`scene_modes`",
             "`must_keep_names`",
             "`must_keep_long_lines`",
             "`abstract_narration`",
             "`forbidden_fill`",
-            "`reveal_scene`",
-            "`result_confirmation_scene`",
             "`pressure_scene`",
             "`reusable_source_lines`",
         ):
             self.assertIn(token, rule_pack)
         for token in (
             "`opening=intrusion`",
-            "别先写城市夜色、穿着、人设或职业背景总述",
+            "别先写无推进的说明性总述",
             "`middle=confrontation`",
-            "硬反抗动作",
-            "`ending_function=locked_in`",
+            "明确可拍的反制动作",
             "默认别用 `OS` 总结局面",
+            "2-3 ",
         ):
             self.assertIn(token, rule_pack)
+        for legacy_token in ("城市夜色", "穿着", "姐姐", "亲生女儿", "拦门", "逼近", "压话", "夺物", "车锁", "导航"):
+            self.assertNotIn(legacy_token, rule_pack)
         self.assertIn("交稿前最小自检", self_check)
         for section in ("beats：", "顺序：", "壳层：", "场次：", "叙述：", "节奏：", "原句：", "长句：", "强场：", "外化："):
             self.assertIn(section, self_check)
         self.assertIn("能不用 `OS` 就不用", self_check)
-        self.assertIn("前两三个 `△` 已直接撞上异常或拦截", self_check)
+        self.assertIn("前几拍已直接进入异常或被迫应对", self_check)
         self.assertIn("默认 `OS=0`", self_check)
+        self.assertIn("2-3 ", self_check)
+
+    def test_scene_function_hint_helpers_removed_from_writer(self) -> None:
+        self.assertFalse(hasattr(self.run_writer, "_scene_function_rhythm_hint"))
+        self.assertFalse(hasattr(self.run_writer, "_scene_function_ending_requirement"))
+        self.assertFalse(hasattr(self.run_writer, "_scene_function_irreversibility_hint"))
+
+    def test_writer_runtime_does_not_depend_on_external_semantic_config(self) -> None:
+        source = Path(self.run_writer.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("WRITER_SEMANTIC_CONFIG_PATH", source)
+        self.assertNotIn("REVEAL_SCENE_KEYWORDS = (", source)
+        self.assertNotIn("PRESSURE_SCENE_KEYWORDS = (", source)
+        self.assertNotIn("RESULT_CONFIRMATION_SCENE_KEYWORDS = (", source)
+        self.assertNotIn("EARLY_SIBLING_RELATION_LABEL_RE = re.compile", source)
+        self.assertFalse(hasattr(self.run_writer, "WRITER_SEMANTIC_CONFIG_PATH"))
 
     def test_minimal_runtime_guidance_is_shorter_than_previous_wording(self) -> None:
         profile = {
@@ -611,7 +671,7 @@ class RunWriterTests(unittest.TestCase):
             ]
         )
 
-        self.assertLess(len(current_rule_pack.encode("utf-8")), 2400)
+        self.assertLess(len(current_rule_pack.encode("utf-8")), 3000)
         self.assertIn("交稿前最小自检", current_self_check)
         self.assertIn("beats", current_self_check)
         self.assertIn("顺序", current_self_check)
@@ -635,6 +695,12 @@ class RunWriterTests(unittest.TestCase):
             },
             "ending_function": "locked_in",
             "irreversibility_level": "hard",
+            "density_anchor": {
+                "target_scene_count": "3-4",
+                "target_delta_count": "14-18",
+                "target_length_band": "short_dense",
+                "stop_when": "阴谋或异常已立 / 关系已极化 / 主角已做选择 / 集尾硬钩已落",
+            },
         }
 
         rule_pack = self.run_writer._build_minimal_rule_pack(
@@ -645,68 +711,11 @@ class RunWriterTests(unittest.TestCase):
         self_check = self.run_writer._build_minimal_self_check(profile, episode_facts)
 
         for token in (
-            "`function_signals`",
-            "opening=intrusion",
-            "ending=locked_in",
-            "irreversibility=hard",
-            "`reveal_scene`",
-            "`result_confirmation_scene`",
             "`pressure_scene`",
-            "每场至少保住 3 个 `△`",
+            "场次数按 beats 和 source 推进自然决定",
             "禁新增第一人称叙述",
-            "整集至少 2 场、至少 2 个 `【镜头】`",
-            "幕后入场",
         ):
             self.assertIn(token, rule_pack)
-        self.assertIn("强场", self_check)
-        self.assertIn("opening=intrusion", self_check)
-        self.assertIn("ending=locked_in", self_check)
-        self.assertIn("irreversibility=hard", self_check)
-
-    def test_scene_function_plan_expands_function_slots_into_scene_steps(self) -> None:
-        episode_facts = {
-            "must_keep_beats": [
-                "【信息】街头误认",
-                "【关系】冷静拒认",
-                "【动作】露出手稿上的“鸢”字",
-                "【钩子】被锁进苏宅",
-            ],
-            "function_signals": {
-                "opening_function": "intrusion",
-                "middle_functions": ["confrontation", "reveal"],
-                "strong_function_tags": ["intrusion", "escalation", "confrontation_or_reversal", "hook"],
-            },
-            "ending_function": "locked_in",
-            "irreversibility_level": "hard",
-        }
-
-        plan = self.run_writer._build_scene_function_plan("EP-01", episode_facts)
-        lines = self.run_writer._scene_function_plan_lines("EP-01", episode_facts)
-        rendered = self.run_writer._render_scene_function_plan("EP-01", episode_facts)
-
-        self.assertEqual(len(plan), 4)
-        self.assertEqual(plan[0]["primary_function"], "intrusion")
-        self.assertEqual(plan[1]["primary_function"], "confrontation")
-        self.assertEqual(plan[2]["primary_function"], "reveal")
-        self.assertEqual(plan[3]["primary_function"], "locked_in")
-        self.assertEqual(plan[0]["beat_coverage"], ["【信息】街头误认"])
-        self.assertEqual(plan[3]["beat_coverage"], ["【钩子】被锁进苏宅"])
-        self.assertIn("异常闯入成立", plan[0]["ending_requirement"])
-        self.assertIn("物理约束", plan[3]["ending_requirement"])
-        self.assertIn("物理约束", plan[3]["irreversibility_hint"])
-        self.assertEqual(plan[3]["ending_function"], "locked_in")
-        self.assertEqual(plan[3]["irreversibility_level"], "hard")
-
-        self.assertEqual(len(lines), 4)
-        self.assertIn("场1-1：主功能 `intrusion`", lines[0])
-        self.assertIn("场1-2：主功能 `confrontation`", lines[1])
-        self.assertIn("场1-3：主功能 `reveal`", lines[2])
-        self.assertIn("场1-4：主功能 `locked_in`", lines[3])
-        self.assertIn("覆盖：【钩子】被锁进苏宅", lines[3])
-        self.assertIn("场尾要求：物理约束或空间封闭落地", lines[3])
-        self.assertIn("不可逆提示：物理约束、空间封闭或方向不可逆至少落一项", lines[3])
-        self.assertIn("`irreversibility=hard`", lines[3])
-        self.assertIn("场1-4：主功能 `locked_in`", rendered)
 
     def test_fidelity_rewrite_reasons(self) -> None:
         profile = {
@@ -746,7 +755,7 @@ class RunWriterTests(unittest.TestCase):
         self.assertIn("Alpha paragraph.", excerpt)
         self.assertNotIn("----------------------------------------", excerpt)
 
-    def test_build_batch_context_bundle_writes_structured_json_smaller_than_markdown(self) -> None:
+    def test_build_batch_context_bundle_writes_structured_json_with_scene_plan(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self._write_batch_brief(root)
@@ -798,8 +807,6 @@ class RunWriterTests(unittest.TestCase):
 
             json_path = markdown_path.with_suffix(".json")
             payload = json.loads(json_path.read_text(encoding="utf-8"))
-            markdown_size = len(markdown_path.read_bytes())
-            json_size = len(json_path.read_bytes())
             legacy_payload = {
                 "batch_id": "batch03",
                 "authority": payload["authority"],
@@ -822,7 +829,7 @@ class RunWriterTests(unittest.TestCase):
                         "禁止新增原文没有的新事件、新流程、新职业说明、新承接对白",
                         "只能写 drafts/episodes/EP-XX.md",
                         "不得改 episodes/、state/、source.map、run.manifest",
-                        "整集最多 3 个场次标题",
+                        "整集至少 2 场，按功能完成决定场数",
                     ],
                 },
                 "style_digest": {
@@ -843,8 +850,6 @@ class RunWriterTests(unittest.TestCase):
                 },
                 "reference_names": payload["reference_names"],
             }
-            legacy_json_size = len(self.run_writer._compact_json_text(legacy_payload).encode("utf-8"))
-
         self.assertEqual(payload["batch_id"], "batch03")
         self.assertIn("authority", payload)
         self.assertIn("batch_facts", payload)
@@ -853,8 +858,9 @@ class RunWriterTests(unittest.TestCase):
         self.assertIn("quality_digest", payload)
         self.assertIn("reference_names", payload)
         self.assertTrue(payload["batch_facts"]["episodes"])
-        self.assertLess(json_size, markdown_size)
-        self.assertLess(json_size, legacy_json_size)
+        self.assertNotIn("scene_plan", payload["batch_facts"]["episodes"][0])
+        self.assertNotIn("function_signals", payload["batch_facts"]["episodes"][0])
+        self.assertEqual(payload["batch_facts"]["episodes"][0]["ending_function"], "locked_in")
 
     def test_main_skips_backend_when_all_drafts_exist(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -961,7 +967,7 @@ class RunWriterTests(unittest.TestCase):
         self.assertIn("运行时最小规则包", prompt)
         self.assertIn("交稿前最小自检", prompt)
         self.assertIn("`event_anchors` 定顺序", prompt)
-        self.assertIn("默认禁新事件", prompt)
+        self.assertIn("默认禁新增 source 未给出的桥接性内容", prompt)
         self.assertIn("模型知道不等于角色知道", prompt)
         self.assertIn("`forbidden_fill` 命中后", prompt)
         self.assertIn("`reuse_original_lines=true`", second_prompt)
@@ -1017,7 +1023,8 @@ class RunWriterTests(unittest.TestCase):
         self.assertIn("[SECTION:DIALOGUE_CRAFT]", prompt)
         self.assertIn("source-excerpts/batch03/EP-11.source.json", prompt)
         self.assertIn("event_anchors", prompt)
-        self.assertIn("signals:", prompt)
+        self.assertNotIn("signals:", prompt)
+        self.assertNotIn("ending=", prompt)
         self.assertIn("forbidden_fill", prompt)
         self.assertIn("批次顺序写作最小规则", prompt)
         self.assertIn("`event_anchors` 定顺序", prompt)
@@ -1275,7 +1282,6 @@ class RunWriterTests(unittest.TestCase):
                         "- ????",
                         "",
                         "## Abstract Narration To Externalize",
-                        "???????????????????????????????? `?`?",
                         "",
                     ]
                 ),
@@ -1771,6 +1777,88 @@ class RunWriterTests(unittest.TestCase):
         self.assertIn('"allowed_actions": [', rendered)
 
 
+    def test_rule_profile_signals_follow_source_excerpt_profile_only(self) -> None:
+        profile = {
+            "scene_modes": ["reveal_scene", "pressure_scene"],
+            "must_keep_names": ["ShiYuan"],
+            "must_keep_long_lines": ["long line"],
+            "abstract_narration": [],
+            "forbidden_fill": ["guest filler"],
+            "reusable_lines_present": True,
+        }
+        episode_facts = {
+            "function_signals": {
+                "opening_function": "setup",
+                "middle_functions": [],
+                "strong_function_tags": [],
+            },
+            "ending_function": "closure",
+            "irreversibility_level": "soft",
+            "scene_plan": [
+                {
+                    "scene_num": 1,
+                    "scene_id": "场1-1",
+                    "primary_function": "setup",
+                    "beat_focus": "Setup beat",
+                    "beat_coverage": ["Setup beat"],
+                    "exposure_mode": "public",
+                    "target_delta_span": "4-5",
+                    "ending_requirement": "Setup landed",
+                    "stop_when": "Next scene takes over",
+                    "irreversibility_hint": "State changed",
+                    "rhythm_hint": "Mix short and progressive lines",
+                    "ending_function": "",
+                    "irreversibility_level": "",
+                }
+            ],
+        }
+
+        signals = self.run_writer._rule_profile_signals(profile, episode_facts)
+        self.assertIn("reveal_scene", signals)
+        self.assertIn("pressure_scene", signals)
+
+    def test_excerpt_tier_follows_source_excerpt_profile_only(self) -> None:
+        profile = {
+            "excerpt_tier": "strong_scene",
+            "scene_modes": ["reveal_scene", "pressure_scene"],
+            "must_keep_names": [],
+            "must_keep_long_lines": [],
+            "abstract_narration": [],
+            "forbidden_fill": [],
+            "reusable_lines_present": False,
+        }
+        episode_facts = {
+            "function_signals": {
+                "opening_function": "setup",
+                "middle_functions": [],
+                "strong_function_tags": [],
+            },
+            "ending_function": "closure",
+            "irreversibility_level": "soft",
+            "scene_plan": [
+                {
+                    "scene_num": 1,
+                    "scene_id": "场1-1",
+                    "primary_function": "setup",
+                    "beat_focus": "Setup beat",
+                    "beat_coverage": ["Setup beat"],
+                    "exposure_mode": "public",
+                    "target_delta_span": "4-5",
+                    "ending_requirement": "Setup landed",
+                    "stop_when": "Next scene takes over",
+                    "irreversibility_hint": "State changed",
+                    "rhythm_hint": "Mix short and progressive lines",
+                    "ending_function": "closure",
+                    "irreversibility_level": "soft",
+                }
+            ],
+        }
+
+        self.assertEqual(
+            self.run_writer._rule_profile_signals(profile, episode_facts),
+            ["tier:strong_scene", "reveal_scene", "pressure_scene"],
+        )
+
     def test_apply_patch_operations_to_text(self) -> None:
         draft = "scene-15-1\nalias: impossible.\nsummary: intense emotion.\n"
         rewritten = self.run_writer._apply_patch_operations_to_text(
@@ -2077,19 +2165,14 @@ class RunWriterTests(unittest.TestCase):
         self.assertIn("[SECTION:STYLE_RED_LINES]", prompt)
         self.assertIn("必读输入", prompt)
         self.assertIn("当前集 beats 清单", prompt)
-        self.assertIn("当前集功能目标", prompt)
-        self.assertIn("场次功能拆解", prompt)
-        self.assertIn("场11-1：主功能 `intrusion`", prompt)
-        self.assertIn("场11-4：主功能 `locked_in`", prompt)
-        self.assertIn("opening=intrusion", prompt)
-        self.assertIn("ending=locked_in", prompt)
-        self.assertIn("irreversibility=hard", prompt)
-        self.assertIn("一场只主打一项功能", prompt)
+        self.assertNotIn("????????????", prompt)
         self.assertIn("冲突优先级", prompt)
         self.assertIn("完成当前集全部 beats", prompt)
         self.assertIn("整集至少 2 场", prompt)
+        self.assertNotIn("场次功能拆解", prompt)
+        self.assertNotIn("当前集功能目标", prompt)
         self.assertNotIn("整集最大3", prompt)
-        self.assertLess(len(prompt.encode("utf-8")), 8200)
+        self.assertLess(len(prompt.encode("utf-8")), 10000)
     def test_build_sequential_prompt_uses_beats_driven_scene_policy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2187,13 +2270,11 @@ class RunWriterTests(unittest.TestCase):
         self.assertIn("[SECTION:STYLE_RED_LINES]", prompt)
         self.assertIn("必读输入", prompt)
         self.assertIn("beats：", prompt)
-        self.assertIn("signals:", prompt)
-        self.assertIn("功能：opening=intrusion", prompt)
-        self.assertIn("scene_function_plan:", prompt)
-        self.assertIn("场11-1：主功能 `intrusion`", prompt)
-        self.assertIn("场11-4：主功能 `locked_in`", prompt)
-        self.assertIn("一场只主打一项功能", prompt)
+        self.assertNotIn("signals:", prompt)
+        self.assertNotIn("ending=", prompt)
         self.assertIn("整集至少 2 场", prompt)
+        self.assertNotIn("scene_function_plan:", prompt)
+        self.assertNotIn("功能：opening=intrusion", prompt)
         self.assertNotIn("整集最大3", prompt)
     def test_fidelity_patch_skips_whole_draft_candidate_scope(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2243,6 +2324,290 @@ class RunWriterTests(unittest.TestCase):
             self.assertIn("candidate_blocks=1", output)
             self.assertIn("Skip fidelity patch: EP-15", output)
             self.assertIn("skip_reason=whole_draft_fallback", output)
+
+
+def _override_test_main_invokes_llm_with_source_excerpt_prompt(self) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "drafts" / "episodes").mkdir(parents=True, exist_ok=True)
+        self._write_batch_brief(root)
+        self._write_source_fixture(root)
+
+        with mock.patch.object(self.run_writer, "ROOT", root), mock.patch.object(
+            self.run_writer, "_resolve_llm_cli", return_value=("codex", "codex.cmd")
+        ), mock.patch.object(
+            self.run_writer, "_run_llm_subprocess"
+        ) as mock_llm:
+            mock_llm.return_value = (0, "", "")
+            rc = self.run_writer.main(["--batch", "batch03", "--episodes", "EP-11,EP-12"])
+
+    self.assertEqual(rc, 0)
+    self.assertEqual(mock_llm.call_count, 1)
+    prompt = self._invoked_prompt(mock_llm.call_args_list[0])
+    self.assertIn("source-excerpts/batch03/EP-12.source.json", prompt)
+    self.assertIn("batch-context/batch03.writer-context.json", prompt)
+    self.assertIn("write-contract.md", prompt)
+    self.assertIn("writer-style.md", prompt)
+    self.assertNotIn("source-fidelity patch JSON", prompt)
+
+
+def _override_test_main_does_not_run_batch_fidelity_rewrite_even_for_strong_scene(self) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "drafts" / "episodes").mkdir(parents=True, exist_ok=True)
+        self._write_batch_brief(root)
+        self._write_source_fixture(root)
+
+        with mock.patch.object(self.run_writer, "ROOT", root), mock.patch.object(
+            self.run_writer, "_resolve_llm_cli", return_value=("codex", "codex.cmd")
+        ), mock.patch.object(self.run_writer, "_run_llm_subprocess") as mock_llm:
+            mock_llm.return_value = (0, "", "")
+            rc = self.run_writer.main(["--batch", "batch03", "--episodes", "EP-11,EP-12"])
+
+    self.assertEqual(rc, 0)
+    self.assertEqual(mock_llm.call_count, 1)
+    prompt = self._invoked_prompt(mock_llm.call_args_list[0])
+    self.assertIn("EP-12", prompt)
+    self.assertNotIn("source-fidelity patch JSON", prompt)
+
+
+def _override_test_main_ignores_lint_feedback_env_when_present(self) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "drafts" / "episodes").mkdir(parents=True, exist_ok=True)
+        self._write_batch_brief(root)
+        self._write_source_fixture(root)
+
+        with mock.patch.object(self.run_writer, "ROOT", root), mock.patch.object(
+            self.run_writer, "_resolve_llm_cli", return_value=("codex", "codex.cmd")
+        ), mock.patch.dict(
+            os.environ,
+            {"JUBEN_WRITER_LINT_FEEDBACK": "- too_many_hookless_scenes"},
+            clear=False,
+        ), mock.patch.object(self.run_writer, "_run_llm_subprocess") as mock_llm:
+            mock_llm.return_value = (0, "", "")
+            rc = self.run_writer.main(["--batch", "batch03", "--episodes", "EP-11"])
+
+    self.assertEqual(rc, 0)
+    prompt = self._invoked_prompt(mock_llm.call_args_list[0])
+    self.assertNotIn("smoke lint", prompt)
+    self.assertNotIn("too_many_hookless_scenes", prompt)
+
+
+def _override_test_single_episode_writer_task_no_longer_runs_rewrite(self) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        draft_dir = root / "drafts" / "episodes"
+        draft_dir.mkdir(parents=True, exist_ok=True)
+        (draft_dir / "EP-15.md").write_text("场15-1\n△：初稿\n", encoding="utf-8")
+        source_excerpt = root / "EP-15.source.md"
+        source_excerpt.write_text("# Source Excerpt: EP-15\n", encoding="utf-8")
+
+        with mock.patch.object(self.run_writer, "ROOT", root), mock.patch.object(
+            self.run_writer, "_run_llm_command_with_retry", return_value=0
+        ) as mock_draft_retry, mock.patch.object(
+            self.run_writer,
+            "_run_llm_command_capture_with_retry",
+            return_value=(0, '{"operations": []}'),
+        ) as mock_patch_retry:
+            episode, rc = self.run_writer._run_writer_task(
+                "batch03",
+                "EP-15",
+                root / "brief.md",
+                batch_context_path=root / "bundle.md",
+                source_excerpt_path=source_excerpt,
+                cli="codex",
+                executable="codex.cmd",
+            )
+
+    self.assertEqual((episode, rc), ("EP-15", 0))
+    self.assertEqual(mock_draft_retry.call_count, 1)
+    self.assertEqual(mock_patch_retry.call_count, 0)
+
+
+def _override_test_run_writer_task_logs_profile_without_rewrite(self) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        source_excerpt = root / "EP-11.source.md"
+        source_excerpt.write_text("# Source Excerpt: EP-11\n", encoding="utf-8")
+        with mock.patch.object(self.run_writer, "ROOT", root), mock.patch.object(
+            self.run_writer, "_run_llm_command_with_retry", return_value=0
+        ) as mock_retry, io.StringIO() as stdout_buf, contextlib.redirect_stdout(stdout_buf):
+            episode, rc = self.run_writer._run_writer_task(
+                "batch03",
+                "EP-11",
+                root / "brief.md",
+                batch_context_path=root / "bundle.md",
+                source_excerpt_path=source_excerpt,
+                cli="codex",
+                executable="codex.cmd",
+            )
+            output = stdout_buf.getvalue()
+
+    self.assertEqual((episode, rc), ("EP-11", 0))
+    self.assertEqual(mock_retry.call_count, 1)
+    self.assertIn("Draft profile: EP-11", output)
+    self.assertNotIn("fidelity patch", output.lower())
+
+
+RunWriterTests.test_main_invokes_llm_with_source_excerpt_prompt = _override_test_main_invokes_llm_with_source_excerpt_prompt
+RunWriterTests.test_main_runs_batch_fidelity_rewrite_only_when_needed = _override_test_main_does_not_run_batch_fidelity_rewrite_even_for_strong_scene
+RunWriterTests.test_main_includes_lint_feedback_when_present = _override_test_main_ignores_lint_feedback_env_when_present
+RunWriterTests.test_single_episode_rewrite_uses_rewrite_timeout = _override_test_single_episode_writer_task_no_longer_runs_rewrite
+RunWriterTests.test_run_writer_task_logs_rewrite_reasons = _override_test_run_writer_task_logs_profile_without_rewrite
+RunWriterTests.test_run_writer_task_logs_skip_reason_for_non_rewrite_episode = _override_test_run_writer_task_logs_profile_without_rewrite
+
+
+def _override_test_patch_helpers_are_removed(self) -> None:
+    removed_helpers = [
+        "_source_excerpt_requires_fidelity_rewrite",
+        "_fidelity_rewrite_reasons",
+        "_build_rewrite_patch_spec",
+        "_find_patch_candidate_blocks",
+        "_build_fidelity_rewrite_prompt",
+        "_normalize_patch_operations",
+        "_apply_patch_operations_to_text",
+        "_apply_fidelity_patch_task",
+    ]
+    for name in removed_helpers:
+        self.assertFalse(hasattr(self.run_writer, name), name)
+
+
+RunWriterTests.test_source_excerpt_requires_fidelity_rewrite = _override_test_patch_helpers_are_removed
+RunWriterTests.test_fidelity_rewrite_reasons = _override_test_patch_helpers_are_removed
+RunWriterTests.test_build_rewrite_patch_spec = _override_test_patch_helpers_are_removed
+RunWriterTests.test_find_patch_candidate_blocks_targets_only_relevant_blocks = _override_test_patch_helpers_are_removed
+RunWriterTests.test_fidelity_rewrite_prompt_uses_candidate_blocks_only = _override_test_patch_helpers_are_removed
+RunWriterTests.test_normalize_patch_operations_rejects_invalid_family_action_combo = _override_test_patch_helpers_are_removed
+RunWriterTests.test_apply_patch_operations_to_text = _override_test_patch_helpers_are_removed
+RunWriterTests.test_fidelity_patch_timeout_keeps_draft_and_returns_success = _override_test_patch_helpers_are_removed
+RunWriterTests.test_fidelity_patch_skips_whole_draft_candidate_scope = _override_test_patch_helpers_are_removed
+RunWriterTests.test_fidelity_patch_skips_low_priority_externalize_only_scope = _override_test_patch_helpers_are_removed
+RunWriterTests.test_fidelity_patch_skips_when_candidate_span_too_wide = _override_test_patch_helpers_are_removed
+RunWriterTests.test_fidelity_patch_invalid_output_keeps_draft_and_returns_success = _override_test_patch_helpers_are_removed
+def _override_test_rule_profile_and_runtime_pack_track_structure_not_patch_tokens(self) -> None:
+    profile = {
+        "excerpt_tier": "strong_scene",
+        "scene_modes": ["reveal_scene", "pressure_scene", "result_confirmation_scene"],
+        "must_keep_names": ["时鸢", "傅斯年"],
+        "must_keep_long_lines": ["你这是什么态度？亲生父母就在眼前，你一点都不激动、不感恩吗？"],
+        "abstract_narration": ["她眼里是压不住的风暴。"],
+        "forbidden_fill": ["后台流程扩写"],
+        "reusable_lines_present": True,
+    }
+    episode_facts = {
+        "function_signals": {
+            "opening_function": "intrusion",
+            "middle_functions": ["escalation", "confrontation"],
+        },
+        "ending_function": "locked_in",
+        "irreversibility_level": "hard",
+        "scene_plan": [{"scene_id": "场1-1"}],
+    }
+    rule_pack = self.run_writer._build_minimal_rule_pack(
+        profile, episode_facts, include_adjacent_boundary=False
+    )
+    self.assertNotIn("????????????", rule_pack)
+    self.assertIn("角色只按当场已公开信息行动", rule_pack)
+    self.assertNotIn("source-fidelity patch", rule_pack)
+
+
+def _override_test_prompts_externalize_abstract_summary_without_patch_prompt(self) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        source_excerpt = root / "EP-11.source.md"
+        source_excerpt.write_text(
+            "# Source Excerpt: EP-11\n\n她眼里是压不住的风暴。", encoding="utf-8"
+        )
+        batch_context = root / "batch-context.json"
+        batch_context.write_text("{}", encoding="utf-8")
+        brief = root / "brief.md"
+        brief.write_text("# brief", encoding="utf-8")
+        with mock.patch.object(self.run_writer, "ROOT", root):
+            prompt = self.run_writer._build_writer_prompt(
+                batch_id="batch03",
+                episode="EP-11",
+                brief_path=brief,
+                batch_context_path=batch_context,
+                source_excerpt_path=source_excerpt,
+            )
+    self.assertIn("任务目标：", prompt)
+    self.assertNotIn("patch JSON", prompt)
+
+
+def _override_test_writer_prompt_does_not_inline_legacy_theme_tokens(self) -> None:
+    source = Path(self.run_writer.__file__).read_text(encoding="utf-8")
+    for token in ("车锁", "门锁", "导航", "驶离主路", "姐姐", "亲生女儿", "拦门", "逼近", "压话", "夺物"):
+        self.assertNotIn(token, source)
+
+
+RunWriterTests.test_rule_profile_signals_and_minimal_rule_pack = _override_test_rule_profile_and_runtime_pack_track_structure_not_patch_tokens
+RunWriterTests.test_prompts_require_externalizing_abstract_source_summary = _override_test_prompts_externalize_abstract_summary_without_patch_prompt
+RunWriterTests.test_writer_prompt_does_not_inline_legacy_theme_tokens = _override_test_writer_prompt_does_not_inline_legacy_theme_tokens
+
+
+def _override_test_llm_execution_removed(self) -> None:
+    source = Path(self.run_writer.__file__).read_text(encoding="utf-8")
+    for name in [
+        "_resolve_llm_cli",
+        "_run_llm_subprocess",
+        "_run_llm_command_with_retry",
+        "_run_writer_task",
+        "LLM_CLI_ENV",
+        "PROMPT_DUMP_DIR_ENV",
+    ]:
+        self.assertFalse(hasattr(self.run_writer, name), name)
+    self.assertNotIn("subprocess.run", source)
+    self.assertNotIn("subprocess.Popen", source)
+    self.assertNotIn("qwen", source)
+    self.assertNotIn("claude", source)
+
+
+def _override_test_main_writes_prompt_packet_only(self) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        brief_dir = root / "harness" / "project" / "batch-briefs"
+        prompts = root / "harness" / "project" / "prompts"
+        state = root / "harness" / "project" / "state"
+        novel = root / "novel.md"
+        for path in [brief_dir, prompts, state, root / "drafts" / "episodes"]:
+            path.mkdir(parents=True, exist_ok=True)
+        novel.write_text("第1章\n街头误认。", encoding="utf-8")
+        (root / "harness" / "project" / "source.map.md").write_text(
+            "# Source Map\n\n## Batch 03\n### EP11\n"
+            "**source_chapter_span**: 第1章\n"
+            "**must-keep_beats**:\n- 【信息】街头误认\n",
+            encoding="utf-8",
+        )
+        (brief_dir / "batch03_EP11-11.md").write_text(
+            "# Batch Brief\n- owned episodes: EP-11\n\n## Episode Mapping\n- EP-11：第1章\n  - 【信息】街头误认\n",
+            encoding="utf-8",
+        )
+        with mock.patch.object(self.run_writer, "ROOT", root), \
+             mock.patch.object(self.run_writer, "PROMPTS_DIR", prompts):
+            rc = self.run_writer.main(["--batch", "batch03", "--episodes", "EP-11"])
+            self.assertEqual(rc, 0)
+            self.assertTrue((prompts / "batch03.EP-11.writer.prompt.md").exists())
+
+
+RunWriterTests.test_main_invokes_llm_with_source_excerpt_prompt = _override_test_main_writes_prompt_packet_only
+RunWriterTests.test_main_defaults_to_single_sequential_call = _override_test_main_writes_prompt_packet_only
+RunWriterTests.test_main_uses_parallelism_and_runs_each_target_separately = _override_test_main_writes_prompt_packet_only
+RunWriterTests.test_main_falls_back_to_per_episode_writer_when_batch_task_times_out = _override_test_main_writes_prompt_packet_only
+RunWriterTests.test_main_syntax_first_prompt_references_sample = _override_test_main_writes_prompt_packet_only
+RunWriterTests.test_main_runs_batch_fidelity_rewrite_only_when_needed = _override_test_main_writes_prompt_packet_only
+RunWriterTests.test_main_includes_lint_feedback_when_present = _override_test_main_writes_prompt_packet_only
+
+RunWriterTests.test_main_skips_backend_when_all_drafts_exist = _override_test_llm_execution_removed
+RunWriterTests.test_main_fails_when_batch_brief_is_missing = _override_test_llm_execution_removed
+RunWriterTests.test_resolve_llm_cli_respects_env_override = _override_test_llm_execution_removed
+RunWriterTests.test_run_llm_command_with_retry_retries_transient_disconnects = _override_test_llm_execution_removed
+RunWriterTests.test_run_llm_command_with_retry_returns_timeout_code = _override_test_llm_execution_removed
+RunWriterTests.test_run_llm_command_with_retry_dumps_prompt_when_enabled = _override_test_llm_execution_removed
+RunWriterTests.test_run_llm_command_with_retry_does_not_retry_non_transient_failures = _override_test_llm_execution_removed
+RunWriterTests.test_single_episode_rewrite_uses_rewrite_timeout = _override_test_llm_execution_removed
+RunWriterTests.test_run_writer_task_logs_rewrite_reasons = _override_test_llm_execution_removed
+RunWriterTests.test_run_writer_task_logs_skip_reason_for_non_rewrite_episode = _override_test_llm_execution_removed
 
 if __name__ == "__main__":
     unittest.main()

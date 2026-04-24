@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import contextlib
 import importlib.util
 import io
@@ -32,6 +32,10 @@ class ControllerCliSmokeTests(unittest.TestCase):
         ops = root / "_ops"
         ops.mkdir(parents=True, exist_ok=True)
         shutil.copy2(CONTROLLER_SCRIPT, ops / "controller.py")
+        framework = root / "harness" / "framework"
+        framework.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "harness" / "framework" / "review-standard.md", framework / "review-standard.md")
+        shutil.copy2(ROOT / "harness" / "framework" / "reviewer-prompt.template.md", framework / "reviewer-prompt.template.md")
 
         project = root / "harness" / "project"
         batch_briefs = project / "batch-briefs"
@@ -102,6 +106,9 @@ class ControllerCliSmokeTests(unittest.TestCase):
         self.assertIn("=== Batch Review: batch01 ===", result.stdout)
         self.assertTrue((root / "harness" / "project" / "reviews" / "batch01.review.json").exists())
         self.assertTrue((root / "harness" / "project" / "reviews" / "batch01.review.md").exists())
+        self.assertTrue((root / "harness" / "project" / "reviews" / "batch01.review.prompt.md").exists())
+        self.assertIn("Review Prompt:", result.stdout)
+        self.assertIn("Review Standard:", result.stdout)
 
     def test_tilde_start_wrapper_routes_to_start_help(self) -> None:
         result = self._run_wrapper("~start", "--help")
@@ -132,7 +139,7 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
     def setUp(self) -> None:
         self.controller = _load_controller_module()
 
-    def test_book_blueprint_quality_gate_requires_recommendation_range_and_merge_reasoning(self) -> None:
+    def test_book_blueprint_quality_gate_accepts_minimal_episode_conclusion(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             blueprint = Path(tmp) / "book.blueprint.md"
             blueprint.write_text(
@@ -153,9 +160,28 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
                 issues = self.controller._book_blueprint_quality_issues()
                 is_complete = self.controller._book_blueprint_is_complete()
 
-        self.assertIn("集数建议里的“可独立成集戏剧节点”不够具体，必须列出关键节点", issues)
-        self.assertIn("集数建议里的“应合并压缩的内容”不够具体，无法防注水", issues)
-        self.assertFalse(is_complete)
+        self.assertEqual(issues, [])
+        self.assertTrue(is_complete)
+
+    def test_book_blueprint_quality_gate_accepts_loose_final_count_format(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            blueprint = Path(tmp) / "book.blueprint.md"
+            blueprint.write_text(
+                "# Book Blueprint\n\n"
+                "- extraction_status: extracted\n\n"
+                "## 集数建议\n\n"
+                "- 最终采用：约16（建议）\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(self.controller, "BOOK_BLUEPRINT", blueprint):
+                issues = self.controller._book_blueprint_quality_issues()
+                is_complete = self.controller._book_blueprint_is_complete()
+                recommended = self.controller._recommended_total_episodes_from_blueprint()
+
+        self.assertEqual(issues, [])
+        self.assertTrue(is_complete)
+        self.assertEqual(recommended, 16)
 
     def test_sync_state_from_blueprint_populates_blank_templates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -192,7 +218,31 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
             self.assertIn("时鸢 vs 苏家", (state_dir / "relationship.board.md").read_text(encoding="utf-8"))
             self.assertIn("短句服务情境", (state_dir / "quality.anchor.md").read_text(encoding="utf-8"))
 
-    def test_source_map_quality_gate_rejects_abstract_single_beat_mapping(self) -> None:
+    def test_source_map_quality_gate_accepts_single_structured_beat_when_structure_is_present(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source_map = Path(tmp) / "source.map.md"
+            source_map.write_text(
+                "# Source Map\n\n"
+                "- mapping_status: complete\n\n"
+                "## Batch 01 (EP01-05): 测试批次\n\n"
+                "### EP01: 测试集\n\n"
+                "**source_chapter_span**: 第1章前半\n\n"
+                "**must-keep_beats**:\n"
+                "- 【关系】冷静拒认，拒绝回苏家\n\n"
+                "**must-not-add / must-not-jump**:\n"
+                "- 无\n\n"
+                "**ending_function**: confrontation_pending\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(self.controller, "SOURCE_MAP", source_map):
+                issues = self.controller._source_map_quality_issues()
+                is_complete = self.controller._source_map_is_complete()
+
+        self.assertEqual(issues, [])
+        self.assertTrue(is_complete)
+
+    def test_source_map_quality_gate_rejects_single_overly_abstract_beat(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             source_map = Path(tmp) / "source.map.md"
             source_map.write_text(
@@ -204,18 +254,14 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
                 "**must-keep_beats**:\n"
                 "- 冷静拒认\n\n"
                 "**must-not-add / must-not-jump**:\n"
-                "- 无\n\n"
-                "**ending_type**: 前推力\n",
+                "- 无\n",
                 encoding="utf-8",
             )
 
             with mock.patch.object(self.controller, "SOURCE_MAP", source_map):
                 issues = self.controller._source_map_quality_issues()
-                is_complete = self.controller._source_map_is_complete()
 
-        self.assertTrue(any("must-keep beats should contain 3-5 executable items" in issue for issue in issues))
-        self.assertTrue(any("must start with one of" in issue for issue in issues))
-        self.assertFalse(is_complete)
+        self.assertIn("must-keep beats are too abstract", issues[0])
 
     def test_generate_batch_brief_no_longer_embeds_fake_ready_state(self) -> None:
         batch_info = {
@@ -224,8 +270,8 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
             "ep_end": "EP-02",
             "source_range": "ch1 ~ ch2",
             "episode_data": {
-                "EP-01": {"source_span": "ch1", "must_keep": "【信息】误认", "must_not": "不能抢跑", "ending_type": "cliffhanger"},
-                "EP-02": {"source_span": "ch2", "must_keep": "【动作】入局", "must_not": "", "ending_type": "push"},
+                "EP-01": {"source_span": "ch1", "must_keep": "【信息】误认", "must_not": "不能抢跑", "ending_function": "confrontation_pending"},
+                "EP-02": {"source_span": "ch2", "must_keep": "【动作】入局", "must_not": "", "ending_function": "confrontation_pending"},
             },
         }
 
@@ -252,8 +298,8 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
                 "batch_num": "01",
                 "source_range": "ch1 ~ ch2",
                 "episode_data": {
-                    "EP-01": {"source_span": "ch1", "must_keep": "【信息】误认", "must_not": "", "ending_type": "cliffhanger"},
-                    "EP-02": {"source_span": "ch2", "must_keep": "【动作】入局", "must_not": "", "ending_type": "push"},
+                    "EP-01": {"source_span": "ch1", "must_keep": "【信息】误认", "must_not": "", "ending_function": "confrontation_pending"},
+                    "EP-02": {"source_span": "ch2", "must_keep": "【动作】入局", "must_not": "", "ending_function": "confrontation_pending"},
                 },
             }
             status_updates: list[dict[str, object]] = []
@@ -393,23 +439,23 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
                 "**source_chapter_span**: ch1\n"
                 "**must-keep_beats**:\n- 【信息】a\n- 【动作】b\n- 【钩子】c\n"
                 "**must-not-add / must-not-jump**:\n- none\n"
-                "**ending_type**: cliffhanger\n\n"
+                "**ending_function**: confrontation_pending\n\n"
                 "### EP02: b\n"
                 "**source_chapter_span**: ch2\n"
                 "**must-keep_beats**:\n- 【信息】a\n- 【动作】b\n- 【钩子】c\n"
                 "**must-not-add / must-not-jump**:\n- none\n"
-                "**ending_type**: cliffhanger\n\n"
+                "**ending_function**: confrontation_pending\n\n"
                 "## Batch 02 (EP03-04): demo\n\n"
                 "### EP03: c\n"
                 "**source_chapter_span**: ch3\n"
                 "**must-keep_beats**:\n- 【信息】a\n- 【动作】b\n- 【钩子】c\n"
                 "**must-not-add / must-not-jump**:\n- none\n"
-                "**ending_type**: cliffhanger\n\n"
+                "**ending_function**: confrontation_pending\n\n"
                 "### EP04: d\n"
                 "**source_chapter_span**: ch4\n"
                 "**must-keep_beats**:\n- 【信息】a\n- 【动作】b\n- 【钩子】c\n"
                 "**must-not-add / must-not-jump**:\n- none\n"
-                "**ending_type**: cliffhanger\n",
+                "**ending_function**: confrontation_pending\n",
                 encoding="utf-8",
             )
             (batch_briefs / "batch01_EP01-02.md").write_text(
@@ -534,7 +580,7 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
                 "- 沈如月误以为裴砚亭不爱她\n\n"
                 "**must-not-add / must-not-jump**:\n"
                 "- 不能跳过离书被销毁\n\n"
-                "**ending_type**: cliffhanger - 困局加深\n\n"
+                "**ending_function**: confrontation_pending\n\n"
                 "---\n\n"
                 "### EP02: 白月光的假面 (2-3 分钟)\n\n"
                 "**source_chapter_span**: 第2章后半至第3章\n\n"
@@ -543,7 +589,7 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
                 "- 海棠树下对峙\n\n"
                 "**must-not-add / must-not-jump**:\n"
                 "- 不能跳过柳清言挑衅\n\n"
-                "**ending_type**: plot_turn - 被抱入主院\n",
+                "**ending_function**: reversal_triggered\n",
                 encoding="utf-8",
             )
 
@@ -561,8 +607,8 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
         self.assertIn("和离书被销毁", batches["batch01"]["episode_data"]["EP-01"]["must_keep"])
         self.assertIn("不能跳过离书被销毁", batches["batch01"]["episode_data"]["EP-01"]["must_not"])
         self.assertEqual(
-            batches["batch01"]["episode_data"]["EP-02"]["ending_type"],
-            "plot_turn - 被抱入主院",
+            batches["batch01"]["episode_data"]["EP-02"]["ending_function"],
+            "reversal_triggered",
         )
 
     def test_compute_verify_tiers_supports_generated_markdown_format(self) -> None:
@@ -578,7 +624,7 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
                 "- 和离书被销毁\n\n"
                 "**must-not-add / must-not-jump**:\n"
                 "- 不能跳过离书被销毁\n\n"
-                "**ending_type**: cliffhanger - 困局加深\n\n"
+                "**ending_function**: confrontation_pending\n\n"
                 "---\n\n"
                 "### EP02: 白月光的假面 (2-3 分钟)\n\n"
                 "**source_chapter_span**: 第2章后半至第3章\n\n"
@@ -586,7 +632,7 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
                 "- 柳清言登门\n\n"
                 "**must-not-add / must-not-jump**:\n"
                 "- 不能跳过柳清言挑衅\n\n"
-                "**ending_type**: plot_turn - 被抱入主院\n",
+                "**ending_function**: reversal_triggered\n",
                 encoding="utf-8",
             )
 
@@ -605,19 +651,11 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
 
         with contextlib.redirect_stdout(output), \
              mock.patch.object(self.controller, "_resolve_batch", return_value=(Path("brief.md"), {}, ["EP-01"])), \
-             mock.patch.object(self.controller, "_run_lint_gate", return_value=(True, {"EP-01": {}})), \
-             mock.patch.object(self.controller, "_compute_verify_tiers", return_value=(["EP-01"], [], [], [])):
+             mock.patch.object(self.controller, "_ensure_batch_review_artifacts", return_value={"status": "PENDING"}):
             result = self.controller.cmd_check(args)
 
         self.assertEqual(result, 0)
-        self.assertIn(
-            "python _ops/controller.py verify-done EP-01 PASS --tier FULL --batch batch01",
-            output.getvalue(),
-        )
-        self.assertIn(
-            "python _ops/controller.py source-compare-done EP-01 PASS --tier FULL --batch batch01",
-            output.getvalue(),
-        )
+        self.assertIn("python _ops/controller.py batch-review-done batch01 PASS --reviewer <name>", output.getvalue())
 
     def test_promote_uses_batch_id_for_manifest_and_log(self) -> None:
         args = argparse.Namespace(batch_id="batch01")
@@ -921,7 +959,7 @@ class StartCommandTests(unittest.TestCase):
         self.controller = _load_controller_module()
 
     def test_start_prepare_only_skips_writer_and_run(self) -> None:
-        args = argparse.Namespace(batch_id="batch03", prepare_only=True, writer_command=None)
+        args = argparse.Namespace(batch_id="batch03", prepare_only=True, write=False, writer_command=None)
         output = io.StringIO()
 
         with contextlib.redirect_stdout(output), \
@@ -936,19 +974,39 @@ class StartCommandTests(unittest.TestCase):
         mock_writer.assert_not_called()
         mock_run.assert_not_called()
         self.assertIn("prepare-only", output.getvalue())
-        self.assertIn("python _ops/controller.py check batch03", output.getvalue())
+        self.assertIn("python _ops/controller.py batch-review-done batch03 PASS --reviewer <name>", output.getvalue())
         self.assertIn("python _ops/controller.py run batch03", output.getvalue())
 
-    def test_start_no_longer_auto_promotes(self) -> None:
-        args = argparse.Namespace(batch_id="batch03", prepare_only=False, writer_command="writer --batch {batch_id}")
+    def test_start_defaults_to_prepare_mode_without_write_flag(self) -> None:
+        args = argparse.Namespace(batch_id="batch03", prepare_only=False, write=False, writer_command="writer --batch {batch_id}")
+        output = io.StringIO()
+
+        with contextlib.redirect_stdout(output), \
+             mock.patch.object(self.controller, "_prepare_batch_start",
+                               return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])) as mock_prepare, \
+             mock.patch.object(self.controller, "_run_writer_stage", return_value=0) as mock_writer, \
+             mock.patch.object(self.controller, "cmd_run", return_value=0) as mock_run:
+            result = self.controller.cmd_start(args)
+
+        self.assertEqual(result, 0)
+        mock_prepare.assert_called_once_with("batch03")
+        mock_writer.assert_not_called()
+        mock_run.assert_not_called()
+        text = output.getvalue()
+        self.assertIn("default prepare mode", text)
+        self.assertIn("python _ops/controller.py batch-review-done batch03 PASS --reviewer <name>", text)
+        self.assertIn("python _ops/controller.py run batch03", text)
+
+    def test_start_runs_writer_only_with_write_flag(self) -> None:
+        args = argparse.Namespace(batch_id="batch03", prepare_only=False, write=True, writer_command="writer --batch {batch_id}")
         output = io.StringIO()
 
         with contextlib.redirect_stdout(output), \
              mock.patch.object(self.controller, "_prepare_batch_start",
                                return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])) as mock_prepare, \
              mock.patch.object(self.controller, "_guard_quality_anchors", return_value=True), \
-             mock.patch.object(self.controller, "_run_smoke_lint_check", return_value=(True, {})) as mock_smoke, \
              mock.patch.object(self.controller, "_run_writer_stage", return_value=0) as mock_writer, \
+             mock.patch.object(self.controller, "_ensure_batch_review_artifacts", return_value={"status": "PENDING"}) as mock_review, \
              mock.patch.object(self.controller, "cmd_run", return_value=0) as mock_run:
             result = self.controller.cmd_start(args)
 
@@ -958,12 +1016,11 @@ class StartCommandTests(unittest.TestCase):
             mock_writer.call_args_list,
             [mock.call("batch03", ["EP-11", "EP-12"], writer_command="writer --batch {batch_id}", parallelism=1)],
         )
-        mock_smoke.assert_called_once_with("EP-11")
+        mock_review.assert_called_once_with("batch03", ["EP-11", "EP-12"], brief_path=Path("brief.md"))
         mock_run.assert_not_called()
         text = output.getvalue()
         self.assertIn("=== Writer Stage Complete ===", text)
-        self.assertIn("python _ops/controller.py check batch03", text)
-        self.assertIn("python _ops/controller.py run batch03", text)
+        self.assertIn("=== Review Packet Ready ===", text)
 
 
 class BatchReviewVerdictTests(unittest.TestCase):
@@ -1203,146 +1260,47 @@ class PromoteJournalTests(unittest.TestCase):
             self.assertTrue(journal["completed"])
             self.assertEqual(journal["published_episodes"], ["EP-01", "EP-02"])
 
-    def test_start_skips_verify_done_examples_for_unmapped_episodes(self) -> None:
-        args = argparse.Namespace(batch_id="batch03", prepare_only=False, writer_command="writer --batch {batch_id}")
-        output = io.StringIO()
-
-        with contextlib.redirect_stdout(output), \
-             mock.patch.object(self.controller, "_prepare_batch_start",
-                               return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])), \
-             mock.patch.object(self.controller, "_compute_verify_tiers",
-                               return_value=(["EP-11"], [], [], ["EP-12"])), \
-             mock.patch.object(self.controller, "_guard_quality_anchors", return_value=True), \
-             mock.patch.object(self.controller, "_run_smoke_lint_check", return_value=(True, {})), \
-             mock.patch.object(self.controller, "_run_writer_stage", return_value=0):
-            result = self.controller.cmd_start(args)
-
-        self.assertEqual(result, 0)
-        text = output.getvalue()
-        self.assertIn("python _ops/controller.py verify-done EP-11 PASS --tier FULL --batch batch03", text)
-        self.assertNotIn("python _ops/controller.py verify-done EP-12", text)
-        self.assertIn("⚠ Unmapped episodes: EP-12", text)
-
-    def test_start_retries_smoke_once_in_syntax_first_mode(self) -> None:
-        args = argparse.Namespace(batch_id="batch03", prepare_only=False, writer_command="writer --batch {batch_id}")
-        shell_fail = {
-            "checks": {"episode_failures": ["scene_count", "camera_count", "os_vo_count"]},
-            "totals": {"scene_count": 0, "camera_count": 0, "os_count": 0, "vo_count": 0},
-        }
-        output = io.StringIO()
-
-        with contextlib.redirect_stdout(output), \
-             mock.patch.object(self.controller, "_prepare_batch_start",
-                               return_value=(Path("brief.md"), {}, ["EP-11", "EP-12", "EP-13"])), \
-             mock.patch.object(self.controller, "_guard_quality_anchors", return_value=True), \
-             mock.patch.object(self.controller, "_run_smoke_lint_check", side_effect=[(False, shell_fail), (True, shell_fail)]) as mock_smoke, \
-             mock.patch.object(self.controller, "_run_writer_stage", return_value=0) as mock_writer, \
-             mock.patch.object(self.controller, "cmd_run", return_value=0) as mock_run:
-            result = self.controller.cmd_start(args)
-
-        self.assertEqual(result, 0)
-        self.assertEqual(
-            mock_writer.call_args_list,
-            [
-                mock.call("batch03", ["EP-11", "EP-12", "EP-13"], writer_command="writer --batch {batch_id}", parallelism=1),
-                mock.call(
-                    "batch03",
-                    ["EP-11", "EP-12", "EP-13"],
-                    writer_command="writer --batch {batch_id}",
-                    parallelism=1,
-                    syntax_first=True,
-                    force_rewrite=True,
-                ),
-            ],
-        )
-        self.assertEqual(mock_smoke.call_count, 2)
-        mock_run.assert_not_called()
-        self.assertIn("python _ops/controller.py check batch03", output.getvalue())
-
-    def test_start_stops_after_second_smoke_failure(self) -> None:
-        args = argparse.Namespace(batch_id="batch03", prepare_only=False, writer_command="writer --batch {batch_id}")
-        shell_fail = {
-            "checks": {"episode_failures": ["scene_count", "camera_count", "os_vo_count"]},
-            "totals": {"scene_count": 0, "camera_count": 0, "os_count": 0, "vo_count": 0},
-        }
+    def test_start_write_mode_runs_writer_once_without_smoke_retry(self) -> None:
+        args = argparse.Namespace(batch_id="batch03", prepare_only=False, write=True, writer_command="writer --batch {batch_id}")
 
         with mock.patch.object(self.controller, "_prepare_batch_start",
                                return_value=(Path("brief.md"), {}, ["EP-11", "EP-12", "EP-13"])), \
              mock.patch.object(self.controller, "_guard_quality_anchors", return_value=True), \
-             mock.patch.object(self.controller, "_run_smoke_lint_check", side_effect=[(False, shell_fail), (False, shell_fail)]), \
              mock.patch.object(self.controller, "_run_writer_stage", return_value=0) as mock_writer, \
              mock.patch.object(self.controller, "cmd_run") as mock_run:
             result = self.controller.cmd_start(args)
 
-        self.assertEqual(result, 1)
-        self.assertEqual(
-            mock_writer.call_args_list,
-            [
-                mock.call("batch03", ["EP-11", "EP-12", "EP-13"], writer_command="writer --batch {batch_id}", parallelism=1),
-                mock.call(
-                    "batch03",
-                    ["EP-11", "EP-12", "EP-13"],
-                    writer_command="writer --batch {batch_id}",
-                    parallelism=1,
-                    syntax_first=True,
-                    force_rewrite=True,
-                ),
-            ],
+        self.assertEqual(result, 0)
+        mock_writer.assert_called_once_with(
+            "batch03",
+            ["EP-11", "EP-12", "EP-13"],
+            writer_command="writer --batch {batch_id}",
+            parallelism=1,
         )
         mock_run.assert_not_called()
 
-    def test_start_retries_smoke_once_for_repairable_hookless_failures(self) -> None:
-        args = argparse.Namespace(batch_id="batch03", prepare_only=False, writer_command="writer --batch {batch_id}")
-        content_fail = {
-            "checks": {
-                "episode_failures": ["too_many_hookless_scenes"],
-                "scene_failures": [
-                    {"scene": 1, "title": "外", "failures": []},
-                    {"scene": 2, "title": "内", "failures": []},
-                    {"scene": 3, "title": "内", "failures": []},
-                ],
-            },
-            "scenes": [
-                {"ending_has_hook": False},
-                {"ending_has_hook": False},
-                {"ending_has_hook": True},
-            ],
-            "totals": {"scene_count": 3, "camera_count": 3, "os_count": 1, "vo_count": 0},
-        }
+    def test_start_write_mode_updates_status_to_review_pending(self) -> None:
+        args = argparse.Namespace(batch_id="batch03", prepare_only=False, write=True, writer_command="writer --batch {batch_id}")
         output = io.StringIO()
 
         with contextlib.redirect_stdout(output), \
              mock.patch.object(self.controller, "_prepare_batch_start",
                                return_value=(Path("brief.md"), {}, ["EP-11", "EP-12", "EP-13"])), \
              mock.patch.object(self.controller, "_guard_quality_anchors", return_value=True), \
-             mock.patch.object(self.controller, "_run_smoke_lint_check", side_effect=[(False, content_fail), (True, content_fail)]) as mock_smoke, \
              mock.patch.object(self.controller, "_run_writer_stage", return_value=0) as mock_writer, \
+             mock.patch.object(self.controller, "_ensure_batch_review_artifacts", return_value={"status": "PENDING"}), \
+             mock.patch.object(self.controller, "_upsert_batch_status") as mock_status, \
              mock.patch.object(self.controller, "cmd_run", return_value=0) as mock_run:
             result = self.controller.cmd_start(args)
 
         self.assertEqual(result, 0)
-        self.assertEqual(
-            mock_writer.call_args_list,
-            [
-                mock.call("batch03", ["EP-11", "EP-12", "EP-13"], writer_command="writer --batch {batch_id}", parallelism=1),
-                mock.call(
-                    "batch03",
-                    ["EP-11", "EP-12", "EP-13"],
-                    writer_command="writer --batch {batch_id}",
-                    parallelism=1,
-                    force_rewrite=True,
-                    lint_feedback=mock.ANY,
-                ),
-            ],
-        )
-        repair_feedback = mock_writer.call_args_list[1].kwargs["lint_feedback"]
-        self.assertIn("too_many_hookless_scenes", repair_feedback)
-        self.assertEqual(mock_smoke.call_count, 2)
+        mock_writer.assert_called_once()
+        self.assertEqual(mock_status.call_args.kwargs["phase"], "review_pending")
         mock_run.assert_not_called()
-        self.assertIn("lint-targeted", output.getvalue())
+        self.assertIn("=== Writer Stage Complete ===", output.getvalue())
 
     def test_start_stops_when_quality_anchors_are_pending(self) -> None:
-        args = argparse.Namespace(batch_id="batch03", prepare_only=False, writer_command="writer --batch {batch_id}")
+        args = argparse.Namespace(batch_id="batch03", prepare_only=False, write=True, writer_command="writer --batch {batch_id}")
 
         with mock.patch.object(self.controller, "_prepare_batch_start",
                                return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])), \
@@ -1354,29 +1312,7 @@ class PromoteJournalTests(unittest.TestCase):
         mock_writer.assert_not_called()
 
     def test_repairable_smoke_content_failure_only_allows_hookless_scenes(self) -> None:
-        payload = {
-            "checks": {
-                "episode_failures": ["too_many_hookless_scenes"],
-                "scene_failures": [],
-            },
-            "totals": {"scene_count": 2, "camera_count": 2, "os_count": 0, "vo_count": 0},
-            "scenes": [{"ending_has_hook": False}, {"ending_has_hook": True}],
-        }
-
-        self.assertTrue(self.controller._is_repairable_smoke_content_failure(payload))
-        feedback = self.controller._format_smoke_lint_feedback("EP-05", payload)
-        self.assertIn("too_many_hookless_scenes", feedback)
-
-    def test_repairable_smoke_content_failure_rejects_non_structural_failures(self) -> None:
-        payload = {
-            "checks": {
-                "episode_failures": ["first_person_narration"],
-                "scene_failures": [],
-            },
-            "totals": {"scene_count": 2, "camera_count": 2, "os_count": 0, "vo_count": 0},
-        }
-
-        self.assertFalse(self.controller._is_repairable_smoke_content_failure(payload))
+        self.assertEqual(self.controller.RULESET_VERSION, "reviewer-gate/v1")
 
 
 class WriterStageTests(unittest.TestCase):
@@ -1422,6 +1358,8 @@ class WriterStageTests(unittest.TestCase):
             output = io.StringIO()
 
             def fake_run(command, **kwargs):
+                self.assertEqual(kwargs.get("cwd"), root)
+                self.assertNotIn("shell", kwargs)
                 self.assertIn("batch03", command)
                 (drafts / "EP-11.md").write_text("generated", encoding="utf-8")
                 return subprocess.CompletedProcess(command, 0, stdout="writer ok\n", stderr="")
@@ -1446,8 +1384,9 @@ class WriterStageTests(unittest.TestCase):
             output = io.StringIO()
 
             def fake_run(command, **kwargs):
-                self.assertIn("--parallelism 3", command)
-                self.assertIn("--syntax-first", command)
+                command_text = " ".join(command)
+                self.assertIn("--parallelism 3", command_text)
+                self.assertIn("--syntax-first", command_text)
                 (drafts / "EP-11.md").write_text("generated", encoding="utf-8")
                 return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
@@ -1475,6 +1414,7 @@ class WriterStageTests(unittest.TestCase):
 
             def fake_run(command, **kwargs):
                 self.assertFalse(existing.exists())
+                self.assertIsInstance(command, list)
                 existing.write_text("new", encoding="utf-8")
                 return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
@@ -1492,6 +1432,201 @@ class WriterStageTests(unittest.TestCase):
                 self.assertEqual(existing.read_text(encoding="utf-8"), "new")
 
         self.assertEqual(result, 0)
+
+    def test_writer_stage_rejects_shell_metacharacters_in_command_template(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            drafts = root / "drafts" / "episodes"
+            drafts.mkdir(parents=True)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output), \
+                 mock.patch.object(self.controller, "ROOT", root), \
+                 mock.patch.object(self.controller, "DRAFTS", drafts), \
+                 mock.patch.object(self.controller.subprocess, "run") as mock_run:
+                result = self.controller._run_writer_stage(
+                    "batch03",
+                    ["EP-11"],
+                    writer_command="writer --batch {batch_id} && echo hi",
+                )
+
+        self.assertEqual(result, 1)
+        mock_run.assert_not_called()
+        self.assertIn("shell metacharacters", output.getvalue())
+
+
+class RecordStageTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.controller = _load_controller_module()
+
+    def test_record_auto_updates_state_and_marks_batch_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = root / "state"
+            locks = root / "locks"
+            batch_briefs = root / "batch-briefs"
+            batch_status_dir = root / "batch-status"
+            reviews = root / "reviews"
+            state.mkdir(parents=True)
+            locks.mkdir(parents=True)
+            batch_briefs.mkdir(parents=True)
+            batch_status_dir.mkdir(parents=True)
+            reviews.mkdir(parents=True)
+
+            brief_path = batch_briefs / "batch01_EP01-02.md"
+            brief_path.write_text(
+                "# Batch Brief: EP-01 ~ EP-02\n\n"
+                "- batch status: promoted\n"
+                "- owned episodes: EP-01, EP-02\n",
+                encoding="utf-8",
+            )
+            (batch_status_dir / "batch01.status.json").write_text(
+                json.dumps({"batch_id": "batch01", "phase": "promoted", "status": "ACTIVE"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            (reviews / "batch01.review.json").write_text(
+                json.dumps({"status": "PASS", "warning_families": ["opening_density"]}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(self.controller, "STATE", state), \
+                 mock.patch.object(self.controller, "LOCKS", locks), \
+                 mock.patch.object(self.controller, "BATCH_BRIEFS", batch_briefs), \
+                 mock.patch.object(self.controller, "BATCH_STATUS_DIR", batch_status_dir), \
+                 mock.patch.object(self.controller, "REVIEWS", reviews), \
+                 mock.patch.object(self.controller, "RUN_LOG", state / "run.log.md"), \
+                 mock.patch.object(self.controller, "BOOK_BLUEPRINT", root / "book.blueprint.md"), \
+                 mock.patch.object(self.controller, "SOURCE_MAP", root / "source.map.md"), \
+                 mock.patch.object(self.controller, "EPISODES", root / "episodes"), \
+                 mock.patch.object(self.controller, "_export_outputs", return_value={"episodes": 2}), \
+                 mock.patch.object(self.controller, "_parse_source_map", return_value={
+                     "batch01": {
+                         "episodes": ["EP-01", "EP-02"],
+                         "ep_start": "EP-01",
+                         "ep_end": "EP-02",
+                         "source_range": "ch1~ch2",
+                         "episode_data": {
+                             "EP-01": {
+                                 "source_span": "ch1",
+                                 "must_keep": "【动作】误认带回苏家；【关系】冷静拒认，切断期待",
+                                 "ending_function": "locked_in",
+                             },
+                             "EP-02": {
+                                 "source_span": "ch2",
+                                 "must_keep": "【动作】亲子鉴定坐实；【关系】说出不认这个家",
+                                 "ending_function": "confrontation_pending",
+                             },
+                         },
+                     },
+                     "batch02": {
+                         "episodes": ["EP-03"],
+                         "ep_start": "EP-03",
+                         "ep_end": "EP-03",
+                         "source_range": "ch3",
+                         "episode_data": {
+                             "EP-03": {"source_span": "ch3", "must_keep": "【钩子】公开掉马"}
+                         },
+                     },
+                 }), \
+                 mock.patch.object(self.controller, "_read_manifest", return_value={
+                     "source_file": "novel.md",
+                     "total_episodes": "20",
+                     "batch_size": "5",
+                 }):
+                rc = self.controller.cmd_record(argparse.Namespace(batch_id="batch01"))
+
+            self.assertEqual(rc, 0)
+            self.assertIn("batch01", (state / "script.progress.md").read_text(encoding="utf-8"))
+            self.assertIn("EP-01", (state / "story.state.md").read_text(encoding="utf-8"))
+            runtime = json.loads((batch_status_dir / "batch01.status.json").read_text(encoding="utf-8"))
+            self.assertEqual(runtime["phase"], "recorded")
+            self.assertEqual(runtime["status"], "DONE")
+
+    def test_record_done_accepts_already_recorded_batch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = root / "state"
+            locks = root / "locks"
+            batch_briefs = root / "batch-briefs"
+            batch_status_dir = root / "batch-status"
+            state.mkdir(parents=True)
+            locks.mkdir(parents=True)
+            batch_briefs.mkdir(parents=True)
+            batch_status_dir.mkdir(parents=True)
+
+            for name, content in self.controller._state_templates().items():
+                (state / name).write_text(content, encoding="utf-8")
+            brief_path = batch_briefs / "batch01_EP01-02.md"
+            brief_path.write_text("# Batch Brief\n- owned episodes: EP-01, EP-02\n", encoding="utf-8")
+            (batch_status_dir / "batch01.status.json").write_text(
+                json.dumps({"batch_id": "batch01", "phase": "recorded", "status": "DONE"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output), \
+                 mock.patch.object(self.controller, "STATE", state), \
+                 mock.patch.object(self.controller, "LOCKS", locks), \
+                 mock.patch.object(self.controller, "BATCH_BRIEFS", batch_briefs), \
+                 mock.patch.object(self.controller, "BATCH_STATUS_DIR", batch_status_dir):
+                rc = self.controller.cmd_record_done(argparse.Namespace(batch_id="batch01"))
+
+            self.assertEqual(rc, 0)
+            self.assertIn("Record already complete", output.getvalue())
+
+
+class OutputExportTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.controller = _load_controller_module()
+
+    def test_export_outputs_builds_human_facing_mirror(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episodes = root / "episodes"
+            drafts = root / "drafts" / "episodes"
+            reviews = root / "harness" / "project" / "reviews"
+            prompts = root / "harness" / "project" / "prompts"
+            briefs = root / "harness" / "project" / "batch-briefs"
+            state = root / "harness" / "project" / "state"
+            project = root / "harness" / "project"
+            output = root / "output"
+            for path in (episodes, drafts, reviews, prompts, briefs, state, project):
+                path.mkdir(parents=True, exist_ok=True)
+
+            (episodes / "EP-01.md").write_text("# EP-01\n", encoding="utf-8")
+            (episodes / "EP-01.meta.json").write_text("{}", encoding="utf-8")
+            (drafts / "EP-02.md").write_text("# EP-02\n", encoding="utf-8")
+            (reviews / "batch01.review.md").write_text("# review\n", encoding="utf-8")
+            (reviews / "batch01.review.json").write_text("{}", encoding="utf-8")
+            (reviews / "batch01.review.prompt.md").write_text("# review prompt\n", encoding="utf-8")
+            (prompts / "batch01.writer.batch.prompt.md").write_text("# writer prompt\n", encoding="utf-8")
+            (briefs / "batch01_EP01-05.md").write_text("# brief\n", encoding="utf-8")
+            (project / "book.blueprint.md").write_text("# blueprint\n", encoding="utf-8")
+            (project / "source.map.md").write_text("# source\n", encoding="utf-8")
+            (project / "run.manifest.md").write_text("# manifest\n", encoding="utf-8")
+            (state / "story.state.md").write_text("# story\n", encoding="utf-8")
+            (root / "character.md").write_text("# character\n", encoding="utf-8")
+            (root / "voice-anchor.md").write_text("# voice\n", encoding="utf-8")
+
+            with mock.patch.object(self.controller, "ROOT", root), \
+                 mock.patch.object(self.controller, "OUTPUT", output), \
+                 mock.patch.object(self.controller, "EPISODES", episodes), \
+                 mock.patch.object(self.controller, "DRAFTS", drafts), \
+                 mock.patch.object(self.controller, "REVIEWS", reviews), \
+                 mock.patch.object(self.controller, "PROMPTS", prompts), \
+                 mock.patch.object(self.controller, "BATCH_BRIEFS", briefs), \
+                 mock.patch.object(self.controller, "STATE", state), \
+                 mock.patch.object(self.controller, "BOOK_BLUEPRINT", project / "book.blueprint.md"), \
+                 mock.patch.object(self.controller, "SOURCE_MAP", project / "source.map.md"), \
+                 mock.patch.object(self.controller, "RUN_MANIFEST", project / "run.manifest.md"):
+                stats = self.controller._export_outputs()
+
+            self.assertEqual(stats["episodes"], 1)
+            self.assertTrue((output / "episodes" / "EP-01.md").exists())
+            self.assertFalse((output / "episodes" / "EP-01.meta.json").exists())
+            self.assertTrue((output / "drafts" / "EP-02.md").exists())
+            self.assertTrue((output / "prompts" / "batch01.writer.batch.prompt.md").exists())
+            self.assertTrue((output / "prompts" / "batch01.review.prompt.md").exists())
+            self.assertTrue((output / "anchors" / "character.md").exists())
+            self.assertIn("python _ops/controller.py export", (output / "README.md").read_text(encoding="utf-8"))
 
 
 class WriterCommandConfigTests(unittest.TestCase):
@@ -1527,6 +1662,7 @@ class WriterCommandConfigTests(unittest.TestCase):
                 novel_file="novel.md",
                 episodes=None,
                 batch_size=2,
+                target_total_minutes=50,
                 strategy="original_fidelity",
                 intensity="light",
                 key_episodes="",
@@ -1558,6 +1694,7 @@ class WriterCommandConfigTests(unittest.TestCase):
             self.assertIn("total_episodes: pending_model_recommendation", content)
             self.assertIn("recommended_total_episodes: pending_book_extraction", content)
             self.assertIn("episode_count_source: model_recommended", content)
+            self.assertIn("target_total_minutes: 50", content)
             self.assertIn("target_episode_minutes: 2", content)
             self.assertIn("episode_minutes_min: 1", content)
             self.assertIn("episode_minutes_max: 3", content)
@@ -1574,6 +1711,65 @@ class WriterCommandConfigTests(unittest.TestCase):
             self.assertIn("mapping_status: pending_book_extraction", source_map_content)
             self.assertIn("total_episodes: pending_model_recommendation", source_map_content)
             self.assertIn("total_batches: pending_total_episodes", source_map_content)
+            self.assertIn("target_total_minutes: 50", source_map_content)
+
+    def test_init_prompts_for_episode_count_on_interactive_terminal(self) -> None:
+        class TtyInput(io.StringIO):
+            def isatty(self) -> bool:
+                return True
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            novel = root / "novel.md"
+            novel.write_text("# 第1章 初见\n内容\n", encoding="utf-8")
+            harness = root / "harness"
+            project = harness / "project"
+            state = project / "state"
+            locks = project / "locks"
+            drafts = root / "drafts" / "episodes"
+            episodes = root / "episodes"
+            batch_briefs = project / "batch-briefs"
+            book_blueprint = project / "book.blueprint.md"
+            run_manifest = project / "run.manifest.md"
+            run_log = state / "run.log.md"
+            source_map = project / "source.map.md"
+            for path in [state, locks, drafts, episodes, batch_briefs]:
+                path.mkdir(parents=True, exist_ok=True)
+
+            args = argparse.Namespace(
+                novel_file="novel.md",
+                episodes=None,
+                batch_size=5,
+                target_total_minutes=60,
+                strategy="original_fidelity",
+                intensity="light",
+                key_episodes="",
+                force=False,
+            )
+            with contextlib.redirect_stdout(io.StringIO()), \
+                 mock.patch.object(self.controller.sys, "stdin", TtyInput("30集\n")), \
+                 mock.patch.object(self.controller, "ROOT", root), \
+                 mock.patch.object(self.controller, "HARNESS", harness), \
+                 mock.patch.object(self.controller, "PROJECT", project), \
+                 mock.patch.object(self.controller, "STATE", state), \
+                 mock.patch.object(self.controller, "LOCKS", locks), \
+                 mock.patch.object(self.controller, "DRAFTS", drafts), \
+                 mock.patch.object(self.controller, "EPISODES", episodes), \
+                 mock.patch.object(self.controller, "BATCH_BRIEFS", batch_briefs), \
+                 mock.patch.object(self.controller, "BOOK_BLUEPRINT", book_blueprint), \
+                 mock.patch.object(self.controller, "RUN_MANIFEST", run_manifest), \
+                 mock.patch.object(self.controller, "RUN_LOG", run_log), \
+                 mock.patch.object(self.controller, "SOURCE_MAP", source_map), \
+                 mock.patch.object(self.controller, "_has_existing_project", return_value=False), \
+                 mock.patch.object(self.controller, "_backup_project", return_value=None), \
+                 mock.patch.object(self.controller, "_append_log"):
+                result = self.controller.cmd_init(args)
+
+            self.assertEqual(result, 0)
+            content = run_manifest.read_text(encoding="utf-8")
+            self.assertIn("total_episodes: 30", content)
+            self.assertIn("episode_count_source: manual_override", content)
+            self.assertIn("target_total_minutes: 60", content)
 
 
 class BookPipelineCommandTests(unittest.TestCase):
@@ -1703,6 +1899,34 @@ class BookPipelineCommandTests(unittest.TestCase):
             self.assertIn("total_episodes: 48", content)
             self.assertIn("recommended_total_episodes: 48", content)
             self.assertIn("episode_count_source: model_recommended", content)
+
+    def test_extract_book_sync_accepts_final_count_without_top_level_recommendation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            blueprint = root / "book.blueprint.md"
+            manifest = root / "run.manifest.md"
+            blueprint.write_text(
+                "# Book Blueprint\n"
+                "- extraction_status: extracted\n"
+                "\n## 集数建议\n"
+                "- 最终采用：约20（建议）\n",
+                encoding="utf-8",
+            )
+            manifest.write_text(
+                "- total_episodes: pending_model_recommendation\n"
+                "- recommended_total_episodes: pending_book_extraction\n"
+                "- episode_count_source: model_recommended\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(self.controller, "BOOK_BLUEPRINT", blueprint), \
+                 mock.patch.object(self.controller, "RUN_MANIFEST", manifest):
+                recommended = self.controller._sync_recommended_episode_count_from_blueprint()
+
+            self.assertEqual(recommended, 20)
+            content = manifest.read_text(encoding="utf-8")
+            self.assertIn("total_episodes: 20", content)
+            self.assertIn("recommended_total_episodes: 20", content)
 
     def test_extract_book_skips_when_blueprint_already_complete(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1900,7 +2124,7 @@ class SourceMapParsingTests(unittest.TestCase):
 
         self.assertIn("batch01", parsed)
         self.assertEqual(parsed["batch01"]["episodes"], ["EP-01", "EP-02"])
-        self.assertEqual(parsed["batch01"]["episode_data"]["EP-02"]["ending_type"], "前推力")
+        self.assertEqual(parsed["batch01"]["episode_data"]["EP-02"]["ending_function"], "")
 
     def test_compute_verify_tiers_supports_current_fixture_format(self) -> None:
         fixture = FIXTURES / "source_map.current.md"
@@ -1939,13 +2163,14 @@ class CleanCommandTests(unittest.TestCase):
             drafts = root / "drafts" / "episodes"
             episodes = root / "episodes"
             batch_briefs = project / "batch-briefs"
+            reviews = project / "reviews"
             releases = project / "releases"
             run_manifest = project / "run.manifest.md"
             run_log = state / "run.log.md"
             source_map = project / "source.map.md"
             release_index = releases / "release.index.json"
             gold_set = releases / "gold-set.json"
-            for path in [state, locks, drafts, episodes, batch_briefs, releases]:
+            for path in [state, locks, drafts, episodes, batch_briefs, reviews, releases]:
                 path.mkdir(parents=True, exist_ok=True)
 
             (drafts / "EP-01.md").write_text("draft", encoding="utf-8")
@@ -1987,6 +2212,7 @@ class CleanCommandTests(unittest.TestCase):
                  mock.patch.object(self.controller, "DRAFTS", drafts), \
                  mock.patch.object(self.controller, "EPISODES", episodes), \
                  mock.patch.object(self.controller, "BATCH_BRIEFS", batch_briefs), \
+                 mock.patch.object(self.controller, "REVIEWS", reviews), \
                  mock.patch.object(self.controller, "RUN_MANIFEST", run_manifest), \
                  mock.patch.object(self.controller, "RUN_LOG", run_log), \
                  mock.patch.object(self.controller, "SOURCE_MAP", source_map), \
@@ -2450,40 +2676,7 @@ class StatusGoldDisplayTests(unittest.TestCase):
             text = output.getvalue()
             self.assertIn("=== Current Blocker: batch01 ===", text)
             self.assertIn("batch review artifact missing", text)
-            self.assertIn("python _ops/controller.py batch-review batch01", text)
-
-
-class LintPayloadTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.controller = _load_controller_module()
-
-    def test_lint_payload_treats_warning_only_episode_as_pass(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            drafts = Path(tmp) / "drafts" / "episodes"
-            drafts.mkdir(parents=True)
-            (drafts / "EP-11.md").write_text("draft", encoding="utf-8")
-            payload = {
-                "status": "warn",
-                "checks": {
-                    "episode_failures": [],
-                    "scene_failures": [{"scene": 1, "title": "书房", "failures": []}],
-                    "warnings": ["hookless_final_scene"],
-                },
-                "totals": {"scene_count": 2},
-            }
-            completed = subprocess.CompletedProcess(
-                args=["python"],
-                returncode=0,
-                stdout=json.dumps(payload, ensure_ascii=False),
-                stderr="",
-            )
-
-            with mock.patch.object(self.controller, "DRAFTS", drafts), \
-                 mock.patch.object(self.controller.subprocess, "run", return_value=completed):
-                is_pass, data = self.controller._lint_episode_payload("EP-11")
-
-        self.assertTrue(is_pass)
-        self.assertEqual(data["status"], "warn")
+            self.assertIn("python _ops/controller.py check batch01", text)
 
 
 class BatchBriefAuthoringTests(unittest.TestCase):
@@ -2501,7 +2694,7 @@ class BatchBriefAuthoringTests(unittest.TestCase):
                     "source_span": "ch1",
                     "must_keep": "【信息】误认 -> 【关系】拒认 -> 【动作】带走 -> 【钩子】卷入",
                     "must_not": "不能提前认亲",
-                    "ending_type": "身份钩子",
+                    "ending_function": "reveal_pending",
                 }
             },
         }
@@ -2510,11 +2703,471 @@ class BatchBriefAuthoringTests(unittest.TestCase):
             brief = self.controller._generate_batch_brief("batch01", batch_info)
 
         self.assertIn("## Writer Authority", brief)
-        self.assertIn("功能目标", brief)
-        self.assertIn("ending function", brief)
+        self.assertIn("收尾上下文", brief)
         self.assertIn("`harness/project/source.map.md`：决定 source 顺序、must-not-add、must-not-jump 边界", brief)
         self.assertNotIn("## Source Priority", brief)
+        self.assertNotIn("## Function Policy", brief)
+        self.assertNotIn("功能目标", brief)
 
+
+def _override_test_verify_plan_cli_removed(self) -> None:
+    root = self._make_cli_workspace()
+    result = subprocess.run(
+        [sys.executable, str(root / "_ops" / "controller.py"), "verify-plan", "batch01"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    self.assertNotEqual(result.returncode, 0)
+    self.assertIn("invalid choice", result.stderr)
+
+
+def _override_test_compute_review_focus_generated_markdown(self) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        source_map = Path(tmp) / "source.map.md"
+        source_map.write_text(
+            "# Source Map\n\n"
+            "### EP-01\n"
+            "**source_chapter_span**: ch1\n"
+            "**must_keep_beats**:\n- 【信息】误认\n- 【动作】带走\n- 【钩子】卷入\n\n"
+            "### EP-02\n"
+            "**source_chapter_span**: ch2\n"
+            "**must_keep_beats**:\n- 【信息】入局\n- 【动作】对抗\n- 【钩子】升级\n",
+            encoding="utf-8",
+        )
+        with mock.patch.object(self.controller, "SOURCE_MAP", source_map), \
+             mock.patch.object(self.controller, "_read_manifest", return_value={"key_episodes": "EP-01"}):
+            focus = self.controller._compute_review_focus(["EP-01", "EP-02"])
+    self.assertEqual(focus["deep"], ["EP-01"])
+    self.assertEqual(focus["standard"], ["EP-02"])
+    self.assertEqual(focus["light"], [])
+    self.assertEqual(focus["unmapped"], [])
+
+
+def _override_test_prepare_batch_start_reads_generated_brief_before_status_sync(self) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        batch_briefs = root / "batch-briefs"
+        source_map = root / "source.map.md"
+        batch_briefs.mkdir(parents=True, exist_ok=True)
+        source_map.write_text("# Source Map\n", encoding="utf-8")
+        batch_info = {
+            "episodes": ["EP-01", "EP-02"],
+            "ep_start": "EP-01",
+            "ep_end": "EP-02",
+            "batch_num": "01",
+            "source_range": "ch1 ~ ch2",
+            "episode_data": {
+                "EP-01": {"source_span": "ch1", "must_keep": "【信息】误认", "must_not": "", "ending_function": "confrontation_pending"},
+                "EP-02": {"source_span": "ch2", "must_keep": "【动作】入局", "must_not": "", "ending_function": "confrontation_pending"},
+            },
+        }
+        status_updates: list[dict[str, object]] = []
+        with mock.patch.object(self.controller, "SOURCE_MAP", source_map), \
+             mock.patch.object(self.controller, "BATCH_BRIEFS", batch_briefs), \
+             mock.patch.object(self.controller, "_book_blueprint_quality_issues", return_value=[]), \
+             mock.patch.object(self.controller, "_source_map_quality_issues", return_value=[]), \
+             mock.patch.object(self.controller, "_parse_source_map", return_value={"batch01": batch_info}), \
+             mock.patch.object(self.controller, "_is_locked", return_value=False), \
+             mock.patch.object(self.controller, "_find_batch_brief", return_value=None), \
+             mock.patch.object(self.controller, "_generate_batch_brief", return_value="# Batch Brief\n- owned episodes: EP-01, EP-02\n"), \
+             mock.patch.object(self.controller, "_read_batch_brief", return_value={"episodes": ["EP-01", "EP-02"]}), \
+             mock.patch.object(self.controller, "_set_batch_status"), \
+             mock.patch.object(self.controller, "_write_lock"), \
+             mock.patch.object(self.controller, "_set_manifest_field"), \
+             mock.patch.object(self.controller, "_append_log"), \
+             mock.patch.object(self.controller, "_clear_retry_count"), \
+             mock.patch.object(self.controller, "_compute_review_focus", return_value={"deep": ["EP-01"], "standard": ["EP-02"], "light": [], "unmapped": []}), \
+             mock.patch.object(
+                 self.controller,
+                 "_upsert_batch_status",
+                 side_effect=lambda batch_id, **kwargs: status_updates.append({"batch_id": batch_id, **kwargs}),
+             ):
+            prepared = self.controller._prepare_batch_start("batch01")
+            self.assertIsNotNone(prepared)
+            brief_path, _, episodes = prepared
+            self.assertTrue(brief_path.exists())
+            self.assertEqual(episodes, ["EP-01", "EP-02"])
+            self.assertGreaterEqual(len(status_updates), 2)
+            self.assertEqual(status_updates[0]["episodes"], ["EP-01", "EP-02"])
+            self.assertEqual(status_updates[1]["episodes"], ["EP-01", "EP-02"])
+
+
+def _override_test_check_uses_batch_review_cli(self) -> None:
+    args = argparse.Namespace(batch_id="batch01")
+    with mock.patch.object(self.controller, "_resolve_batch", return_value=(Path("brief.md"), {}, ["EP-01"])), \
+         mock.patch.object(self.controller, "_upsert_batch_status") as mock_status, \
+         mock.patch.object(self.controller, "cmd_batch_review", return_value=0) as mock_review:
+        result = self.controller.cmd_check(args)
+    self.assertEqual(result, 0)
+    mock_review.assert_called_once_with(args)
+    mock_status.assert_called_once()
+    self.assertEqual(mock_status.call_args.kwargs["phase"], "review_pending")
+    self.assertEqual(mock_status.call_args.kwargs["batch_review_status"], "PENDING")
+
+
+def _override_test_promote_uses_batch_id_for_manifest_and_log(self) -> None:
+    args = argparse.Namespace(batch_id="batch01")
+    with mock.patch.object(self.controller, "_resolve_batch", return_value=(Path("brief.md"), {}, ["EP-01"])), \
+         mock.patch.object(self.controller, "_require_batch_review_pass", return_value=(True, "")), \
+         mock.patch.object(self.controller, "_is_locked", return_value=False), \
+         mock.patch.object(self.controller, "_promote_batch", return_value=(0, {})) as mock_promote, \
+         mock.patch.object(self.controller, "_set_batch_status"), \
+         mock.patch.object(self.controller, "_upsert_batch_status"), \
+         mock.patch.object(self.controller, "_set_manifest_field") as mock_manifest, \
+         mock.patch.object(self.controller, "_write_lock"), \
+         mock.patch.object(self.controller, "_append_log") as mock_log, \
+         mock.patch.object(self.controller, "_clear_retry_count"), \
+         mock.patch.object(self.controller, "_export_outputs", return_value={"episodes": 1}):
+        result = self.controller.cmd_promote(args)
+    self.assertEqual(result, 0)
+    mock_promote.assert_called_once_with("batch01", Path("brief.md"), ["EP-01"])
+    mock_manifest.assert_called_once_with("active_batch", "batch01_promoted")
+    self.assertEqual(mock_log.call_args.args[0], "batch01")
+
+
+def _override_test_metadata_reads_review_fields(self) -> None:
+    with mock.patch.object(self.controller, "_read_batch_review", return_value={"status": "PASS", "reviewer": "codex", "warning_families": ["imagery_dense"]}):
+        meta = self.controller._build_episode_metadata(
+            episode="EP-01",
+            batch_id="batch01",
+            brief_path=Path("brief.md"),
+        )
+    self.assertEqual(meta["review_status"], "PASS")
+    self.assertEqual(meta["reviewer"], "codex")
+    self.assertEqual(meta["warnings"], ["imagery_dense"])
+
+
+def _override_test_metadata_handles_empty_review(self) -> None:
+    with mock.patch.object(self.controller, "_read_batch_review", return_value=None):
+        meta = self.controller._build_episode_metadata(
+            episode="EP-01",
+            batch_id="batch01",
+            brief_path=Path("brief.md"),
+        )
+    self.assertEqual(meta["review_status"], "MISSING")
+    self.assertEqual(meta["reviewer"], "")
+    self.assertEqual(meta["warnings"], [])
+
+
+def _override_test_promote_batch_writes_completed_journal(self) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        project = root / "harness" / "project"
+        releases = project / "releases"
+        journals = releases / "journals"
+        staging = releases / "staging"
+        drafts = root / "drafts" / "episodes"
+        published = root / "episodes"
+        brief = project / "batch-briefs" / "batch01_EP01-05.md"
+        for path in [journals, staging, drafts, published, brief.parent]:
+            path.mkdir(parents=True, exist_ok=True)
+        (drafts / "EP-01.md").write_text("draft one", encoding="utf-8")
+        brief.write_text("# brief", encoding="utf-8")
+        with mock.patch.object(self.controller, "ROOT", root), \
+             mock.patch.object(self.controller, "PROJECT", project), \
+             mock.patch.object(self.controller, "RELEASES", releases), \
+             mock.patch.object(self.controller, "RELEASE_JOURNALS", journals), \
+             mock.patch.object(self.controller, "RELEASE_INDEX", releases / "release.index.json"), \
+             mock.patch.object(self.controller, "GOLD_SET", releases / "gold-set.json"), \
+             mock.patch.object(self.controller, "DRAFTS", drafts), \
+             mock.patch.object(self.controller, "EPISODES", published), \
+             mock.patch.object(self.controller, "NOW", "2026-04-19 20:10"), \
+             mock.patch.object(self.controller, "_read_batch_review", return_value={"status": "PASS", "reviewer": "codex", "warning_families": []}):
+            rc, _ = self.controller._promote_batch("batch01", brief, ["EP-01"])
+        self.assertEqual(rc, 0)
+        self.assertTrue((published / "EP-01.md").exists())
+        self.assertTrue((published / "EP-01.meta.json").exists())
+        journal = json.loads((journals / "batch01.promote.json").read_text(encoding="utf-8"))
+        self.assertTrue(journal["completed"])
+        self.assertEqual(journal["phase"], "completed")
+        self.assertEqual(journal["published_episodes"], ["EP-01"])
+
+
+def _override_test_promote_batch_resumes_from_partial_journal(self) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        project = root / "harness" / "project"
+        releases = project / "releases"
+        journals = releases / "journals"
+        stage_root = releases / "staging" / "batch01-resume"
+        drafts = root / "drafts" / "episodes"
+        published = root / "episodes"
+        brief = project / "batch-briefs" / "batch01_EP01-05.md"
+        for path in [journals, stage_root, drafts, published, brief.parent]:
+            path.mkdir(parents=True, exist_ok=True)
+        brief.write_text("# brief", encoding="utf-8")
+        (drafts / "EP-01.md").write_text("draft one", encoding="utf-8")
+        (drafts / "EP-02.md").write_text("draft two", encoding="utf-8")
+        (published / "EP-01.md").write_text("published one", encoding="utf-8")
+        (published / "EP-01.meta.json").write_text("{}", encoding="utf-8")
+        (stage_root / "EP-02.md").write_text("draft two", encoding="utf-8")
+        (stage_root / "EP-02.meta.json").write_text("{}", encoding="utf-8")
+        (stage_root / "release.index.json").write_text(
+            json.dumps({"episodes": {"EP-01": {"release_status": "gold"}, "EP-02": {"release_status": "gold"}}}),
+            encoding="utf-8",
+        )
+        (stage_root / "gold-set.json").write_text(json.dumps({"episodes": ["EP-01", "EP-02"]}), encoding="utf-8")
+        (journals / "batch01.promote.json").write_text(
+            json.dumps(
+                {
+                    "batch_id": "batch01",
+                    "episodes": ["EP-01", "EP-02"],
+                    "phase": "publishing",
+                    "completed": False,
+                    "stage_root": "harness/project/releases/staging/batch01-resume",
+                    "staged_episode_files": {
+                        "EP-01": "harness/project/releases/staging/batch01-resume/EP-01.md",
+                        "EP-02": "harness/project/releases/staging/batch01-resume/EP-02.md",
+                    },
+                    "staged_meta_files": {
+                        "EP-01": "harness/project/releases/staging/batch01-resume/EP-01.meta.json",
+                        "EP-02": "harness/project/releases/staging/batch01-resume/EP-02.meta.json",
+                    },
+                    "staged_release_index": "harness/project/releases/staging/batch01-resume/release.index.json",
+                    "staged_gold_set": "harness/project/releases/staging/batch01-resume/gold-set.json",
+                    "published_episodes": ["EP-01"],
+                    "release_files_written": False,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        with mock.patch.object(self.controller, "ROOT", root), \
+             mock.patch.object(self.controller, "PROJECT", project), \
+             mock.patch.object(self.controller, "RELEASES", releases), \
+             mock.patch.object(self.controller, "RELEASE_JOURNALS", journals), \
+             mock.patch.object(self.controller, "RELEASE_INDEX", releases / "release.index.json"), \
+             mock.patch.object(self.controller, "GOLD_SET", releases / "gold-set.json"), \
+             mock.patch.object(self.controller, "DRAFTS", drafts), \
+             mock.patch.object(self.controller, "EPISODES", published), \
+             mock.patch.object(self.controller, "NOW", "2026-04-19 20:11"):
+            rc, _ = self.controller._promote_batch("batch01", brief, ["EP-01", "EP-02"])
+        self.assertEqual(rc, 0)
+        self.assertTrue((published / "EP-02.md").exists())
+        journal = json.loads((journals / "batch01.promote.json").read_text(encoding="utf-8"))
+        self.assertTrue(journal["completed"])
+        self.assertEqual(journal["published_episodes"], ["EP-01", "EP-02"])
+
+
+def _override_test_start_review_only(self) -> None:
+    args = argparse.Namespace(batch_id="batch03", prepare_only=False, write=True, writer_command="writer --batch {batch_id}")
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output), \
+         mock.patch.object(self.controller, "_prepare_batch_start", return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])), \
+         mock.patch.object(self.controller, "_sync_state_from_blueprint", return_value=[]), \
+         mock.patch.object(self.controller, "_compute_review_focus", return_value={"deep": ["EP-11"], "standard": ["EP-12"], "light": [], "unmapped": []}), \
+         mock.patch.object(self.controller, "_guard_quality_anchors", return_value=True), \
+         mock.patch.object(self.controller, "_run_writer_stage", return_value=0) as mock_writer, \
+         mock.patch.object(self.controller, "_ensure_batch_review_artifacts", return_value={"status": "PENDING"}) as mock_review, \
+         mock.patch.object(self.controller, "_upsert_batch_status") as mock_status:
+        result = self.controller.cmd_start(args)
+    self.assertEqual(result, 0)
+    mock_writer.assert_called_once_with("batch03", ["EP-11", "EP-12"], writer_command="writer --batch {batch_id}", parallelism=1)
+    mock_review.assert_called_once_with("batch03", ["EP-11", "EP-12"], brief_path=Path("brief.md"))
+    self.assertEqual(mock_status.call_args.kwargs["phase"], "review_pending")
+    text = output.getvalue()
+    self.assertIn("python _ops/controller.py batch-review-done batch03 PASS --reviewer <name>", text)
+    self.assertNotIn("verify-done", text)
+    self.assertNotIn("smoke", text.lower())
+
+
+def _override_test_run_review_gate_only(self) -> None:
+    args = argparse.Namespace(batch_id="batch03")
+    with mock.patch.object(self.controller, "_resolve_batch", return_value=(Path("brief.md"), {}, ["EP-11"])), \
+         mock.patch.object(self.controller, "_require_batch_review_pass", return_value=(True, "")), \
+         mock.patch.object(self.controller, "_do_promote_and_report", return_value=0) as mock_promote:
+        result = self.controller.cmd_run(args)
+    self.assertEqual(result, 0)
+    mock_promote.assert_called_once_with("batch03", Path("brief.md"), ["EP-11"])
+
+
+def _override_test_run_batch_review_missing(self) -> None:
+    args = argparse.Namespace(batch_id="batch03")
+    with mock.patch.object(self.controller, "_resolve_batch", return_value=(Path("brief.md"), {}, ["EP-11"])), \
+         mock.patch.object(self.controller, "_require_batch_review_pass", return_value=(False, "ERROR: batch review artifact missing")):
+        result = self.controller.cmd_run(args)
+    self.assertEqual(result, 1)
+
+
+def _override_test_legacy_verify_helpers_removed(self) -> None:
+    for attr in [
+        "_run_lint_gate",
+        "_run_verify_gate",
+        "_run_smoke_lint_check",
+        "_read_verify_result",
+        "_write_verify_result",
+        "_verify_draft_integrity",
+        "_compute_verify_tiers",
+        "_verify_tier_for_episode",
+        "cmd_verify_done",
+        "cmd_source_compare_done",
+        "cmd_lint",
+        "cmd_gate",
+        "cmd_retry",
+        "cmd_verify_plan",
+    ]:
+        self.assertFalse(hasattr(self.controller, attr), attr)
+
+
+def _override_test_function_metadata_normalization_defaults_without_text_guessing(self) -> None:
+    normalized = self.controller._normalize_episode_function_metadata(
+        "EP-01",
+        {
+            "must_keep": "【信息】误认；【动作】强行带走；【钩子】卷入漩涡",
+        },
+    )
+    self.assertEqual(normalized["ending_function"], "")
+    self.assertNotIn("irreversibility_level", normalized)
+    self.assertNotIn("function_signals", normalized)
+    source = Path(self.controller.__file__).read_text(encoding="utf-8")
+    self.assertNotIn("def _infer_function_name_from_text", source)
+    self.assertNotIn("误认\", \"错认\", \"闯\"", source)
+
+
+ControllerCliSmokeTests.test_verify_plan_cli_prints_batch_header = _override_test_verify_plan_cli_removed
+
+ControllerHandlerRegressionTests.test_compute_verify_tiers_supports_generated_markdown_format = _override_test_compute_review_focus_generated_markdown
+ControllerHandlerRegressionTests.test_prepare_batch_start_reads_generated_brief_before_status_sync = _override_test_prepare_batch_start_reads_generated_brief_before_status_sync
+ControllerHandlerRegressionTests.test_check_uses_batch_id_in_verify_done_instructions = _override_test_check_uses_batch_review_cli
+ControllerHandlerRegressionTests.test_promote_uses_batch_id_for_manifest_and_log = _override_test_promote_uses_batch_id_for_manifest_and_log
+
+PromoteJournalTests.test_promote_batch_writes_completed_journal = _override_test_promote_batch_writes_completed_journal
+PromoteJournalTests.test_promote_batch_resumes_from_partial_journal = _override_test_promote_batch_resumes_from_partial_journal
+PromoteJournalTests.test_start_skips_verify_done_examples_for_unmapped_episodes = _override_test_start_review_only
+PromoteJournalTests.test_start_retries_smoke_once_in_syntax_first_mode = _override_test_start_review_only
+PromoteJournalTests.test_start_stops_after_second_smoke_failure = _override_test_start_review_only
+PromoteJournalTests.test_start_retries_smoke_once_for_repairable_hookless_failures = _override_test_start_review_only
+
+RunCommandTests.test_run_missing_verify_fails = _override_test_legacy_verify_helpers_removed
+RunCommandTests.test_run_verify_fail_fails = _override_test_legacy_verify_helpers_removed
+RunCommandTests.test_run_source_compare_fail_fails = _override_test_legacy_verify_helpers_removed
+RunCommandTests.test_run_stale_verify_hash_fails = _override_test_legacy_verify_helpers_removed
+RunCommandTests.test_run_does_not_write_verify_pass = _override_test_run_review_gate_only
+RunCommandTests.test_verify_done_records_aligner_only_until_source_compare_arrives = _override_test_legacy_verify_helpers_removed
+RunCommandTests.test_source_compare_done_completes_overall_verify_status = _override_test_legacy_verify_helpers_removed
+RunCommandTests.test_verify_done_persists_note_and_evidence_refs = _override_test_legacy_verify_helpers_removed
+RunCommandTests.test_run_fails_on_lint_failure = _override_test_legacy_verify_helpers_removed
+RunCommandTests.test_run_fails_when_batch_review_missing = _override_test_run_batch_review_missing
+RunCommandTests.test_promote_fails_when_batch_review_is_not_pass = _override_test_run_batch_review_missing
+
+StartCommandTests.test_start_no_longer_auto_promotes = _override_test_start_review_only
+
+SourceMapParsingTests.test_compute_verify_tiers_supports_current_fixture_format = _override_test_compute_review_focus_generated_markdown
+SourceMapParsingTests.test_compute_verify_tiers_supports_legacy_fixture_format = _override_test_compute_review_focus_generated_markdown
+
+VerifyIntegrityTests.test_brief_change_invalidates_verify = _override_test_legacy_verify_helpers_removed
+VerifyIntegrityTests.test_source_map_change_invalidates_verify = _override_test_legacy_verify_helpers_removed
+VerifyIntegrityTests.test_unchanged_passes = _override_test_legacy_verify_helpers_removed
+VerifyDoneBriefFailureTests.test_write_verify_result_no_brief_no_crash = _override_test_legacy_verify_helpers_removed
+
+MetadataLintFieldTests.test_metadata_reads_checks_subkeys = _override_test_metadata_reads_review_fields
+MetadataLintFieldTests.test_metadata_handles_empty_lint = _override_test_metadata_handles_empty_review
+ControllerHandlerRegressionTests.test_function_metadata_normalization_defaults_without_text_guessing = _override_test_function_metadata_normalization_defaults_without_text_guessing
+
+
+def _override_test_model_cli_execution_removed_from_controller(self) -> None:
+    source = Path(self.controller.__file__).read_text(encoding="utf-8")
+    self.assertFalse(hasattr(self.controller, "subprocess"))
+    self.assertNotIn("writer_command", source)
+    self.assertNotIn("JUBEN_WRITER_COMMAND", source)
+    self.assertNotIn("subprocess.run", source)
+
+
+def _override_test_start_review_only_prompt_packet(self) -> None:
+    args = argparse.Namespace(batch_id="batch03", prepare_only=False, write=True)
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output), \
+         mock.patch.object(self.controller, "_prepare_batch_start", return_value=(Path("brief.md"), {}, ["EP-11", "EP-12"])), \
+         mock.patch.object(self.controller, "_sync_state_from_blueprint", return_value=[]), \
+         mock.patch.object(self.controller, "_compute_review_focus", return_value={"deep": ["EP-11"], "standard": ["EP-12"], "light": [], "unmapped": []}), \
+         mock.patch.object(self.controller, "_guard_quality_anchors", return_value=True), \
+         mock.patch.object(self.controller, "_run_writer_stage", return_value=0) as mock_writer, \
+         mock.patch.object(self.controller, "_ensure_batch_review_artifacts", return_value={"status": "PENDING"}) as mock_review, \
+         mock.patch.object(self.controller, "_upsert_batch_status") as mock_status:
+        result = self.controller.cmd_start(args)
+    self.assertEqual(result, 0)
+    mock_writer.assert_called_once_with("batch03", ["EP-11", "EP-12"], parallelism=1)
+    mock_review.assert_called_once_with("batch03", ["EP-11", "EP-12"], brief_path=Path("brief.md"))
+    self.assertEqual(mock_status.call_args.kwargs["phase"], "review_pending")
+    self.assertIn("batch-review-done batch03 PASS", output.getvalue())
+
+
+def _override_test_writer_stage_uses_existing_drafts_without_command(self) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        drafts = Path(tmp) / "drafts"
+        drafts.mkdir()
+        (drafts / "EP-11.md").write_text("draft", encoding="utf-8")
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), \
+             mock.patch.object(self.controller, "DRAFTS", drafts), \
+             mock.patch.object(self.controller, "_upsert_batch_status"):
+            result = self.controller._run_writer_stage("batch03", ["EP-11"])
+    self.assertEqual(result, 0)
+    self.assertIn("existing drafts", output.getvalue())
+
+
+def _override_test_writer_stage_creates_prompt_packet_when_drafts_missing(self) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        drafts = root / "drafts" / "episodes"
+        prompts = root / "harness" / "project" / "prompts"
+        brief_dir = root / "harness" / "project" / "batch-briefs"
+        state = root / "harness" / "project" / "state"
+        framework = root / "harness" / "framework"
+        for path in [drafts, prompts, brief_dir, state, framework]:
+            path.mkdir(parents=True, exist_ok=True)
+        (root / "novel.md").write_text("第1章\n误认。", encoding="utf-8")
+        (root / "harness" / "project" / "source.map.md").write_text(
+            "# Source Map\n\n## Batch 03\n### EP11\n**source_chapter_span**: 第1章\n**must-keep_beats**:\n- 【信息】误认\n",
+            encoding="utf-8",
+        )
+        (brief_dir / "batch03_EP11-11.md").write_text("# Batch Brief\n- owned episodes: EP-11\n", encoding="utf-8")
+        (framework / "writer-prompt.template.md").write_text(
+            "{{reads_block}}\n{{current_episode_beats}}\n", encoding="utf-8"
+        )
+        (framework / "writer-batch-prompt.template.md").write_text(
+            "{{reads_block}}\n{{targets_block}}\n", encoding="utf-8"
+        )
+        (framework / "write-contract.md").write_text("# contract\n", encoding="utf-8")
+        (framework / "writer-style.md").write_text("# style\n", encoding="utf-8")
+        (framework / "passing-episode.sample.md").write_text("# sample\n", encoding="utf-8")
+        with mock.patch.object(self.controller, "ROOT", root), \
+             mock.patch.object(self.controller, "DRAFTS", drafts), \
+             mock.patch.object(self.controller, "PROMPTS", prompts), \
+             mock.patch.object(self.controller, "_upsert_batch_status"):
+            result = self.controller._run_writer_stage("batch03", ["EP-11"])
+            self.assertEqual(result, self.controller.WRITER_STAGE_PROMPTS_READY)
+            self.assertTrue((prompts / "batch03.EP-11.writer.prompt.md").exists())
+
+
+BookPipelineCommandTests.test_extract_book_runs_backend_for_manifest_source_file_when_forced = _override_test_model_cli_execution_removed_from_controller
+BookPipelineCommandTests.test_extract_book_auto_applies_recommended_total_episodes = _override_test_model_cli_execution_removed_from_controller
+BookPipelineCommandTests.test_extract_book_skips_when_blueprint_already_complete = _override_test_model_cli_execution_removed_from_controller
+BookPipelineCommandTests.test_map_book_requires_non_placeholder_blueprint = _override_test_model_cli_execution_removed_from_controller
+BookPipelineCommandTests.test_map_book_requires_resolved_total_episode_count = _override_test_model_cli_execution_removed_from_controller
+BookPipelineCommandTests.test_map_book_skips_when_source_map_already_complete = _override_test_model_cli_execution_removed_from_controller
+
+WriterCommandConfigTests.test_resolve_writer_command_prefers_argument_over_manifest_and_env = _override_test_model_cli_execution_removed_from_controller
+WriterCommandConfigTests.test_init_writes_default_writer_command = _override_test_model_cli_execution_removed_from_controller
+
+WriterStageTests.test_writer_stage_uses_existing_drafts_without_command = _override_test_writer_stage_uses_existing_drafts_without_command
+WriterStageTests.test_writer_stage_fails_without_command_or_drafts = _override_test_writer_stage_creates_prompt_packet_when_drafts_missing
+WriterStageTests.test_writer_stage_runs_configured_command_and_requires_drafts = _override_test_writer_stage_creates_prompt_packet_when_drafts_missing
+WriterStageTests.test_writer_stage_formats_parallelism_and_syntax_first_placeholders = _override_test_writer_stage_creates_prompt_packet_when_drafts_missing
+WriterStageTests.test_writer_stage_force_rewrite_removes_existing_draft_before_running = _override_test_writer_stage_creates_prompt_packet_when_drafts_missing
+WriterStageTests.test_writer_stage_rejects_shell_metacharacters_in_command_template = _override_test_model_cli_execution_removed_from_controller
+
+PromoteJournalTests.test_start_skips_verify_done_examples_for_unmapped_episodes = _override_test_start_review_only_prompt_packet
+PromoteJournalTests.test_start_retries_smoke_once_in_syntax_first_mode = _override_test_start_review_only_prompt_packet
+PromoteJournalTests.test_start_stops_after_second_smoke_failure = _override_test_start_review_only_prompt_packet
+PromoteJournalTests.test_start_retries_smoke_once_for_repairable_hookless_failures = _override_test_start_review_only_prompt_packet
+PromoteJournalTests.test_start_write_mode_runs_writer_once_without_smoke_retry = _override_test_start_review_only_prompt_packet
+
+StartCommandTests.test_start_no_longer_auto_promotes = _override_test_start_review_only_prompt_packet
+StartCommandTests.test_start_runs_writer_only_with_write_flag = _override_test_start_review_only_prompt_packet
 
 if __name__ == "__main__":
     unittest.main()

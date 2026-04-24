@@ -14,8 +14,8 @@ _BACKENDS = {
     },
     "codex": {
         "label": "Codex",
-        "executable": "codex",
-        "command_prefix": ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox"],
+        "executable": "codex.cmd",
+        "command_prefix": ["codex.cmd", "exec", "--dangerously-bypass-approvals-and-sandbox"],
     },
 }
 _AUTO_BACKEND_ORDER = ("claude", "codex")

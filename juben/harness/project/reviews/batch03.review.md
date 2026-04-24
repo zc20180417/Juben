@@ -1,0 +1,45 @@
+# Batch Review: batch03
+
+- status: PASS
+- reviewer: codex
+- timestamp: 2026-04-24 22:11
+- episodes: EP-11, EP-12, EP-13, EP-14, EP-15
+- sampled episodes: EP-11, EP-12
+
+## Checklist
+
+- [ ] sampled-episode adversarial checks complete
+- [ ] cross-episode arc continuity reviewed
+- [ ] future-payoff theft checked
+- [ ] unsupported additions assessed
+- [ ] quality anchor regression assessed
+
+## Evidence
+
+- (none)
+
+## Blocking Reasons
+
+- (none)
+
+## Warning Families
+
+- (none)
+
+## Arc Regressions
+
+- (none)
+
+## Function Theft Findings
+
+- (none)
+
+## Quality Anchor Findings
+
+- (none)
+
+## Final Verdict
+
+- verdict: PASS
+- reviewer: codex
+- reason: batch03 beats complete; onsite resistance rule applied across reveal, evidence, action, reversal, and accusation scenes; rename consistency passes

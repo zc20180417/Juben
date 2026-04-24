@@ -1,10 +1,11 @@
 # Run Manifest
 
 - source_file: 被弃真千金：总裁不好惹.md
-- total_episodes: 40
-- recommended_total_episodes: 40
-- episode_count_source: model_recommended
+- total_episodes: 25
+- recommended_total_episodes: pending_book_extraction
+- episode_count_source: manual_override
 - batch_size: 5
+- target_total_minutes: 50
 - target_episode_minutes: 2
 - episode_minutes_min: 1
 - episode_minutes_max: 3
@@ -12,12 +13,11 @@
 - adaptation_mode: novel_to_short_drama
 - adaptation_strategy: original_fidelity
 - dialogue_adaptation_intensity: light
-- generation_execution_mode: orchestrated_subagents
+- generation_execution_mode: prompt_packet_external_agent
 - writer_parallelism: 1
-- writer_command: "{python}" _ops/run_writer.py --batch {batch_id} --episodes {episodes_csv} --parallelism {parallelism} {syntax_first_flag}
 - generation_reset_mode: clean_rebuild
 - run_status: active
-- active_batch: batch01_EP-01-EP-05
+- active_batch: batch04_promoted
 - source_authority: original novel manuscript + harness/project/book.blueprint.md + harness/project/source.map.md
 - draft_lane: drafts/episodes
 - publish_lane: episodes
