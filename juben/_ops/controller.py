@@ -3148,7 +3148,7 @@ def _write_output_readme(stats: dict[str, int]) -> None:
         "- `_runtime/state/`：连续性、关系、open loop 等状态摘要\n\n"
         "## 刷新方式\n\n"
         "```powershell\n"
-        "python _ops/controller.py export\n"
+        ".\\~export.cmd\n"
         "```\n\n"
         "## 当前导出统计\n\n"
         f"- episodes: {stats.get('episodes', 0)}\n"

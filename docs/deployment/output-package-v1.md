@@ -3,7 +3,7 @@
 `juben/output/` 是 V1 的稳定交付面。它可以被删除，并通过下面命令完整重建：
 
 ```powershell
-python .\juben\_ops\controller.py export
+.\~export.cmd
 ```
 
 ## 公开交付层

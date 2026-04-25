@@ -9,11 +9,22 @@ V1 使用入口：
 
 ```powershell
 .\~init.cmd "被弃真千金：总裁不好惹.md" --episodes 25 --target-total-minutes 50
+.\~extract.cmd
+.\~map.cmd
 .\~start.cmd batch01 --write
 .\~review.cmd batch01 PASS --reviewer codex
 .\~run.cmd batch01
 .\~record.cmd batch01
 .\~next.cmd
+```
+
+常用辅助命令：
+
+```powershell
+.\~status.cmd
+.\~export.cmd
+.\~check.cmd batch01
+.\~clean.cmd
 ```
 
 输出入口：

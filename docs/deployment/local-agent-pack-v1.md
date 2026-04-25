@@ -19,8 +19,8 @@ V1 是 agent-native 本地工具包：Python 只负责初始化、生成 prompt 
 之后按 agent 提示执行三类工作：
 
 ```powershell
-python .\juben\_ops\controller.py extract-book
-python .\juben\_ops\controller.py map-book
+.\~extract.cmd
+.\~map.cmd
 .\~start.cmd batch01 --write
 ```
 
@@ -48,16 +48,21 @@ python .\juben\_ops\controller.py map-book
 手动刷新：
 
 ```powershell
-python .\juben\_ops\controller.py export
+.\~export.cmd
 ```
 
 ## 命令边界
 
 - `~init`：初始化当前项目。
+- `~extract`：生成全书蓝图 prompt packet / 同步抽取结果。
+- `~map`：生成 source map prompt packet / 同步分集结果。
 - `~start`：准备批次；加 `--write` 生成 writer prompt packet。
+- `~check`：重建当前批次 review packet。
 - `~review`：回填批次评审结论。
 - `~run`：正式发布当前批次到 `episodes/` 并刷新 `output/`。
 - `~record`：把已发布批次写入状态摘要。
+- `~status`：查看完整运行状态。
+- `~export`：手动刷新 `output/` 交付包。
 - `~next`：查看当前进度和下一步。
 - `~clean`：备份并清理当前运行产物，用于重新测试工程能力。
 

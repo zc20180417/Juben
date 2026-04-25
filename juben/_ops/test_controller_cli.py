@@ -145,6 +145,32 @@ class ControllerCliSmokeTests(unittest.TestCase):
         self.assertIn("usage: controller.py batch-review-done", result.stdout)
         self.assertIn("--reviewer", result.stdout)
 
+    def test_tilde_extract_wrapper_routes_to_extract_book_help(self) -> None:
+        result = self._run_wrapper("~extract", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("usage: controller.py extract-book", result.stdout)
+
+    def test_tilde_map_wrapper_routes_to_map_book_help(self) -> None:
+        result = self._run_wrapper("~map", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("usage: controller.py map-book", result.stdout)
+
+    def test_tilde_check_wrapper_routes_to_check_help(self) -> None:
+        result = self._run_wrapper("~check", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("usage: controller.py check", result.stdout)
+        self.assertIn("batch_id", result.stdout)
+
+    def test_tilde_status_wrapper_routes_to_status_help(self) -> None:
+        result = self._run_wrapper("~status", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("usage: controller.py status", result.stdout)
+
+    def test_tilde_export_wrapper_routes_to_export_help(self) -> None:
+        result = self._run_wrapper("~export", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("usage: controller.py export", result.stdout)
+
 
 class ControllerHandlerRegressionTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -1813,7 +1839,7 @@ class OutputExportTests(unittest.TestCase):
             self.assertTrue((output / "_runtime" / "prompts" / "batch01.review.prompt.md").exists())
             self.assertTrue((output / "anchors" / "character.md").exists())
             self.assertIn("_runtime/", (output / "README.md").read_text(encoding="utf-8"))
-            self.assertIn("python _ops/controller.py export", (output / "README.md").read_text(encoding="utf-8"))
+            self.assertIn(".\\~export.cmd", (output / "README.md").read_text(encoding="utf-8"))
 
     def test_export_marks_manifest_complete_when_all_batches_recorded(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

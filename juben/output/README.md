@@ -22,7 +22,7 @@
 ## 刷新方式
 
 ```powershell
-python _ops/controller.py export
+.\~export.cmd
 ```
 
 ## 当前导出统计
