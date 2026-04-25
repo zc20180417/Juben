@@ -9,10 +9,11 @@
 - target_episode_minutes: 2
 - episode_minutes_min: 1
 - episode_minutes_max: 3
-- key_episodes:
+- key_episodes: 
 - adaptation_mode: novel_to_short_drama
 - adaptation_strategy: original_fidelity
 - dialogue_adaptation_intensity: light
+- quality_mode: standard
 - generation_execution_mode: prompt_packet_external_agent
 - writer_parallelism: 1
 - generation_reset_mode: clean_rebuild

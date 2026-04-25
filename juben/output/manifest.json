@@ -1,6 +1,6 @@
 {
   "schema_version": "juben-output/v1",
-  "generated_at": "2026-04-25T15:44:01",
+  "generated_at": "2026-04-25T17:46:43",
   "source_file": "被弃真千金：总裁不好惹.md",
   "total_episodes": "25",
   "target_total_minutes": "50",
@@ -12,7 +12,7 @@
     "episodes": 25,
     "drafts": 25,
     "reviews": 10,
-    "prompts": 8,
+    "prompts": 12,
     "briefs": 5,
     "maps": 3,
     "protocols": 1,
@@ -246,13 +246,13 @@
         "EP-04",
         "EP-05"
       ],
-      "source_range": "第1章 line 19 ~ 21 ~ 第5章 line 47 ~ 53",
+      "source_range": "第1章开头至姜照眠被带入沈家前后，可自然吃进初到沈家门口的第一轮压迫。 ~ 第4章至第5章沈家求和、女主公开切割、沈雨棠下一轮谋划。",
       "phase": "recorded",
       "status": "DONE",
       "review_status": "PASS",
-      "reviewer": "codex",
-      "review_reason": "",
-      "updated_at": "2026-04-25 13:46"
+      "reviewer": "codex-smoke",
+      "review_reason": "batch01完成黄金开场、称谓边界、三场主戏闭环和阶段钩；未发现原著人名残留或核心越界。",
+      "updated_at": "2026-04-25 16:24"
     },
     {
       "batch_id": "batch02",
@@ -263,13 +263,13 @@
         "EP-09",
         "EP-10"
       ],
-      "source_range": "第6章 line 54 ~ 60 ~ 第10章 line 82 ~ 88",
+      "source_range": "第5章至第6章顾砚舟追求、赔罪与姜照眠建立边界。 ~ 第9章至第10章沈家权力重排、旧案线索浮现。",
       "phase": "recorded",
       "status": "DONE",
       "review_status": "PASS",
-      "reviewer": "codex",
-      "review_reason": "",
-      "updated_at": "2026-04-25 13:56"
+      "reviewer": "codex-smoke",
+      "review_reason": "batch02完成追求边界、发布会反击、姐妹登场、资料陷害和旧案线索；未发现原著人名残留或核心越界。",
+      "updated_at": "2026-04-25 17:10"
     },
     {
       "batch_id": "batch03",
@@ -280,13 +280,13 @@
         "EP-14",
         "EP-15"
       ],
-      "source_range": "第11章 line 89 ~ 95 ~ 第13章 line 103 ~ 109",
+      "source_range": "第10章至第11章旧案回忆、家宴冲突、失踪疑点。 ~ 第14章至第15章沈知微被栽赃、姐妹信任与沈家站队。",
       "phase": "recorded",
       "status": "DONE",
       "review_status": "PASS",
-      "reviewer": "codex",
-      "review_reason": "",
-      "updated_at": "2026-04-25 13:58"
+      "reviewer": "codex-smoke",
+      "review_reason": "batch03完成旧案疑点、行动取证、被困硬钩、诱捕反咬和沈知微信任危机；未直接洗清或提前收网。",
+      "updated_at": "2026-04-25 17:13"
     },
     {
       "batch_id": "batch04",
@@ -297,13 +297,13 @@
         "EP-19",
         "EP-20"
       ],
-      "source_range": "第14章 line 110 ~ 116 ~ 第15章 line 117 ~ 123",
+      "source_range": "第15章至第16章沈知微反证、沈雨棠关键漏洞。 ~ 求婚场面、情感确认、主线关系闭环前半。",
       "phase": "recorded",
       "status": "DONE",
       "review_status": "PASS",
-      "reviewer": "codex",
-      "review_reason": "",
-      "updated_at": "2026-04-25 13:59"
+      "reviewer": "codex-smoke",
+      "review_reason": "batch04按顺序完成沈知微反证、沈雨棠崩盘、亲情有限修复、求婚前自我确认和尊重式求婚；未提前婚礼或一哭和好。",
+      "updated_at": "2026-04-25 17:44"
     },
     {
       "batch_id": "batch05",
@@ -314,13 +314,13 @@
         "EP-24",
         "EP-25"
       ],
-      "source_range": "第16章 line 124 ~ 130 ~ 第17章 line 131 ~ 139",
+      "source_range": "结局支线，陆知衡归来、沈知微情感线补全。 ~ 全书尾声，婚后与家庭关系闭环。",
       "phase": "recorded",
       "status": "DONE",
       "review_status": "PASS",
-      "reviewer": "codex",
-      "review_reason": "",
-      "updated_at": "2026-04-25 14:02"
+      "reviewer": "codex-smoke",
+      "review_reason": "batch05完成陆知衡归来、婚礼自主权、婚纱高光、双重誓言和尾声闭环；未新增反派、狗血或续集悬念。",
+      "updated_at": "2026-04-25 17:46"
     }
   ],
   "next_action": "所有已映射批次都已发布；可直接交付 `output/`，或继续人工精修成稿。"

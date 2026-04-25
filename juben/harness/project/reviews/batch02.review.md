@@ -1,8 +1,8 @@
 # Batch Review: batch02
 
 - status: PASS
-- reviewer: codex
-- timestamp: 2026-04-25 13:56
+- reviewer: codex-smoke
+- timestamp: 2026-04-25 17:10
 - episodes: EP-06, EP-07, EP-08, EP-09, EP-10
 - sampled episodes: EP-06, EP-07
 
@@ -24,7 +24,7 @@
 
 ## Warning Families
 
-- (none)
+- EP08相对偏短，但三场主戏闭环成立。
 
 ## Arc Regressions
 
@@ -41,5 +41,5 @@
 ## Final Verdict
 
 - verdict: PASS
-- reviewer: codex
-- reason: (none)
+- reviewer: codex-smoke
+- reason: batch02完成追求边界、发布会反击、姐妹登场、资料陷害和旧案线索；未发现原著人名残留或核心越界。

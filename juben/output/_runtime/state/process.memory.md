@@ -7,9 +7,9 @@
 - writer 外调命令已改为参数列表执行，避免 shell=True 带来的 Windows 不稳定。
 
 ## 当前执行准则
-- start batchXX
-- start batchXX --write
-- batch-review-done batchXX PASS|FAIL --reviewer <name>
-- run batchXX
-- record batchXX
+- .\~start.cmd batchXX
+- .\~start.cmd batchXX --write
+- .\~review.cmd batchXX PASS|FAIL --reviewer <name>
+- .\~run.cmd batchXX
+- .\~record.cmd batchXX
 

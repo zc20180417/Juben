@@ -1,8 +1,8 @@
 # Batch Review: batch05
 
 - status: PASS
-- reviewer: codex
-- timestamp: 2026-04-25 14:02
+- reviewer: codex-smoke
+- timestamp: 2026-04-25 17:46
 - episodes: EP-21, EP-22, EP-23, EP-24, EP-25
 - sampled episodes: EP-21, EP-22
 
@@ -24,7 +24,7 @@
 
 ## Warning Families
 
-- (none)
+- 终局集字数偏克制，但闭环明确。
 
 ## Arc Regressions
 
@@ -41,5 +41,5 @@
 ## Final Verdict
 
 - verdict: PASS
-- reviewer: codex
-- reason: (none)
+- reviewer: codex-smoke
+- reason: batch05完成陆知衡归来、婚礼自主权、婚纱高光、双重誓言和尾声闭环；未新增反派、狗血或续集悬念。

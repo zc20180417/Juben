@@ -54,18 +54,18 @@
 
 ## 批次状态
 
-- batch01：recorded / review=PASS / codex / EP-01, EP-02, EP-03, EP-04, EP-05
-- batch02：recorded / review=PASS / codex / EP-06, EP-07, EP-08, EP-09, EP-10
-- batch03：recorded / review=PASS / codex / EP-11, EP-12, EP-13, EP-14, EP-15
-- batch04：recorded / review=PASS / codex / EP-16, EP-17, EP-18, EP-19, EP-20
-- batch05：recorded / review=PASS / codex / EP-21, EP-22, EP-23, EP-24, EP-25
+- batch01：recorded / review=PASS / codex-smoke / EP-01, EP-02, EP-03, EP-04, EP-05
+- batch02：recorded / review=PASS / codex-smoke / EP-06, EP-07, EP-08, EP-09, EP-10
+- batch03：recorded / review=PASS / codex-smoke / EP-11, EP-12, EP-13, EP-14, EP-15
+- batch04：recorded / review=PASS / codex-smoke / EP-16, EP-17, EP-18, EP-19, EP-20
+- batch05：recorded / review=PASS / codex-smoke / EP-21, EP-22, EP-23, EP-24, EP-25
 
 ## 导出统计
 
 - episodes: 25
 - drafts: 25
 - reviews: 10
-- prompts: 8
+- prompts: 12
 - briefs: 5
 - maps: 3
 - anchors: 2

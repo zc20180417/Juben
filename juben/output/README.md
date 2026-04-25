@@ -31,7 +31,7 @@
 - episodes: 25
 - drafts: 25
 - reviews: 10
-- prompts: 8
+- prompts: 12
 - briefs: 5
 - maps: 3
 - anchors: 2

@@ -2,7 +2,7 @@
 
 ## 场景厚度
 
-- 当前批次 batch05 以 reviewer verdict 为主，warning=(none)。
+- 当前批次 batch05 以 reviewer verdict 为主，warning=终局集字数偏克制，但闭环明确。。
 
 ## 对话节奏
 
@@ -14,3 +14,4 @@
 
 ## 代表性打法
 - batch05: reviewer-only gate / contract-first writing
+

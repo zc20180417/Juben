@@ -1,8 +1,8 @@
 {
   "batch_id": "batch02",
   "status": "PASS",
-  "reviewer": "codex",
-  "timestamp": "2026-04-25 13:56",
+  "reviewer": "codex-smoke",
+  "timestamp": "2026-04-25 17:10",
   "episodes": [
     "EP-06",
     "EP-07",
@@ -15,10 +15,12 @@
     "EP-07"
   ],
   "blocking_reasons": [],
-  "warning_families": [],
+  "warning_families": [
+    "EP08相对偏短，但三场主戏闭环成立。"
+  ],
   "arc_regressions": [],
   "function_theft_findings": [],
   "quality_anchor_findings": [],
   "evidence_refs": [],
-  "reason": ""
+  "reason": "batch02完成追求边界、发布会反击、姐妹登场、资料陷害和旧案线索；未发现原著人名残留或核心越界。"
 }
