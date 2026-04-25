@@ -1,6 +1,6 @@
 {
   "schema_version": "juben-output/v1",
-  "generated_at": "2026-04-25T14:06:16",
+  "generated_at": "2026-04-25T14:23:14",
   "source_file": "被弃真千金：总裁不好惹.md",
   "total_episodes": "25",
   "target_total_minutes": "50",
@@ -21,13 +21,14 @@
   "paths": {
     "summary": "SUMMARY.md",
     "episodes": "episodes/",
-    "drafts": "drafts/",
-    "reviews": "reviews/",
-    "prompts": "prompts/",
-    "briefs": "briefs/",
-    "maps": "maps/",
     "anchors": "anchors/",
-    "state": "state/"
+    "runtime": "_runtime/",
+    "drafts": "_runtime/drafts/",
+    "reviews": "_runtime/reviews/",
+    "prompts": "_runtime/prompts/",
+    "briefs": "_runtime/briefs/",
+    "maps": "_runtime/maps/",
+    "state": "_runtime/state/"
   },
   "published_episodes": [
     {
@@ -134,103 +135,103 @@
   "draft_episodes": [
     {
       "episode": "EP-01",
-      "path": "drafts/EP-01.md"
+      "path": "_runtime/drafts/EP-01.md"
     },
     {
       "episode": "EP-02",
-      "path": "drafts/EP-02.md"
+      "path": "_runtime/drafts/EP-02.md"
     },
     {
       "episode": "EP-03",
-      "path": "drafts/EP-03.md"
+      "path": "_runtime/drafts/EP-03.md"
     },
     {
       "episode": "EP-04",
-      "path": "drafts/EP-04.md"
+      "path": "_runtime/drafts/EP-04.md"
     },
     {
       "episode": "EP-05",
-      "path": "drafts/EP-05.md"
+      "path": "_runtime/drafts/EP-05.md"
     },
     {
       "episode": "EP-06",
-      "path": "drafts/EP-06.md"
+      "path": "_runtime/drafts/EP-06.md"
     },
     {
       "episode": "EP-07",
-      "path": "drafts/EP-07.md"
+      "path": "_runtime/drafts/EP-07.md"
     },
     {
       "episode": "EP-08",
-      "path": "drafts/EP-08.md"
+      "path": "_runtime/drafts/EP-08.md"
     },
     {
       "episode": "EP-09",
-      "path": "drafts/EP-09.md"
+      "path": "_runtime/drafts/EP-09.md"
     },
     {
       "episode": "EP-10",
-      "path": "drafts/EP-10.md"
+      "path": "_runtime/drafts/EP-10.md"
     },
     {
       "episode": "EP-11",
-      "path": "drafts/EP-11.md"
+      "path": "_runtime/drafts/EP-11.md"
     },
     {
       "episode": "EP-12",
-      "path": "drafts/EP-12.md"
+      "path": "_runtime/drafts/EP-12.md"
     },
     {
       "episode": "EP-13",
-      "path": "drafts/EP-13.md"
+      "path": "_runtime/drafts/EP-13.md"
     },
     {
       "episode": "EP-14",
-      "path": "drafts/EP-14.md"
+      "path": "_runtime/drafts/EP-14.md"
     },
     {
       "episode": "EP-15",
-      "path": "drafts/EP-15.md"
+      "path": "_runtime/drafts/EP-15.md"
     },
     {
       "episode": "EP-16",
-      "path": "drafts/EP-16.md"
+      "path": "_runtime/drafts/EP-16.md"
     },
     {
       "episode": "EP-17",
-      "path": "drafts/EP-17.md"
+      "path": "_runtime/drafts/EP-17.md"
     },
     {
       "episode": "EP-18",
-      "path": "drafts/EP-18.md"
+      "path": "_runtime/drafts/EP-18.md"
     },
     {
       "episode": "EP-19",
-      "path": "drafts/EP-19.md"
+      "path": "_runtime/drafts/EP-19.md"
     },
     {
       "episode": "EP-20",
-      "path": "drafts/EP-20.md"
+      "path": "_runtime/drafts/EP-20.md"
     },
     {
       "episode": "EP-21",
-      "path": "drafts/EP-21.md"
+      "path": "_runtime/drafts/EP-21.md"
     },
     {
       "episode": "EP-22",
-      "path": "drafts/EP-22.md"
+      "path": "_runtime/drafts/EP-22.md"
     },
     {
       "episode": "EP-23",
-      "path": "drafts/EP-23.md"
+      "path": "_runtime/drafts/EP-23.md"
     },
     {
       "episode": "EP-24",
-      "path": "drafts/EP-24.md"
+      "path": "_runtime/drafts/EP-24.md"
     },
     {
       "episode": "EP-25",
-      "path": "drafts/EP-25.md"
+      "path": "_runtime/drafts/EP-25.md"
     }
   ],
   "batches": [

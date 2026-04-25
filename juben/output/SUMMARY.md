@@ -1,6 +1,6 @@
 # Juben V1 Output Summary
 
-这是当前项目给外部使用者看的固定入口。内部运行文件仍在 `harness/project/`、`drafts/`、`episodes/`，`output/` 是可随时重建的交付镜像。
+这是当前项目给外部使用者看的固定入口。公开交付内容在根目录，运行态诊断材料统一收进 `_runtime/`。
 
 ## 项目概况
 
@@ -11,17 +11,18 @@
 - 当前状态：complete
 - 当前批次：(none)
 - 已发布成稿：25 集
-- 当前草稿镜像：25 集
+- 内部草稿镜像：25 集
 
 ## 下一步
 
 所有已映射批次都已发布；可直接交付 `output/`，或继续人工精修成稿。
 
-## 给不同角色的入口
+## 交付入口
 
-- 编剧/制片：优先看 `episodes/` 和本文件；需要上下文再看 `maps/`。
-- 审稿 agent：看 `reviews/`、`prompts/`、`briefs/`。
-- 工程维护者：看 `manifest.json`、`state/` 和 `maps/`。
+- `episodes/`：正式成稿，每集一个 `EP-xx.md`
+- `anchors/`：角色与声纹参考，可给人工精修或审稿 agent 使用
+- `manifest.json`：机器可读索引
+- `_runtime/`：内部诊断包，包含草稿、prompt、review、brief、map、state；普通交付可忽略
 
 ## 已发布剧集
 

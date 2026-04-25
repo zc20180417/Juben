@@ -40,7 +40,7 @@ python .\juben\_ops\controller.py map-book
 - [G:\Juben\juben\harness\project](/G:/Juben/juben/harness/project)：当前项目的 blueprint、source.map、brief、state、releases、reviews
 - [G:\Juben\juben\drafts\episodes](/G:/Juben/juben/drafts/episodes)：writer 草稿
 - [G:\Juben\juben\episodes](/G:/Juben/juben/episodes)：已发布剧本
-- [G:\Juben\juben\output](/G:/Juben/juben/output)：可交付输出镜像，优先看这里
+- [G:\Juben\juben\output](/G:/Juben/juben/output)：可交付输出镜像，优先看这里；内部诊断材料在 `output/_runtime`
 
 ## 常用命令
 

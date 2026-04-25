@@ -20,6 +20,7 @@ V1 使用入口：
 - [G:\Juben\juben\output\SUMMARY.md](/G:/Juben/juben/output/SUMMARY.md)
 - [G:\Juben\juben\output\manifest.json](/G:/Juben/juben/output/manifest.json)
 - [G:\Juben\juben\output\episodes](/G:/Juben/juben/output/episodes)
+- [G:\Juben\juben\output\_runtime](/G:/Juben/juben/output/_runtime)：内部诊断材料，普通交付可忽略
 
 部署文档：
 - [G:\Juben\docs\deployment\local-agent-pack-v1.md](/G:/Juben/docs/deployment/local-agent-pack-v1.md)

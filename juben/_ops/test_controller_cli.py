@@ -1807,10 +1807,12 @@ class OutputExportTests(unittest.TestCase):
             self.assertEqual(stats["episodes"], 1)
             self.assertTrue((output / "episodes" / "EP-01.md").exists())
             self.assertFalse((output / "episodes" / "EP-01.meta.json").exists())
-            self.assertTrue((output / "drafts" / "EP-02.md").exists())
-            self.assertTrue((output / "prompts" / "batch01.writer.batch.prompt.md").exists())
-            self.assertTrue((output / "prompts" / "batch01.review.prompt.md").exists())
+            self.assertTrue((output / "_runtime" / "drafts" / "EP-02.md").exists())
+            self.assertFalse((output / "drafts").exists())
+            self.assertTrue((output / "_runtime" / "prompts" / "batch01.writer.batch.prompt.md").exists())
+            self.assertTrue((output / "_runtime" / "prompts" / "batch01.review.prompt.md").exists())
             self.assertTrue((output / "anchors" / "character.md").exists())
+            self.assertIn("_runtime/", (output / "README.md").read_text(encoding="utf-8"))
             self.assertIn("python _ops/controller.py export", (output / "README.md").read_text(encoding="utf-8"))
 
     def test_export_marks_manifest_complete_when_all_batches_recorded(self) -> None:
@@ -1895,6 +1897,8 @@ class OutputExportTests(unittest.TestCase):
             payload = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(payload["run_status"], "complete")
             self.assertEqual(payload["active_batch"], "(none)")
+            self.assertEqual(payload["paths"]["drafts"], "_runtime/drafts/")
+            self.assertEqual(payload["draft_episodes"][0]["path"], "_runtime/drafts/EP-01.md")
 
 
 class WriterCommandConfigTests(unittest.TestCase):

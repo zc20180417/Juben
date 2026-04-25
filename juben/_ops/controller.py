@@ -3027,7 +3027,6 @@ def _write_output_summary(stats: dict[str, int]) -> None:
     manifest = _safe_read_manifest()
     batch_summaries = _collect_output_batch_summaries()
     published = _episode_ids_in_dir(EPISODES)
-    drafts = _episode_ids_in_dir(DRAFTS)
     source_file = manifest.get("source_file", "(unknown)")
     total_episodes = manifest.get("total_episodes", "")
     target_total_minutes = manifest.get("target_total_minutes", "")
@@ -3049,8 +3048,7 @@ def _write_output_summary(stats: dict[str, int]) -> None:
 
     summary = (
         "# Juben V1 Output Summary\n\n"
-        "这是当前项目给外部使用者看的固定入口。内部运行文件仍在 `harness/project/`、`drafts/`、`episodes/`，"
-        "`output/` 是可随时重建的交付镜像。\n\n"
+        "这是当前项目给外部使用者看的固定入口。公开交付内容在根目录，运行态诊断材料统一收进 `_runtime/`。\n\n"
         "## 项目概况\n\n"
         f"- 原著文件：{source_file}\n"
         f"- 目标集数：{total_episodes or '(unknown)'}\n"
@@ -3059,13 +3057,14 @@ def _write_output_summary(stats: dict[str, int]) -> None:
         f"- 当前状态：{run_status or '(unknown)'}\n"
         f"- 当前批次：{active_batch or '(none)'}\n"
         f"- 已发布成稿：{len(published)} 集\n"
-        f"- 当前草稿镜像：{len(drafts)} 集\n\n"
+        f"- 内部草稿镜像：{stats.get('drafts', 0)} 集\n\n"
         "## 下一步\n\n"
         f"{next_action}\n\n"
-        "## 给不同角色的入口\n\n"
-        "- 编剧/制片：优先看 `episodes/` 和本文件；需要上下文再看 `maps/`。\n"
-        "- 审稿 agent：看 `reviews/`、`prompts/`、`briefs/`。\n"
-        "- 工程维护者：看 `manifest.json`、`state/` 和 `maps/`。\n\n"
+        "## 交付入口\n\n"
+        "- `episodes/`：正式成稿，每集一个 `EP-xx.md`\n"
+        "- `anchors/`：角色与声纹参考，可给人工精修或审稿 agent 使用\n"
+        "- `manifest.json`：机器可读索引\n"
+        "- `_runtime/`：内部诊断包，包含草稿、prompt、review、brief、map、state；普通交付可忽略\n\n"
         "## 已发布剧集\n\n"
         f"{episode_lines}\n\n"
         "## 批次状态\n\n"
@@ -3104,19 +3103,20 @@ def _write_output_manifest(stats: dict[str, int]) -> None:
         "paths": {
             "summary": "SUMMARY.md",
             "episodes": "episodes/",
-            "drafts": "drafts/",
-            "reviews": "reviews/",
-            "prompts": "prompts/",
-            "briefs": "briefs/",
-            "maps": "maps/",
             "anchors": "anchors/",
-            "state": "state/",
+            "runtime": "_runtime/",
+            "drafts": "_runtime/drafts/",
+            "reviews": "_runtime/reviews/",
+            "prompts": "_runtime/prompts/",
+            "briefs": "_runtime/briefs/",
+            "maps": "_runtime/maps/",
+            "state": "_runtime/state/",
         },
         "published_episodes": [
             {"episode": ep, "path": f"episodes/{ep}.md"} for ep in published
         ],
         "draft_episodes": [
-            {"episode": ep, "path": f"drafts/{ep}.md"} for ep in drafts
+            {"episode": ep, "path": f"_runtime/drafts/{ep}.md"} for ep in drafts
         ],
         "batches": batch_summaries,
         "next_action": _output_next_action(batch_summaries),
@@ -3132,20 +3132,20 @@ def _write_output_readme(stats: dict[str, int]) -> None:
     readme = OUTPUT / "README.md"
     readme.write_text(
         "# Juben Output\n\n"
-        "这里是给人看的固定入口。内部流程仍使用 `harness/project`、`drafts`、`episodes` 等运行目录，"
-        "本目录只保存可随时重建的导出镜像。\n\n"
+        "这里是给外部使用者看的交付入口。每次运行 `export` 都会完整重建本目录。\n\n"
         "## 常用入口\n\n"
-        "- `episodes/`：已发布成稿，只放 `EP-xx.md`\n"
-        "- `drafts/`：当前草稿镜像，只放 `EP-xx.md`\n"
-        "- `reviews/`：批次评审结论，包含 Markdown 与 JSON\n"
-        "- `prompts/`：可交给 agent 执行的提示词包\n"
-        "- `briefs/`：批次 brief\n"
-        "- `maps/`：全书蓝图、source map、run manifest\n"
-        "- `anchors/`：角色与声纹锚点\n"
-        "- `state/`：连续性、关系、open loop 等状态摘要\n\n"
-        "## 交付入口\n\n"
-        "- `SUMMARY.md`：给人看的项目摘要、下一步和成稿入口\n"
-        "- `manifest.json`：给工具或平台读取的机器可读索引\n\n"
+        "- `SUMMARY.md`：项目摘要、状态和成稿入口\n"
+        "- `episodes/`：正式成稿，只放 `EP-xx.md`\n"
+        "- `anchors/`：角色与声纹锚点，可用于人工精修\n"
+        "- `manifest.json`：给工具或平台读取的机器可读索引\n"
+        "- `_runtime/`：内部诊断包，普通交付可忽略\n\n"
+        "## `_runtime/` 内容\n\n"
+        "- `_runtime/drafts/`：当前草稿镜像\n"
+        "- `_runtime/reviews/`：批次评审结论，包含 Markdown 与 JSON\n"
+        "- `_runtime/prompts/`：可交给 agent 执行的提示词包\n"
+        "- `_runtime/briefs/`：批次 brief\n"
+        "- `_runtime/maps/`：全书蓝图、source map、run manifest\n"
+        "- `_runtime/state/`：连续性、关系、open loop 等状态摘要\n\n"
         "## 刷新方式\n\n"
         "```powershell\n"
         "python _ops/controller.py export\n"
@@ -3165,19 +3165,20 @@ def _write_output_readme(stats: dict[str, int]) -> None:
 
 def _export_outputs() -> dict[str, int]:
     """Build a human-facing output/ mirror from runtime project files."""
-    OUTPUT.mkdir(parents=True, exist_ok=True)
+    _reset_output_dir(OUTPUT)
+    runtime = OUTPUT / "_runtime"
     sections = {
         "episodes": OUTPUT / "episodes",
-        "drafts": OUTPUT / "drafts",
-        "reviews": OUTPUT / "reviews",
-        "prompts": OUTPUT / "prompts",
-        "briefs": OUTPUT / "briefs",
-        "maps": OUTPUT / "maps",
         "anchors": OUTPUT / "anchors",
-        "state": OUTPUT / "state",
+        "drafts": runtime / "drafts",
+        "reviews": runtime / "reviews",
+        "prompts": runtime / "prompts",
+        "briefs": runtime / "briefs",
+        "maps": runtime / "maps",
+        "state": runtime / "state",
     }
     for dest in sections.values():
-        _reset_output_dir(dest)
+        dest.mkdir(parents=True, exist_ok=True)
 
     stats: dict[str, int] = {}
     stats["episodes"] = _copy_files_to_output(EPISODES, sections["episodes"], ["EP-*.md"])

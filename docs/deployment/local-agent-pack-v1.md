@@ -1,6 +1,6 @@
 # Juben V1 本地部署说明
 
-V1 的定位是 agent-native 本地工具包：Python 只负责初始化、生成 prompt packet、维护状态和导出结果；真正的抽取、分集、写剧本、评审由具备文件读写能力的大模型 agent 执行。
+V1 是 agent-native 本地工具包：Python 只负责初始化、生成 prompt packet、维护状态和导出结果；真正的抽取、分集、写剧本、评审由具备文件读写能力的大模型 agent 执行。
 
 ## 适用对象
 
@@ -27,7 +27,6 @@ python .\juben\_ops\controller.py map-book
 每批写完后：
 
 ```powershell
-python .\juben\_ops\controller.py check batch01
 .\~review.cmd batch01 PASS --reviewer codex
 .\~run.cmd batch01
 .\~record.cmd batch01
@@ -36,14 +35,15 @@ python .\juben\_ops\controller.py check batch01
 
 ## 交付目录
 
-`juben/output/` 是给人看的固定交付入口。每次 `run` 或 `export` 后会刷新：
+`juben/output/` 是给人看的固定交付入口。每次 `run` 或 `export` 后刷新：
 
 - `SUMMARY.md`：项目摘要、下一步、已发布剧集索引。
-- `manifest.json`：平台或工具可读取的机器索引。
 - `episodes/`：已发布剧本。
-- `reviews/`：批次评审结果。
-- `maps/`：蓝图、source map、run manifest。
-- `state/`：连续性和关系状态摘要。
+- `anchors/`：角色与声纹锚点。
+- `manifest.json`：平台或工具可读取的机器索引。
+- `_runtime/`：内部诊断材料，包含 prompts、reviews、briefs、maps、state、drafts。
+
+普通交付只需要 `SUMMARY.md`、`episodes/`、`anchors/`。需要让另一个 agent 接手时，再交付 `manifest.json` 和 `_runtime/`。
 
 手动刷新：
 
@@ -66,4 +66,4 @@ python .\juben\_ops\controller.py export
 - 不让 Python 调模型 CLI，避免编码、超时、日志污染和嵌套 agent 不稳定。
 - 不把 `harness/project/` 当交付目录；对外只交付 `output/`。
 - 不把 reviewer 伪装成 lint；评审标准在 `juben/harness/framework/review-standard.md`，提示词在 `reviewer-prompt.template.md`。
-- 换模型时只需让新 agent 读取 prompt packet，并按文件路径写回指定 Markdown。
+- 换模型时只需要让新 agent 读取 prompt packet，并按文件路径写回指定 Markdown。
