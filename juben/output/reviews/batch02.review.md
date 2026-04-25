@@ -2,7 +2,7 @@
 
 - status: PASS
 - reviewer: codex
-- timestamp: 2026-04-24 21:59
+- timestamp: 2026-04-25 13:56
 - episodes: EP-06, EP-07, EP-08, EP-09, EP-10
 - sampled episodes: EP-06, EP-07
 
@@ -16,10 +16,7 @@
 
 ## Evidence
 
-- draft:EP-06:scene6-3
-- draft:EP-07:scene7-2
-- draft:EP-07:scene7-4
-- draft:EP-10:scene10-4
+- (none)
 
 ## Blocking Reasons
 
@@ -27,7 +24,7 @@
 
 ## Warning Families
 
-- EP-06 is softer emotional-payoff material but keeps姜照眠 boundary and avoids premature acceptance
+- (none)
 
 ## Arc Regressions
 
@@ -45,4 +42,4 @@
 
 - verdict: PASS
 - reviewer: codex
-- reason: batch02 beats complete; relationship boundary, public reversal, sister entry, and business action all pass
+- reason: (none)

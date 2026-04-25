@@ -13,6 +13,11 @@
 - `anchors/`：角色与声纹锚点
 - `state/`：连续性、关系、open loop 等状态摘要
 
+## 交付入口
+
+- `SUMMARY.md`：给人看的项目摘要、下一步和成稿入口
+- `manifest.json`：给工具或平台读取的机器可读索引
+
 ## 刷新方式
 
 ```powershell
@@ -21,11 +26,11 @@ python _ops/controller.py export
 
 ## 当前导出统计
 
-- episodes: 20
-- drafts: 20
-- reviews: 8
-- prompts: 5
-- briefs: 4
+- episodes: 25
+- drafts: 25
+- reviews: 10
+- prompts: 8
+- briefs: 5
 - maps: 3
 - anchors: 2
 - state: 7

@@ -1,21 +1,26 @@
 # Juben Workspace
 
-这个仓库当前维护的是一个 reviewer-only 的小说改编短剧流水线。
+这是一个 agent-native 的小说改编竖屏短剧生产工具包。Python 负责初始化、生成 prompt packet、维护状态和导出结果；大模型 agent 负责抽取、分集、写剧本和评审。
 
 主项目在：
 - [G:\Juben\juben](/G:/Juben/juben)
 
-建议从这里开始看：
-- [G:\Juben\juben\README.md](/G:/Juben/juben/README.md)
-- [G:\Juben\juben\harness\framework\entry.md](/G:/Juben/juben/harness/framework/entry.md)
-- [G:\Juben\juben\_ops\controller.py](/G:/Juben/juben/_ops/controller.py)
+V1 使用入口：
 
-当前主流程：
-1. `init`
-2. `extract-book`
-3. `map-book`
-4. `start batchXX`
-5. `start batchXX --write`
-6. `batch-review-done`
-7. `run batchXX`
-8. `record`
+```powershell
+.\~init.cmd "被弃真千金：总裁不好惹.md" --episodes 25 --target-total-minutes 50
+.\~start.cmd batch01 --write
+.\~review.cmd batch01 PASS --reviewer codex
+.\~run.cmd batch01
+.\~record.cmd batch01
+.\~next.cmd
+```
+
+输出入口：
+- [G:\Juben\juben\output\SUMMARY.md](/G:/Juben/juben/output/SUMMARY.md)
+- [G:\Juben\juben\output\manifest.json](/G:/Juben/juben/output/manifest.json)
+- [G:\Juben\juben\output\episodes](/G:/Juben/juben/output/episodes)
+
+部署文档：
+- [G:\Juben\docs\deployment\local-agent-pack-v1.md](/G:/Juben/docs/deployment/local-agent-pack-v1.md)
+- [G:\Juben\docs\deployment\output-package-v1.md](/G:/Juben/docs/deployment/output-package-v1.md)

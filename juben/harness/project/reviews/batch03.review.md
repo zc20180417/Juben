@@ -2,7 +2,7 @@
 
 - status: PASS
 - reviewer: codex
-- timestamp: 2026-04-24 22:11
+- timestamp: 2026-04-25 13:57
 - episodes: EP-11, EP-12, EP-13, EP-14, EP-15
 - sampled episodes: EP-11, EP-12
 
@@ -42,4 +42,4 @@
 
 - verdict: PASS
 - reviewer: codex
-- reason: batch03 beats complete; onsite resistance rule applied across reveal, evidence, action, reversal, and accusation scenes; rename consistency passes
+- reason: (none)

@@ -7,7 +7,7 @@
 
 权威输入：
 - `{{brief_rel}}` 决定当前集任务与 beats。
-- `harness/project/source.map.md` 决定 source 顺序、must-not-add、must-not-jump 边界。
+- `harness/project/source.map.md` 决定 source 顺序、knowledge_boundary、must-not-add、must-not-jump 边界。
 - `run.manifest.md` 里的 `current batch brief` 只用于运行时定位；若它滞后或冲突，忽略它。
 当前 batch：{{batch_id}}
 当前 episode：{{episode}}
@@ -43,6 +43,11 @@
 当前集 beats 清单：
 {{must_keep_beats_block}}
 - 上面这些 beats 必须全部完成；`【信息】/【关系】/【动作】/【钩子】` 任何一类都不能缺。
+
+当前集角色知识边界：
+{{knowledge_boundary_block}}
+- 上面这些边界决定角色当场能知道什么、不能知道什么、能怎么称呼对方。
+- 剧本正文里的称谓、姓氏、全名、职位、亲属关系和身份判断，必须有现场来源；介绍前优先用“先生 / 小姐 / 你 / 那个人”等中性称谓。
 
 {{rule_pack}}
 {{minimal_self_check}}

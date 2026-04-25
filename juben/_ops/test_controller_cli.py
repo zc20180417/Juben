@@ -1,4 +1,4 @@
-﻿import argparse
+import argparse
 import contextlib
 import importlib.util
 import io
@@ -134,6 +134,17 @@ class ControllerCliSmokeTests(unittest.TestCase):
         self.assertIn("usage: controller.py record", result.stdout)
         self.assertIn("batch_id", result.stdout)
 
+    def test_tilde_next_wrapper_routes_to_next_help(self) -> None:
+        result = self._run_wrapper("~next", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("usage: controller.py next", result.stdout)
+
+    def test_tilde_review_wrapper_routes_to_batch_review_done_help(self) -> None:
+        result = self._run_wrapper("~review", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("usage: controller.py batch-review-done", result.stdout)
+        self.assertIn("--reviewer", result.stdout)
+
 
 class ControllerHandlerRegressionTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -229,6 +240,8 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
                 "**source_chapter_span**: 第1章前半\n\n"
                 "**must-keep_beats**:\n"
                 "- 【关系】冷静拒认，拒绝回苏家\n\n"
+                "**knowledge_boundary**:\n"
+                "- 女主只知道对方在逼认亲，不能提前知道后续鉴定结果\n\n"
                 "**must-not-add / must-not-jump**:\n"
                 "- 无\n\n"
                 "**ending_function**: confrontation_pending\n",
@@ -270,8 +283,8 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
             "ep_end": "EP-02",
             "source_range": "ch1 ~ ch2",
             "episode_data": {
-                "EP-01": {"source_span": "ch1", "must_keep": "【信息】误认", "must_not": "不能抢跑", "ending_function": "confrontation_pending"},
-                "EP-02": {"source_span": "ch2", "must_keep": "【动作】入局", "must_not": "", "ending_function": "confrontation_pending"},
+                "EP-01": {"source_span": "ch1", "must_keep": "【信息】误认", "knowledge_boundary": "女主不知道男主姓名", "must_not": "不能抢跑", "ending_function": "confrontation_pending"},
+                "EP-02": {"source_span": "ch2", "must_keep": "【动作】入局", "knowledge_boundary": "双方已互知姓名", "must_not": "", "ending_function": "confrontation_pending"},
             },
         }
 
@@ -282,6 +295,8 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
         self.assertNotIn("ready for promote", brief)
         self.assertNotIn("batch ready for promote: yes", brief)
         self.assertNotIn("batch status:", brief)
+        self.assertIn("knowledge_boundary", brief)
+        self.assertIn("女主不知道男主姓名", brief)
 
     def test_prepare_batch_start_reads_generated_brief_before_status_sync(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -498,6 +513,110 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
             self.assertIn("Promoted: batch01, batch02", text)
             self.assertNotIn("Pending:  batch01", text)
 
+    def test_export_outputs_writes_summary_and_machine_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project = root / "harness" / "project"
+            state = project / "state"
+            batch_status_dir = state / "batch-status"
+            episodes = root / "episodes"
+            drafts = root / "drafts" / "episodes"
+            output = root / "output"
+            reviews = project / "reviews"
+            prompts = project / "prompts"
+            briefs = project / "batch-briefs"
+            locks = project / "locks"
+            for path in (batch_status_dir, episodes, drafts, reviews, prompts, briefs, locks):
+                path.mkdir(parents=True, exist_ok=True)
+
+            (episodes / "EP-01.md").write_text("# 第1集\n", encoding="utf-8")
+            (drafts / "EP-02.md").write_text("# 第2集\n", encoding="utf-8")
+            (prompts / "batch01.prompt.md").write_text("# Prompt\n", encoding="utf-8")
+            (briefs / "batch01_EP01-02.md").write_text(
+                "# Batch Brief\n- owned episodes: EP-01, EP-02\n",
+                encoding="utf-8",
+            )
+            run_manifest = project / "run.manifest.md"
+            run_manifest.write_text(
+                "# Run Manifest\n\n"
+                "- source_file: sample.md\n"
+                "- total_episodes: 2\n"
+                "- batch_size: 2\n"
+                "- target_total_minutes: 4\n"
+                "- target_episode_minutes: 2\n"
+                "- run_status: active\n"
+                "- active_batch: batch01\n",
+                encoding="utf-8",
+            )
+            source_map = project / "source.map.md"
+            source_map.write_text(
+                "# Source Map\n\n"
+                "## Batch 01 (EP01-02): demo\n\n"
+                "### EP01: a\n"
+                "**source_chapter_span**: ch1\n"
+                "**must-keep_beats**:\n- 【信息】a\n"
+                "**must-not-add / must-not-jump**:\n- none\n"
+                "**ending_function**: confrontation_pending\n\n"
+                "### EP02: b\n"
+                "**source_chapter_span**: ch2\n"
+                "**must-keep_beats**:\n- 【动作】b\n"
+                "**must-not-add / must-not-jump**:\n- none\n"
+                "**ending_function**: locked_in\n",
+                encoding="utf-8",
+            )
+            book_blueprint = project / "book.blueprint.md"
+            book_blueprint.write_text("# Book Blueprint\n", encoding="utf-8")
+            (batch_status_dir / "batch01.status.json").write_text(
+                json.dumps(
+                    {
+                        "batch_id": "batch01",
+                        "phase": "review_pending",
+                        "status": "BLOCKED",
+                        "episodes": ["EP-01", "EP-02"],
+                        "batch_review_status": "PENDING",
+                        "updated_at": "2026-04-24 00:00",
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            (reviews / "batch01.review.json").write_text(
+                json.dumps(
+                    {"batch_id": "batch01", "status": "PENDING", "episodes": ["EP-01", "EP-02"]},
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(self.controller, "ROOT", root), \
+                 mock.patch.object(self.controller, "PROJECT", project), \
+                 mock.patch.object(self.controller, "STATE", state), \
+                 mock.patch.object(self.controller, "BATCH_STATUS_DIR", batch_status_dir), \
+                 mock.patch.object(self.controller, "LOCKS", locks), \
+                 mock.patch.object(self.controller, "EPISODES", episodes), \
+                 mock.patch.object(self.controller, "DRAFTS", drafts), \
+                 mock.patch.object(self.controller, "OUTPUT", output), \
+                 mock.patch.object(self.controller, "REVIEWS", reviews), \
+                 mock.patch.object(self.controller, "PROMPTS", prompts), \
+                 mock.patch.object(self.controller, "BATCH_BRIEFS", briefs), \
+                 mock.patch.object(self.controller, "BOOK_BLUEPRINT", book_blueprint), \
+                 mock.patch.object(self.controller, "SOURCE_MAP", source_map), \
+                 mock.patch.object(self.controller, "RUN_MANIFEST", run_manifest):
+                stats = self.controller._export_outputs()
+
+            self.assertEqual(stats["episodes"], 1)
+            self.assertTrue((output / "SUMMARY.md").exists())
+            self.assertTrue((output / "manifest.json").exists())
+            summary = (output / "SUMMARY.md").read_text(encoding="utf-8")
+            payload = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+            self.assertIn("Juben V1 Output Summary", summary)
+            self.assertIn("~review batch01 PASS", summary)
+            self.assertEqual(payload["schema_version"], "juben-output/v1")
+            self.assertEqual(payload["published_episodes"][0]["episode"], "EP-01")
+            self.assertEqual(payload["batches"][0]["review_status"], "PENDING")
+
     def test_voice_anchor_quality_gate_rejects_common_expression_templates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             voice_anchor = Path(tmp) / "voice-anchor.md"
@@ -566,6 +685,67 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
         self.assertEqual(chapters[1]["title"], "第二章 旧事如刀")
         self.assertEqual(chapters[1]["start_line"], 4)
 
+    def test_init_creates_missing_project_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            novel = root / "sample.md"
+            novel.write_text("第一章\n误认入局。\n", encoding="utf-8")
+            harness = root / "harness"
+            project = harness / "project"
+            state = project / "state"
+            batch_status_dir = state / "batch-status"
+            locks = project / "locks"
+            drafts = root / "drafts" / "episodes"
+            episodes = root / "episodes"
+            batch_briefs = project / "batch-briefs"
+            reviews = project / "reviews"
+            prompts = project / "prompts"
+            releases = project / "releases"
+            release_journals = releases / "journals"
+            run_manifest = project / "run.manifest.md"
+            book_blueprint = project / "book.blueprint.md"
+            source_map = project / "source.map.md"
+            output = root / "output"
+            run_log = state / "run.log.md"
+
+            args = argparse.Namespace(
+                novel_file="sample.md",
+                episodes=4,
+                batch_size=5,
+                target_total_minutes=8,
+                strategy="original_fidelity",
+                intensity="light",
+                key_episodes="",
+                force=True,
+            )
+            with contextlib.redirect_stdout(io.StringIO()), \
+                 mock.patch.object(self.controller, "ROOT", root), \
+                 mock.patch.object(self.controller, "PROJECT", project), \
+                 mock.patch.object(self.controller, "STATE", state), \
+                 mock.patch.object(self.controller, "BATCH_STATUS_DIR", batch_status_dir), \
+                 mock.patch.object(self.controller, "LOCKS", locks), \
+                 mock.patch.object(self.controller, "DRAFTS", drafts), \
+                 mock.patch.object(self.controller, "EPISODES", episodes), \
+                 mock.patch.object(self.controller, "BATCH_BRIEFS", batch_briefs), \
+                 mock.patch.object(self.controller, "REVIEWS", reviews), \
+                 mock.patch.object(self.controller, "PROMPTS", prompts), \
+                 mock.patch.object(self.controller, "RELEASES", releases), \
+                 mock.patch.object(self.controller, "RELEASE_JOURNALS", release_journals), \
+                 mock.patch.object(self.controller, "RUN_MANIFEST", run_manifest), \
+                 mock.patch.object(self.controller, "BOOK_BLUEPRINT", book_blueprint), \
+                 mock.patch.object(self.controller, "SOURCE_MAP", source_map), \
+                 mock.patch.object(self.controller, "RUN_LOG", run_log), \
+                 mock.patch.object(self.controller, "OUTPUT", output):
+                result = self.controller.cmd_init(args)
+
+            self.assertEqual(result, 0)
+            self.assertTrue(run_manifest.exists())
+            self.assertTrue(book_blueprint.exists())
+            self.assertTrue(source_map.exists())
+            self.assertTrue(batch_status_dir.exists())
+            self.assertTrue(prompts.exists())
+            self.assertTrue(release_journals.exists())
+
     def test_parse_source_map_supports_generated_markdown_format(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             source_map = Path(tmp) / "source.map.md"
@@ -578,6 +758,8 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
                 "**must-keep_beats**:\n"
                 "- 和离书被销毁\n"
                 "- 沈如月误以为裴砚亭不爱她\n\n"
+                "**knowledge_boundary**:\n"
+                "- 沈如月不知道裴砚亭真实计划\n\n"
                 "**must-not-add / must-not-jump**:\n"
                 "- 不能跳过离书被销毁\n\n"
                 "**ending_function**: confrontation_pending\n\n"
@@ -587,6 +769,8 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
                 "**must-keep_beats**:\n"
                 "- 柳清言登门\n"
                 "- 海棠树下对峙\n\n"
+                "**knowledge_boundary**:\n"
+                "- 柳清言出现前不能提前叫出她的真实目的\n\n"
                 "**must-not-add / must-not-jump**:\n"
                 "- 不能跳过柳清言挑衅\n\n"
                 "**ending_function**: reversal_triggered\n",
@@ -605,6 +789,7 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
             "第1章至第2章前半",
         )
         self.assertIn("和离书被销毁", batches["batch01"]["episode_data"]["EP-01"]["must_keep"])
+        self.assertIn("沈如月不知道裴砚亭真实计划", batches["batch01"]["episode_data"]["EP-01"]["knowledge_boundary"])
         self.assertIn("不能跳过离书被销毁", batches["batch01"]["episode_data"]["EP-01"]["must_not"])
         self.assertEqual(
             batches["batch01"]["episode_data"]["EP-02"]["ending_function"],
@@ -1628,6 +1813,89 @@ class OutputExportTests(unittest.TestCase):
             self.assertTrue((output / "anchors" / "character.md").exists())
             self.assertIn("python _ops/controller.py export", (output / "README.md").read_text(encoding="utf-8"))
 
+    def test_export_marks_manifest_complete_when_all_batches_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project = root / "harness" / "project"
+            episodes = root / "episodes"
+            drafts = root / "drafts" / "episodes"
+            reviews = project / "reviews"
+            prompts = project / "prompts"
+            briefs = project / "batch-briefs"
+            state = project / "state"
+            locks = project / "locks"
+            batch_status = project / "batch-status"
+            output = root / "output"
+            for path in (project, episodes, drafts, reviews, prompts, briefs, state, locks, batch_status):
+                path.mkdir(parents=True, exist_ok=True)
+
+            (episodes / "EP-01.md").write_text("# EP-01\n", encoding="utf-8")
+            (drafts / "EP-01.md").write_text("# EP-01\n", encoding="utf-8")
+            (project / "book.blueprint.md").write_text("# blueprint\n", encoding="utf-8")
+            (project / "source.map.md").write_text(
+                "# Source Map\n\n"
+                "- mapping_status: complete\n\n"
+                "## Batch 01 (EP01-01): 示例\n\n"
+                "### EP01: 开局\n\n"
+                "**source_chapter_span**: 第1章\n\n"
+                "**must_keep_beats**:\n"
+                "- 【动作】开局冲突\n\n",
+                encoding="utf-8",
+            )
+            run_manifest = project / "run.manifest.md"
+            run_manifest.write_text(
+                "# Run Manifest\n\n"
+                "- source_file: novel.md\n"
+                "- total_episodes: 1\n"
+                "- target_total_minutes: 2\n"
+                "- target_episode_minutes: 2\n"
+                "- batch_size: 1\n"
+                "- run_status: active\n"
+                "- active_batch: batch01_promoted\n",
+                encoding="utf-8",
+            )
+            (batch_status / "batch01.status.json").write_text(
+                json.dumps(
+                    {
+                        "batch_id": "batch01",
+                        "phase": "recorded",
+                        "status": "DONE",
+                        "episodes": ["EP-01"],
+                        "batch_review_status": "PASS",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (reviews / "batch01.review.json").write_text(
+                json.dumps({"batch_id": "batch01", "status": "PASS", "reviewer": "codex"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            with contextlib.redirect_stdout(io.StringIO()), \
+                 mock.patch.object(self.controller, "ROOT", root), \
+                 mock.patch.object(self.controller, "OUTPUT", output), \
+                 mock.patch.object(self.controller, "EPISODES", episodes), \
+                 mock.patch.object(self.controller, "DRAFTS", drafts), \
+                 mock.patch.object(self.controller, "REVIEWS", reviews), \
+                 mock.patch.object(self.controller, "PROMPTS", prompts), \
+                 mock.patch.object(self.controller, "BATCH_BRIEFS", briefs), \
+                 mock.patch.object(self.controller, "STATE", state), \
+                 mock.patch.object(self.controller, "LOCKS", locks), \
+                 mock.patch.object(self.controller, "BATCH_STATUS_DIR", batch_status), \
+                 mock.patch.object(self.controller, "BOOK_BLUEPRINT", project / "book.blueprint.md"), \
+                 mock.patch.object(self.controller, "SOURCE_MAP", project / "source.map.md"), \
+                 mock.patch.object(self.controller, "RUN_MANIFEST", run_manifest):
+                result = self.controller.cmd_export(argparse.Namespace())
+
+            self.assertEqual(result, 0)
+            manifest_text = run_manifest.read_text(encoding="utf-8")
+            self.assertIn("- run_status: complete", manifest_text)
+            self.assertIn("- active_batch: (none)", manifest_text)
+            payload = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["run_status"], "complete")
+            self.assertEqual(payload["active_batch"], "(none)")
+
 
 class WriterCommandConfigTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -2164,13 +2432,16 @@ class CleanCommandTests(unittest.TestCase):
             episodes = root / "episodes"
             batch_briefs = project / "batch-briefs"
             reviews = project / "reviews"
+            prompts = project / "prompts"
             releases = project / "releases"
+            release_journals = releases / "journals"
+            output_dir = root / "output"
             run_manifest = project / "run.manifest.md"
             run_log = state / "run.log.md"
             source_map = project / "source.map.md"
             release_index = releases / "release.index.json"
             gold_set = releases / "gold-set.json"
-            for path in [state, locks, drafts, episodes, batch_briefs, reviews, releases]:
+            for path in [state, locks, drafts, episodes, batch_briefs, reviews, prompts, releases, output_dir]:
                 path.mkdir(parents=True, exist_ok=True)
 
             (drafts / "EP-01.md").write_text("draft", encoding="utf-8")
@@ -2213,12 +2484,15 @@ class CleanCommandTests(unittest.TestCase):
                  mock.patch.object(self.controller, "EPISODES", episodes), \
                  mock.patch.object(self.controller, "BATCH_BRIEFS", batch_briefs), \
                  mock.patch.object(self.controller, "REVIEWS", reviews), \
+                 mock.patch.object(self.controller, "PROMPTS", prompts), \
                  mock.patch.object(self.controller, "RUN_MANIFEST", run_manifest), \
                  mock.patch.object(self.controller, "RUN_LOG", run_log), \
                  mock.patch.object(self.controller, "SOURCE_MAP", source_map), \
                  mock.patch.object(self.controller, "RELEASES", releases), \
+                 mock.patch.object(self.controller, "RELEASE_JOURNALS", release_journals), \
                  mock.patch.object(self.controller, "RELEASE_INDEX", release_index), \
                  mock.patch.object(self.controller, "GOLD_SET", gold_set), \
+                 mock.patch.object(self.controller, "OUTPUT", output_dir), \
                  mock.patch.object(self.controller, "NOW", "2026-04-15 14:30"):
                 result = self.controller.cmd_clean(argparse.Namespace())
 
@@ -2704,7 +2978,7 @@ class BatchBriefAuthoringTests(unittest.TestCase):
 
         self.assertIn("## Writer Authority", brief)
         self.assertIn("收尾上下文", brief)
-        self.assertIn("`harness/project/source.map.md`：决定 source 顺序、must-not-add、must-not-jump 边界", brief)
+        self.assertIn("`harness/project/source.map.md`：决定 source 顺序、knowledge_boundary、must-not-add、must-not-jump 边界", brief)
         self.assertNotIn("## Source Priority", brief)
         self.assertNotIn("## Function Policy", brief)
         self.assertNotIn("功能目标", brief)
@@ -3168,6 +3442,70 @@ PromoteJournalTests.test_start_write_mode_runs_writer_once_without_smoke_retry =
 
 StartCommandTests.test_start_no_longer_auto_promotes = _override_test_start_review_only_prompt_packet
 StartCommandTests.test_start_runs_writer_only_with_write_flag = _override_test_start_review_only_prompt_packet
+
+
+class PolishCommandTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.controller = _load_controller_module()
+
+    def test_polish_creates_prompt_packet_without_model_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project = root / "harness" / "project"
+            framework = root / "harness" / "framework"
+            drafts = root / "drafts" / "episodes"
+            prompts = project / "prompts"
+            reviews = project / "reviews"
+            briefs = project / "batch-briefs"
+            state = project / "state"
+            batch_status = state / "batch-status"
+            for path in (framework, drafts, prompts, reviews, briefs, batch_status):
+                path.mkdir(parents=True, exist_ok=True)
+
+            (root / "character.md").write_text("# Character\n", encoding="utf-8")
+            (root / "voice-anchor.md").write_text("# Voice\n", encoding="utf-8")
+            (project / "source.map.md").write_text("# Source Map\n", encoding="utf-8")
+            (project / "run.manifest.md").write_text(
+                "# Run Manifest\n\n- quality_mode: premium\n",
+                encoding="utf-8",
+            )
+            (framework / "polish-prompt.template.md").write_text(
+                "{{batch_id}}\n{{quality_mode}}\n{{draft_paths}}\n{{polish_report_path}}\n",
+                encoding="utf-8",
+            )
+            (framework / "writer-style.md").write_text("# style\n", encoding="utf-8")
+            (framework / "write-contract.md").write_text("# contract\n", encoding="utf-8")
+            (briefs / "batch03_EP11-12.md").write_text(
+                "# Batch Brief\n- owned episodes: EP-11, EP-12\n",
+                encoding="utf-8",
+            )
+            (drafts / "EP-11.md").write_text("draft 11", encoding="utf-8")
+            (drafts / "EP-12.md").write_text("draft 12", encoding="utf-8")
+
+            with mock.patch.object(self.controller, "ROOT", root), \
+                 mock.patch.object(self.controller, "PROJECT", project), \
+                 mock.patch.object(self.controller, "FRAMEWORK", framework), \
+                 mock.patch.object(self.controller, "DRAFTS", drafts), \
+                 mock.patch.object(self.controller, "PROMPTS", prompts), \
+                 mock.patch.object(self.controller, "REVIEWS", reviews), \
+                 mock.patch.object(self.controller, "BATCH_BRIEFS", briefs), \
+                 mock.patch.object(self.controller, "BATCH_STATUS_DIR", batch_status), \
+                 mock.patch.object(self.controller, "RUN_MANIFEST", project / "run.manifest.md"), \
+                 mock.patch.object(self.controller, "SOURCE_MAP", project / "source.map.md"), \
+                 mock.patch.object(self.controller, "POLISH_PROMPT_TEMPLATE", framework / "polish-prompt.template.md"):
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    rc = self.controller.cmd_polish(argparse.Namespace(batch_id="batch03"))
+
+            prompt = prompts / "batch03.polish.prompt.md"
+            self.assertEqual(rc, self.controller.WRITER_STAGE_PROMPTS_READY)
+            self.assertTrue(prompt.exists())
+            text = prompt.read_text(encoding="utf-8")
+            self.assertIn("premium", text)
+            self.assertIn("drafts/episodes/EP-11.md", text)
+            self.assertIn("harness/project/reviews/batch03.polish.md", text)
+            self.assertIn("Prompt packet ready", output.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

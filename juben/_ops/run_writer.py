@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import json
@@ -711,6 +711,7 @@ def _clean_inline_fact_text(text: str) -> str:
     for marker in (
         "source chapter span",
         "must-keep beats",
+        "knowledge boundary",
         "must-not-add / must-not-jump",
         "function signals",
         "ending function",
@@ -786,6 +787,7 @@ def _extract_batch_facts_from_source_map(batch_id: str) -> dict[str, object]:
                 "**source_chapter_span**:",
                 (
                     "**must-keep_beats**:",
+                    "**knowledge_boundary**:",
                     "**must-not-add / must-not-jump**:",
                     "**function_signals**:",
                     "**scene_plan**:",
@@ -799,6 +801,7 @@ def _extract_batch_facts_from_source_map(batch_id: str) -> dict[str, object]:
                 block,
                 "**must-keep_beats**:",
                 (
+                    "**knowledge_boundary**:",
                     "**must-not-add / must-not-jump**:",
                     "**function_signals**:",
                     "**scene_plan**:",
@@ -811,7 +814,14 @@ def _extract_batch_facts_from_source_map(batch_id: str) -> dict[str, object]:
             _extract_marked_block(
                 block,
                 "**must-not-add / must-not-jump**:",
-                ("**function_signals**:", "**scene_plan**:", "**ending_function**:", "**irreversibility_level**:"),
+                ("**knowledge_boundary**:", "**function_signals**:", "**scene_plan**:", "**ending_function**:", "**irreversibility_level**:"),
+            )
+        )
+        knowledge_boundary = _extract_block_bullets(
+            _extract_marked_block(
+                block,
+                "**knowledge_boundary**:",
+                ("**must-not-add / must-not-jump**:", "**function_signals**:", "**scene_plan**:", "**ending_function**:", "**irreversibility_level**:"),
             )
         )
         ending_function = _clean_inline_fact_text(
@@ -821,6 +831,7 @@ def _extract_batch_facts_from_source_map(batch_id: str) -> dict[str, object]:
             "episode": episode_id,
             "source_span": source_span,
             "must_keep_beats": must_keep_beats,
+            "knowledge_boundary": knowledge_boundary,
             "must_not_add": must_not_add,
             "ending_function": ending_function,
         }
@@ -964,6 +975,16 @@ def _build_episode_source_excerpt(batch_id: str, episode: str) -> Path:
         if must_keep_names
         else "（当前片段未抽到可直接锁定的人名；仍以原文显式出现的称谓为准）"
     )
+    knowledge_boundary = [
+        str(item).strip()
+        for item in episode_facts.get("knowledge_boundary", [])
+        if str(item).strip()
+    ] if isinstance(episode_facts.get("knowledge_boundary"), list) else []
+    knowledge_boundary_block = (
+        "\n".join(f"- {item}" for item in knowledge_boundary)
+        if knowledge_boundary
+        else "（source.map 未提供本集角色知识边界；写作时必须自行按原文当前场已公开信息保守处理）"
+    )
     must_keep_long_lines_block = (
         "\n".join(f"- {line}" for line in must_keep_long_lines)
         if must_keep_long_lines
@@ -987,6 +1008,9 @@ def _build_episode_source_excerpt(batch_id: str, episode: str) -> Path:
         "",
         "## Must-Keep Names",
         must_keep_names_block,
+        "",
+        "## Knowledge Boundary From Source Map",
+        knowledge_boundary_block,
         "",
     ]
     if include_reusable_lines:
@@ -1025,6 +1049,7 @@ def _build_episode_source_excerpt(batch_id: str, episode: str) -> Path:
         "excerpt_tier": excerpt_tier,
         "event_anchors": event_anchors,
         "must_keep_names": must_keep_names,
+        "knowledge_boundary": knowledge_boundary,
         "forbidden_fill": forbidden_fill,
     }
     if excerpt_tier in {"low_risk", "strong_scene"}:
@@ -1230,6 +1255,13 @@ def _render_episode_beats(episode_facts: dict[str, object]) -> str:
     return "\n".join(f"- {str(item).strip()}" for item in beats if str(item).strip())
 
 
+def _render_episode_knowledge_boundary(episode_facts: dict[str, object]) -> str:
+    boundary = episode_facts.get("knowledge_boundary")
+    if not isinstance(boundary, list) or not boundary:
+        return "- （未抽到 knowledge_boundary；按原文当前场已公开信息保守处理，称谓不抢跑）"
+    return "\n".join(f"- {str(item).strip()}" for item in boundary if str(item).strip())
+
+
 def _build_rule_priority_block() -> str:
     lines = [
         "冲突优先级：",
@@ -1255,6 +1287,7 @@ def _episode_rule_profile(source_excerpt_path: Path) -> dict[str, object]:
         "excerpt_tier": "baseline",
         "scene_modes": [],
         "must_keep_names": [],
+        "knowledge_boundary": [],
         "must_keep_long_lines": [],
         "abstract_narration": [],
         "forbidden_fill": [],
@@ -1269,6 +1302,7 @@ def _episode_rule_profile(source_excerpt_path: Path) -> dict[str, object]:
             "excerpt_tier": str(payload.get("excerpt_tier", "baseline")),
             "scene_modes": [item for item in payload.get("scene_modes", []) if isinstance(item, str)],
             "must_keep_names": [item for item in payload.get("must_keep_names", []) if isinstance(item, str)],
+            "knowledge_boundary": [item for item in payload.get("knowledge_boundary", []) if isinstance(item, str)],
             "must_keep_long_lines": [item for item in payload.get("must_keep_long_lines", []) if isinstance(item, str)],
             "abstract_narration": [item for item in payload.get("abstract_narration", []) if isinstance(item, str)],
             "forbidden_fill": [item for item in payload.get("forbidden_fill", []) if isinstance(item, str)],
@@ -1284,6 +1318,7 @@ def _episode_rule_profile(source_excerpt_path: Path) -> dict[str, object]:
         "excerpt_tier": excerpt_tier,
         "scene_modes": _extract_bullet_section(text, "Scene Modes"),
         "must_keep_names": _extract_bullet_section(text, "Must-Keep Names"),
+        "knowledge_boundary": _extract_bullet_section(text, "Knowledge Boundary From Source Map"),
         "must_keep_long_lines": _extract_bullet_section(text, "Must-Keep Long Lines"),
         "abstract_narration": _extract_bullet_section(text, "Abstract Narration To Externalize"),
         "forbidden_fill": _extract_bullet_section(text, "Forbidden Fill"),
@@ -1351,6 +1386,7 @@ def _build_minimal_rule_pack(
         "- `event_anchors` 定顺序；已发生事件不得后拖。",
         "- 默认禁新事件、禁新流程、禁新职业说明、禁新后台调度、禁新承接对白。",
         "- 角色只按当场已公开信息行动；模型知道不等于角色知道。",
+        "- 称谓必须有现场来源；介绍前不提前喊姓氏、全名、职位或关系词。",
         "- `voice-anchor.md` 只看气质和禁区，不复用例句。",
         "- 场次数按 beats 和 source 推进自然决定；整集至少 2 场，不要为凑格式硬拆或硬并。",
         "- 非终场最后一个 `△` 必须带新增推进，别停在静态结果或环境余波。",
@@ -1408,6 +1444,7 @@ def _build_minimal_self_check(profile: dict[str, object], episode_facts: dict[st
         "- beats：`【信息】/【关系】/【动作】/【钩子】` 一项不缺。",
         "- 收尾：最后推进已经落到正文，不停在解释或总结。",
         "- 顺序：`event_anchors` 不后拖；不越过 `must-not-add / must-not-jump`。",
+        "- 知识边界：称谓、身份、关系词必须来自当场已公开信息或 `knowledge_boundary`。",
         "- 壳层：`△ / ♪ / 【镜头】： / 角色： / 角色（os）：` 各自独行。",
         "- 场次：整集至少 2 场；非终场最后一个 `△` 留新增推进。",
         "- 叙述：禁新增第一人称 `OS` / “我……”旁白；能不用 `OS` 就不用。",
@@ -1450,6 +1487,7 @@ def _build_writer_prompt(
     context_paths = _adjacent_context_paths(episode)
     episode_facts = _batch_context_episode_facts(batch_context_path, episode)
     must_keep_beats_block = _render_episode_beats(episode_facts)
+    knowledge_boundary_block = _render_episode_knowledge_boundary(episode_facts)
     rule_profile = _episode_rule_profile(source_excerpt_path)
     rule_pack = _build_minimal_rule_pack(
         rule_profile,
@@ -1482,6 +1520,7 @@ def _build_writer_prompt(
             "episode_num": episode_num,
             "sample_rel": sample_rel,
             "must_keep_beats_block": must_keep_beats_block,
+            "knowledge_boundary_block": knowledge_boundary_block,
             "rule_pack": rule_pack,
             "minimal_self_check": minimal_self_check,
             "syntax_guidance": syntax_guidance,
@@ -1517,7 +1556,8 @@ def _build_sequential_batch_writer_prompt(
             f"- {episode} -> drafts/episodes/{episode}.md\n"
             f"  - excerpt: {_rel(_source_excerpt_runtime_path(source_excerpt_paths[episode]))}\n"
             f"  - 场次：首场 `场{int(episode.split('-')[1])}-1`；整集至少 2 场；按 beats 与 source 推进自然拆场\n"
-            f"  - beats：{'; '.join(_batch_context_episode_facts(batch_context_path, episode).get('must_keep_beats', [])) or '以 batch brief 当前集任务为准'}；`【信息】/【关系】/【动作】/【钩子】` 不能缺"
+            f"  - beats：{'; '.join(_batch_context_episode_facts(batch_context_path, episode).get('must_keep_beats', [])) or '以 batch brief 当前集任务为准'}；`【信息】/【关系】/【动作】/【钩子】` 不能缺\n"
+            f"  - knowledge_boundary：{'; '.join(_batch_context_episode_facts(batch_context_path, episode).get('knowledge_boundary', [])) or '按当场已公开信息保守处理，称谓不抢跑'}"
         )
         for episode in episodes
     )
@@ -1532,7 +1572,8 @@ def _build_sequential_batch_writer_prompt(
         "- 整集至少 2 场；按当前戏的推进自然拆场，不为凑格式硬拆或硬并。",
         "- 非终场最后一个 `△` 必须带服务 beats 的新增推进，别停在静态结果。",
         "- 禁新增第一人称叙述；`角色（os）：` 也不能写成“我……”式内心旁白。",
-        "- 上一集只给边界；承接最多 1-2 个镜头。模型知道不等于角色知道；身份、关系、真名只按当场已公开信息写。",
+        "- 上一集只给边界；承接最多 1-2 个镜头。模型知道不等于角色知道；身份、关系、真名只按当场已公开信息和 `knowledge_boundary` 写。",
+        "- 称谓必须有现场来源；介绍前不提前喊姓氏、全名、职位或关系词。",
         "- `voice-anchor` 只看气质与禁区，优先级低于当前集 beats 和 source 边界。",
     ]
     sequence_runtime_pack = "\n".join(sequence_runtime_lines)
@@ -1630,4 +1671,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

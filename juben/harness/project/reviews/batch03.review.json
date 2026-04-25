@@ -2,7 +2,7 @@
   "batch_id": "batch03",
   "status": "PASS",
   "reviewer": "codex",
-  "timestamp": "2026-04-24 22:11",
+  "timestamp": "2026-04-25 13:57",
   "episodes": [
     "EP-11",
     "EP-12",
@@ -20,5 +20,5 @@
   "function_theft_findings": [],
   "quality_anchor_findings": [],
   "evidence_refs": [],
-  "reason": "batch03 beats complete; onsite resistance rule applied across reveal, evidence, action, reversal, and accusation scenes; rename consistency passes"
+  "reason": ""
 }

@@ -59,12 +59,18 @@ class RunWriterTests(unittest.TestCase):
                     "",
                     "### EP11: test",
                     "**source_chapter_span**: 第1章前半",
+                    "**knowledge_boundary**:",
+                    "- EP11 女主不知道陌生男人姓名",
                     "",
                     "### EP12: test",
                     "**source_chapter_span**: 第1章后半",
+                    "**knowledge_boundary**:",
+                    "- EP12 双方已互知姓名",
                     "",
                     "### EP13: test",
                     "**source_chapter_span**: 第2章",
+                    "**knowledge_boundary**:",
+                    "- EP13 按现场公开信息称呼",
                     "",
                 ]
             )
@@ -780,6 +786,8 @@ class RunWriterTests(unittest.TestCase):
                         "**source_chapter_span**: Chapter 1",
                         "**must-keep_beats**:",
                         "- Beat A",
+                        "**knowledge_boundary**:",
+                        "- Ava does not know the stranger name yet",
                         "**must-not-add / must-not-jump**:",
                         "- Skip A",
                         "**function_signals**:",
@@ -861,6 +869,7 @@ class RunWriterTests(unittest.TestCase):
         self.assertNotIn("scene_plan", payload["batch_facts"]["episodes"][0])
         self.assertNotIn("function_signals", payload["batch_facts"]["episodes"][0])
         self.assertEqual(payload["batch_facts"]["episodes"][0]["ending_function"], "locked_in")
+        self.assertIn("knowledge_boundary", payload["batch_facts"]["episodes"][0])
 
     def test_main_skips_backend_when_all_drafts_exist(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -964,6 +973,8 @@ class RunWriterTests(unittest.TestCase):
         self.assertIn("event_anchors", prompt)
         self.assertIn("must_keep_names", prompt)
         self.assertIn("forbidden_fill", prompt)
+        self.assertIn("当前集角色知识边界", prompt)
+        self.assertIn("称谓必须有现场来源", prompt)
         self.assertIn("运行时最小规则包", prompt)
         self.assertIn("交稿前最小自检", prompt)
         self.assertIn("`event_anchors` 定顺序", prompt)
@@ -1030,6 +1041,8 @@ class RunWriterTests(unittest.TestCase):
         self.assertIn("`event_anchors` 定顺序", prompt)
         self.assertIn("`must_keep_names`、`forbidden_fill` 守边界", prompt)
         self.assertIn("模型知道不等于角色知道", prompt)
+        self.assertIn("knowledge_boundary：", prompt)
+        self.assertIn("称谓必须有现场来源", prompt)
 
     def test_main_runs_batch_fidelity_rewrite_only_when_needed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

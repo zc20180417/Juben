@@ -9,15 +9,15 @@
 - target_episode_minutes: 2
 - episode_minutes_min: 1
 - episode_minutes_max: 3
-- key_episodes: 
+- key_episodes:
 - adaptation_mode: novel_to_short_drama
 - adaptation_strategy: original_fidelity
 - dialogue_adaptation_intensity: light
 - generation_execution_mode: prompt_packet_external_agent
 - writer_parallelism: 1
 - generation_reset_mode: clean_rebuild
-- run_status: active
-- active_batch: batch04_promoted
+- run_status: complete
+- active_batch: (none)
 - source_authority: original novel manuscript + harness/project/book.blueprint.md + harness/project/source.map.md
 - draft_lane: drafts/episodes
 - publish_lane: episodes

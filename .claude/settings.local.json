@@ -3,7 +3,10 @@
     "allow": [
       "Bash(wc:*)",
       "Bash(sed:*)",
-      "Bash(python -m pytest test_episode_lint.py -v)"
+      "Bash(python _ops/test_controller_cli.py)",
+      "Bash(python _ops/test_run_book_extract.py)",
+      "Bash(python _ops/test_run_book_map.py)",
+      "Bash(python _ops/test_run_writer.py)"
     ]
   }
 }

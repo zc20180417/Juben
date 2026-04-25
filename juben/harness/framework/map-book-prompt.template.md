@@ -59,6 +59,7 @@
 每集必须包含的字段：
 - `**source_chapter_span**:`
 - `**must-keep_beats**:`
+- `**knowledge_boundary**:`
 - `**must-not-add / must-not-jump**:`
 - `**ending_function**:` 只有在收尾目标非常明确时才填写
 
@@ -66,6 +67,9 @@
 - `must-keep_beats` 保持 3-5 条
 - 每条 beat 必须是“可执行的成集任务”，不是抽象标签
 - beats 必须帮助 writer 写出完整主戏，不要只列动作摘要
+- `knowledge_boundary` 必须写清本集关键角色“当场知道什么 / 还不知道什么 / 可以怎么称呼对方”
+- `knowledge_boundary` 不是剧情摘要；它用于防止 writer 把编剧全知信息偷跑进角色台词
+- 对误认、认亲、掉马、替身、隐瞒身份、陌生人初见类集数，必须明确称谓解锁顺序：介绍前只能用中性称谓，不能提前喊姓氏、全名、职位或关系词
 - `source_chapter_span` 要能支撑这些 beats 真正写满这一集
 - `must-not-add / must-not-jump` 只写 source 边界和不可抢跑内容，不要写风格建议
 

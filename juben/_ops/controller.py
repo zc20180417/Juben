@@ -10,6 +10,7 @@ Project setup:
 Orchestration commands:
   start <batch_id>       Prepare batch → writer stage → stop for review
   check <batch_id>       Rebuild review packet only (fallback/debug)
+  polish <batch_id>      Create optional premium polish prompt packet
   run <batch_id>         Review gate → promote → next
   finish <batch_id>      Deprecated alias for run
   next                   Show pipeline progress and next batch to start
@@ -34,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import random
@@ -59,6 +61,7 @@ RUN_LOG = STATE / "run.log.md"
 MEMORY_CONTRACT = FRAMEWORK / "memory-contract.md"
 REVIEW_STANDARD = FRAMEWORK / "review-standard.md"
 REVIEW_PROMPT_TEMPLATE = FRAMEWORK / "reviewer-prompt.template.md"
+POLISH_PROMPT_TEMPLATE = FRAMEWORK / "polish-prompt.template.md"
 BOOK_BLUEPRINT = PROJECT / "book.blueprint.md"
 SOURCE_MAP = PROJECT / "source.map.md"
 RELEASES = PROJECT / "releases"
@@ -189,6 +192,10 @@ def _batch_review_md_path(batch_id: str) -> Path:
 
 def _batch_review_prompt_path(batch_id: str) -> Path:
     return REVIEWS / f"{batch_id}.review.prompt.md"
+
+
+def _batch_polish_report_path(batch_id: str) -> Path:
+    return REVIEWS / f"{batch_id}.polish.md"
 
 
 def _empty_batch_status(
@@ -1369,6 +1376,12 @@ def _parse_source_map() -> dict:
                     markdown_pattern=r"\*\*must-keep_beats\*\*:\s*(.*?)(?=\n\*\*|\n---|\Z)",
                     multiline=True,
                 ),
+                "knowledge_boundary": _extract_episode_map_field(
+                    ep_block,
+                    legacy_pattern=r"knowledge boundary：(.+)",
+                    markdown_pattern=r"\*\*knowledge_boundary\*\*:\s*(.*?)(?=\n\*\*|\n---|\Z)",
+                    multiline=True,
+                ),
                 "must_not": _extract_episode_map_field(
                     ep_block,
                     legacy_pattern=r"must-not-add / must-not-jump：(.+)",
@@ -1428,8 +1441,12 @@ def _generate_batch_brief(batch_id: str, batch_info: dict) -> str:
         span = data.get("source_span", "")
         beats = data.get("must_keep", "")
         beat_arrows = " -> ".join(_beats_from_raw(beats)[:5])
+        knowledge_lines = _beats_from_raw(data.get("knowledge_boundary", ""))
         ep_mapping_lines.append(f"- {ep}：{span}")
         ep_mapping_lines.append(f"  - {beat_arrows}")
+        if knowledge_lines:
+            ep_mapping_lines.append("  - knowledge_boundary:")
+            ep_mapping_lines.extend(f"    - {item}" for item in knowledge_lines)
     ep_mapping = "\n".join(ep_mapping_lines)
 
     # Build hard constraints from must-not
@@ -1467,7 +1484,7 @@ def _generate_batch_brief(batch_id: str, batch_info: dict) -> str:
 
 ## Writer Authority
 - 当前 batch brief：决定本批每集的任务、beats 与收尾上下文
-- `harness/project/source.map.md`：决定 source 顺序、must-not-add、must-not-jump 边界
+- `harness/project/source.map.md`：决定 source 顺序、knowledge_boundary、must-not-add、must-not-jump 边界
 - `harness/project/run.manifest.md`：只提供运行参数，不裁决内容冲突
 - `voice-anchor.md` / `character.md`：仅作气质、禁区与称谓参考，不覆盖当前集任务
 
@@ -1504,6 +1521,7 @@ def _source_map_quality_issues() -> list[str]:
             )
             source_span = str(episode_data.get("source_span", "")).strip()
             must_keep = _beats_from_raw(episode_data.get("must_keep", ""))
+            knowledge_boundary = _beats_from_raw(episode_data.get("knowledge_boundary", ""))
             if not source_span:
                 issues.append(f"{batch_id}/{episode}: source_chapter_span is missing")
             if not must_keep:
@@ -1512,6 +1530,8 @@ def _source_map_quality_issues() -> list[str]:
                 issues.append(
                     f"{batch_id}/{episode}: must-keep beats are too abstract; add at least one actionable beat"
                 )
+            if not knowledge_boundary:
+                issues.append(f"{batch_id}/{episode}: knowledge_boundary is missing")
     return issues
 
 
@@ -1875,6 +1895,27 @@ def _write_prompt_packet(filename: str, prompt: str) -> Path:
     return path
 
 
+def _render_polish_prompt(batch_id: str, episodes: list[str], brief_path: Path) -> str:
+    manifest = _read_manifest()
+    draft_paths = "\n".join(f"- drafts/episodes/{episode}.md" for episode in episodes) or "- (none)"
+    return _render_template_text(
+        POLISH_PROMPT_TEMPLATE,
+        {
+            "batch_id": batch_id,
+            "quality_mode": manifest.get("quality_mode", "standard"),
+            "episodes": ", ".join(episodes),
+            "batch_brief_path": _relative_to_root(brief_path),
+            "source_map_path": _relative_to_root(SOURCE_MAP),
+            "character_path": _relative_to_root(ROOT / "character.md"),
+            "voice_anchor_path": _relative_to_root(ROOT / "voice-anchor.md"),
+            "writer_style_path": _relative_to_root(FRAMEWORK / "writer-style.md"),
+            "write_contract_path": _relative_to_root(FRAMEWORK / "write-contract.md"),
+            "draft_paths": draft_paths,
+            "polish_report_path": _relative_to_root(_batch_polish_report_path(batch_id)),
+        },
+    )
+
+
 def _print_prompt_ready(prompt_path: Path, target_paths: list[Path], *, next_command: str | None = None) -> None:
     print("  -> Prompt packet ready; no Python-managed model process was started.")
     print(f"  Prompt: {_relative_to_root(prompt_path)}")
@@ -1895,6 +1936,16 @@ def _sync_run_writer_paths(run_writer_module) -> None:
     run_writer_module.WRITER_PROMPT_TEMPLATE = FRAMEWORK / "writer-prompt.template.md"
     run_writer_module.WRITER_BATCH_PROMPT_TEMPLATE = FRAMEWORK / "writer-batch-prompt.template.md"
     run_writer_module.PROMPTS_DIR = PROMPTS
+
+
+def _load_run_writer_prompt_builder():
+    script_path = Path(__file__).resolve().with_name("run_writer.py")
+    spec = importlib.util.spec_from_file_location("juben_run_writer_prompt_builder", script_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot load {script_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _warn_unanchored_voice_assets() -> None:
@@ -1965,7 +2016,7 @@ def _run_writer_stage(
     print("  -> Building writer prompt packet only; controller will not call model CLIs.")
 
     try:
-        import run_writer
+        run_writer = _load_run_writer_prompt_builder()
     except ImportError as exc:
         print(f"ERROR: failed to load writer prompt builder: {exc}")
         return 1
@@ -2020,6 +2071,38 @@ def _run_writer_stage(
             prompt_targets,
             next_command=f"python _ops/controller.py start {batch_id} --write",
         )
+    return WRITER_STAGE_PROMPTS_READY
+
+
+def _run_polish_stage(batch_id: str, episodes: list[str], brief_path: Path) -> int:
+    missing = _missing_drafts(episodes)
+    if missing:
+        print(f"ERROR: cannot polish; missing drafts: {', '.join(missing)}")
+        print(f"  Run first: python _ops/controller.py start {batch_id} --write")
+        return 1
+    if not POLISH_PROMPT_TEMPLATE.exists():
+        print(f"ERROR: polish prompt template missing: {_relative_to_root(POLISH_PROMPT_TEMPLATE)}")
+        return 1
+
+    REVIEWS.mkdir(parents=True, exist_ok=True)
+    prompt = _render_polish_prompt(batch_id, episodes, brief_path)
+    prompt_path = _write_prompt_packet(f"{batch_id}.polish.prompt.md", prompt)
+    target_paths = [DRAFTS / f"{episode}.md" for episode in episodes]
+    target_paths.append(_batch_polish_report_path(batch_id))
+    _upsert_batch_status(
+        batch_id,
+        phase="polish_pending",
+        status="BLOCKED",
+        episodes=episodes,
+        brief_path=brief_path,
+    )
+    _print_prompt_ready(
+        prompt_path,
+        target_paths,
+        next_command=f"python _ops/controller.py start {batch_id} --write",
+    )
+    print("  Polish mode: external agent only; this command does not call model CLIs.")
+    print("  After polish edits drafts, re-run start --write to refresh the review packet.")
     return WRITER_STAGE_PROMPTS_READY
 
 
@@ -2238,9 +2321,12 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 
 def cmd_export(args: argparse.Namespace) -> int:
+    _sync_manifest_completion_state()
     stats = _export_outputs()
     print("=== Output Export Complete ===")
     print(f"  Root: {OUTPUT.relative_to(ROOT)}")
+    print(f"  Summary: {(OUTPUT / 'SUMMARY.md').relative_to(ROOT)}")
+    print(f"  Manifest: {(OUTPUT / 'manifest.json').relative_to(ROOT)}")
     for key in ("episodes", "drafts", "reviews", "prompts", "briefs", "maps", "anchors", "state"):
         print(f"  {key}: {stats.get(key, 0)}")
     return 0
@@ -2257,6 +2343,16 @@ def cmd_log(args: argparse.Namespace) -> int:
     )
     print(f"OK: log entry appended")
     return 0
+
+
+def cmd_polish(args: argparse.Namespace) -> int:
+    batch_id = args.batch_id
+    resolved = _resolve_batch(batch_id)
+    if resolved is None:
+        return 1
+    brief_path, _brief, episodes = resolved
+    print(f"=== Polish Prompt Packet: {batch_id} ===")
+    return _run_polish_stage(batch_id, episodes, brief_path)
 
 
 def cmd_batch_review(args: argparse.Namespace) -> int:
@@ -2416,6 +2512,7 @@ def cmd_record(args: argparse.Namespace) -> int:
             return 1
         _write_lock("state.lock", "unlocked")
         _upsert_batch_status(batch_id, phase="recorded", status="DONE", batch_review_status="PASS")
+        _sync_manifest_completion_state()
         stats = _export_outputs()
         print(f"=== Record Complete: {batch_id} ===")
         print(f"  Episodes: {', '.join(episodes)}")
@@ -2780,7 +2877,7 @@ def _backup_project() -> Path | None:
             copied += 1
 
     if copied == 0:
-        snapshot_dir.rmdir()
+        shutil.rmtree(snapshot_dir)
         return None
     return snapshot_dir
 
@@ -2812,6 +2909,224 @@ def _copy_files_to_output(source_dir: Path, dest_dir: Path, patterns: list[str])
     return count
 
 
+def _episode_sort_key(episode_id: str) -> tuple[int, str]:
+    match = re.search(r"EP-(\d+)", episode_id)
+    if not match:
+        return (99999, episode_id)
+    return (int(match.group(1)), episode_id)
+
+
+def _episode_ids_in_dir(path: Path) -> list[str]:
+    if not path.exists():
+        return []
+    episode_ids = [_normalize_episode_id(item.stem) for item in path.glob("EP-*.md") if item.is_file()]
+    return sorted(set(episode_ids), key=_episode_sort_key)
+
+
+def _safe_read_manifest() -> dict:
+    if not RUN_MANIFEST.exists():
+        return {}
+    try:
+        return _read_manifest()
+    except Exception:
+        return {}
+
+
+def _safe_parse_source_map() -> dict:
+    if not SOURCE_MAP.exists():
+        return {}
+    try:
+        return _parse_source_map()
+    except Exception:
+        return {}
+
+
+def _collect_output_batch_summaries() -> list[dict]:
+    batches = _safe_parse_source_map()
+    known_ids = set(batches)
+    if BATCH_STATUS_DIR.exists():
+        for path in BATCH_STATUS_DIR.glob("batch*.status.json"):
+            known_ids.add(path.stem.replace(".status", ""))
+
+    summaries = []
+    for batch_id in sorted(known_ids):
+        info = batches.get(batch_id, {})
+        runtime = _read_batch_status(batch_id)
+        review = _read_batch_review(batch_id)
+        episodes = (
+            runtime.get("episodes")
+            if runtime and runtime.get("episodes")
+            else info.get("episodes", [])
+        )
+        summaries.append(
+            {
+                "batch_id": batch_id,
+                "episodes": episodes,
+                "source_range": info.get("source_range", ""),
+                "phase": runtime.get("phase", "planned") if runtime else "planned",
+                "status": runtime.get("status", "ACTIVE") if runtime else "ACTIVE",
+                "review_status": (review or {}).get(
+                    "status",
+                    runtime.get("batch_review_status", "MISSING") if runtime else "MISSING",
+                ),
+                "reviewer": (review or {}).get("reviewer", ""),
+                "review_reason": (review or {}).get("reason", ""),
+                "updated_at": runtime.get("updated_at", "") if runtime else "",
+            }
+        )
+    return summaries
+
+
+def _output_next_action(batch_summaries: list[dict]) -> str:
+    if _is_locked("batch.lock"):
+        lock_data = _read_lock("batch.lock")
+        owner = lock_data.get("owner", "?")
+        return f"batch.lock 当前由 {owner} 持有；先完成当前批次或运行 `python _ops/controller.py unlock batch.lock`。"
+
+    for item in batch_summaries:
+        batch_id = item["batch_id"]
+        phase = item.get("phase", "")
+        review_status = item.get("review_status", "MISSING")
+        if phase in {"promoted", "recorded"}:
+            continue
+        if review_status == "PENDING":
+            return f"评审 {batch_id}：`~review {batch_id} PASS --reviewer <name>` 或记录 FAIL 原因。"
+        if review_status == "FAIL":
+            return f"修正 {batch_id} 后重新评审：`~start {batch_id} --write`，再 `~review {batch_id} PASS --reviewer <name>`。"
+        if phase in {"writer_ready", "review_pending"}:
+            return f"生成或重建 {batch_id} 评审包：`python _ops/controller.py check {batch_id}`。"
+        return f"启动下一批 {batch_id}：`~start {batch_id} --write`。"
+
+    if batch_summaries:
+        return "所有已映射批次都已发布；可直接交付 `output/`，或继续人工精修成稿。"
+    return "尚未生成 source.map；先运行 `~init <书名.md> --episodes N --target-total-minutes M`，再让 agent 执行抽取和分集。"
+
+
+def _all_mapped_batches_recorded(batch_summaries: list[dict] | None = None) -> bool:
+    summaries = batch_summaries if batch_summaries is not None else _collect_output_batch_summaries()
+    if not summaries:
+        return False
+    return all(
+        item.get("phase") == "recorded"
+        and item.get("status") == "DONE"
+        and item.get("review_status") == "PASS"
+        for item in summaries
+    )
+
+
+def _sync_manifest_completion_state() -> None:
+    if not RUN_MANIFEST.exists():
+        return
+    if _all_mapped_batches_recorded():
+        _set_manifest_field("run_status", "complete")
+        _set_manifest_field("active_batch", "(none)")
+
+
+def _write_output_summary(stats: dict[str, int]) -> None:
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    manifest = _safe_read_manifest()
+    batch_summaries = _collect_output_batch_summaries()
+    published = _episode_ids_in_dir(EPISODES)
+    drafts = _episode_ids_in_dir(DRAFTS)
+    source_file = manifest.get("source_file", "(unknown)")
+    total_episodes = manifest.get("total_episodes", "")
+    target_total_minutes = manifest.get("target_total_minutes", "")
+    target_episode_minutes = manifest.get("target_episode_minutes", "")
+    active_batch = manifest.get("active_batch", "")
+    run_status = manifest.get("run_status", "")
+    next_action = _output_next_action(batch_summaries)
+
+    episode_lines = "\n".join(f"- [{ep}](episodes/{ep}.md)" for ep in published) or "- 暂无已发布成稿"
+    batch_lines = []
+    for item in batch_summaries:
+        episodes = ", ".join(item.get("episodes", [])) or "-"
+        review = item.get("review_status", "MISSING")
+        phase = item.get("phase", "planned")
+        reviewer = item.get("reviewer", "")
+        reviewer_text = f" / {reviewer}" if reviewer else ""
+        batch_lines.append(f"- {item['batch_id']}：{phase} / review={review}{reviewer_text} / {episodes}")
+    batch_text = "\n".join(batch_lines) or "- 暂无批次状态"
+
+    summary = (
+        "# Juben V1 Output Summary\n\n"
+        "这是当前项目给外部使用者看的固定入口。内部运行文件仍在 `harness/project/`、`drafts/`、`episodes/`，"
+        "`output/` 是可随时重建的交付镜像。\n\n"
+        "## 项目概况\n\n"
+        f"- 原著文件：{source_file}\n"
+        f"- 目标集数：{total_episodes or '(unknown)'}\n"
+        f"- 目标总时长：{target_total_minutes or '(unknown)'} 分钟\n"
+        f"- 单集中心时长：{target_episode_minutes or '(unknown)'} 分钟\n"
+        f"- 当前状态：{run_status or '(unknown)'}\n"
+        f"- 当前批次：{active_batch or '(none)'}\n"
+        f"- 已发布成稿：{len(published)} 集\n"
+        f"- 当前草稿镜像：{len(drafts)} 集\n\n"
+        "## 下一步\n\n"
+        f"{next_action}\n\n"
+        "## 给不同角色的入口\n\n"
+        "- 编剧/制片：优先看 `episodes/` 和本文件；需要上下文再看 `maps/`。\n"
+        "- 审稿 agent：看 `reviews/`、`prompts/`、`briefs/`。\n"
+        "- 工程维护者：看 `manifest.json`、`state/` 和 `maps/`。\n\n"
+        "## 已发布剧集\n\n"
+        f"{episode_lines}\n\n"
+        "## 批次状态\n\n"
+        f"{batch_text}\n\n"
+        "## 导出统计\n\n"
+        f"- episodes: {stats.get('episodes', 0)}\n"
+        f"- drafts: {stats.get('drafts', 0)}\n"
+        f"- reviews: {stats.get('reviews', 0)}\n"
+        f"- prompts: {stats.get('prompts', 0)}\n"
+        f"- briefs: {stats.get('briefs', 0)}\n"
+        f"- maps: {stats.get('maps', 0)}\n"
+        f"- anchors: {stats.get('anchors', 0)}\n"
+        f"- state: {stats.get('state', 0)}\n"
+    )
+    (OUTPUT / "SUMMARY.md").write_text(summary, encoding="utf-8")
+
+
+def _write_output_manifest(stats: dict[str, int]) -> None:
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    manifest = _safe_read_manifest()
+    batch_summaries = _collect_output_batch_summaries()
+    published = _episode_ids_in_dir(EPISODES)
+    drafts = _episode_ids_in_dir(DRAFTS)
+
+    payload = {
+        "schema_version": "juben-output/v1",
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "source_file": manifest.get("source_file", ""),
+        "total_episodes": manifest.get("total_episodes", ""),
+        "target_total_minutes": manifest.get("target_total_minutes", ""),
+        "target_episode_minutes": manifest.get("target_episode_minutes", ""),
+        "batch_size": manifest.get("batch_size", ""),
+        "run_status": manifest.get("run_status", ""),
+        "active_batch": manifest.get("active_batch", ""),
+        "counts": stats,
+        "paths": {
+            "summary": "SUMMARY.md",
+            "episodes": "episodes/",
+            "drafts": "drafts/",
+            "reviews": "reviews/",
+            "prompts": "prompts/",
+            "briefs": "briefs/",
+            "maps": "maps/",
+            "anchors": "anchors/",
+            "state": "state/",
+        },
+        "published_episodes": [
+            {"episode": ep, "path": f"episodes/{ep}.md"} for ep in published
+        ],
+        "draft_episodes": [
+            {"episode": ep, "path": f"drafts/{ep}.md"} for ep in drafts
+        ],
+        "batches": batch_summaries,
+        "next_action": _output_next_action(batch_summaries),
+    }
+    (OUTPUT / "manifest.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
 def _write_output_readme(stats: dict[str, int]) -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     readme = OUTPUT / "README.md"
@@ -2828,6 +3143,9 @@ def _write_output_readme(stats: dict[str, int]) -> None:
         "- `maps/`：全书蓝图、source map、run manifest\n"
         "- `anchors/`：角色与声纹锚点\n"
         "- `state/`：连续性、关系、open loop 等状态摘要\n\n"
+        "## 交付入口\n\n"
+        "- `SUMMARY.md`：给人看的项目摘要、下一步和成稿入口\n"
+        "- `manifest.json`：给工具或平台读取的机器可读索引\n\n"
         "## 刷新方式\n\n"
         "```powershell\n"
         "python _ops/controller.py export\n"
@@ -2864,7 +3182,7 @@ def _export_outputs() -> dict[str, int]:
     stats: dict[str, int] = {}
     stats["episodes"] = _copy_files_to_output(EPISODES, sections["episodes"], ["EP-*.md"])
     stats["drafts"] = _copy_files_to_output(DRAFTS, sections["drafts"], ["EP-*.md"])
-    stats["reviews"] = _copy_files_to_output(REVIEWS, sections["reviews"], ["*.review.md", "*.review.json"])
+    stats["reviews"] = _copy_files_to_output(REVIEWS, sections["reviews"], ["*.review.md", "*.review.json", "*.polish.md"])
     stats["prompts"] = _copy_files_to_output(PROMPTS, sections["prompts"], ["*.md"])
     stats["prompts"] += _copy_files_to_output(REVIEWS, sections["prompts"], ["*.review.prompt.md"])
     stats["briefs"] = _copy_files_to_output(BATCH_BRIEFS, sections["briefs"], ["*.md"])
@@ -2883,6 +3201,8 @@ def _export_outputs() -> dict[str, int]:
 
     stats["state"] = _copy_files_to_output(STATE, sections["state"], ["*.md"])
     _write_output_readme(stats)
+    _write_output_summary(stats)
+    _write_output_manifest(stats)
     return stats
 
 
@@ -2960,6 +3280,23 @@ def _clear_runtime_project_data() -> dict[str, int]:
     return stats
 
 
+def _ensure_runtime_directories() -> None:
+    for path in (
+        PROJECT,
+        STATE,
+        BATCH_STATUS_DIR,
+        LOCKS,
+        DRAFTS,
+        EPISODES,
+        BATCH_BRIEFS,
+        REVIEWS,
+        PROMPTS,
+        RELEASES,
+        RELEASE_JOURNALS,
+    ):
+        path.mkdir(parents=True, exist_ok=True)
+
+
 def _suggested_episode_count(target_total_minutes: int) -> int:
     return max(1, round(target_total_minutes / max(1, DEFAULT_TARGET_EPISODE_MINUTES)))
 
@@ -3007,6 +3344,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     target_total_minutes = args.target_total_minutes
     strategy = args.strategy
     intensity = args.intensity
+    quality_mode = "premium" if getattr(args, "premium", False) else getattr(args, "quality_mode", "standard")
     key_eps = args.key_episodes or ""
     novel_name = novel_path.name
 
@@ -3020,6 +3358,8 @@ def cmd_init(args: argparse.Namespace) -> int:
 
     if total_eps is None:
         total_eps = _prompt_init_episode_count(target_total_minutes)
+
+    _ensure_runtime_directories()
 
     total_batches = (total_eps + batch_size - 1) // batch_size if total_eps is not None else None
     episode_count_source = "manual_override" if total_eps is not None else "model_recommended"
@@ -3045,6 +3385,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         )
     print(f"  Strategy:   {strategy}")
     print(f"  Intensity:  {intensity}")
+    print(f"  Quality:    {quality_mode}")
     if key_eps:
         print(f"  Key EPs:    {key_eps}")
     print()
@@ -3086,6 +3427,7 @@ def cmd_init(args: argparse.Namespace) -> int:
 - adaptation_mode: novel_to_short_drama
 - adaptation_strategy: {strategy}
 - dialogue_adaptation_intensity: {intensity}
+- quality_mode: {quality_mode}
 - generation_execution_mode: prompt_packet_external_agent
 - writer_parallelism: {DEFAULT_WRITER_PARALLELISM}
 - generation_reset_mode: clean_rebuild
@@ -3209,6 +3551,8 @@ def cmd_init(args: argparse.Namespace) -> int:
     print(f"  1. extract-book  → fill book.blueprint.md + auto-set total_episodes")
     print(f"  2. map-book      → generate source.map.md")
     print(f"  3. start batch01 → begin batch pipeline")
+    if quality_mode == "premium":
+        print(f"  4. polish batchXX → optional精品稿二修 before review")
     print(f"\n  Files pending completion:")
     print(f"  - book.blueprint.md")
     print(f"  - source.map.md")
@@ -3433,9 +3777,8 @@ def _prepare_batch_start(batch_id: str) -> tuple[Path, dict, list[str]] | None:
             return None
         brief_text = brief_path.read_text(encoding="utf-8")
         needs_brief_refresh = (
-            "## Function Policy" not in brief_text
-            or "功能目标：" not in brief_text
-            or "ending function" not in brief_text.lower()
+            "## Writer Authority" not in brief_text
+            or "knowledge_boundary" not in brief_text
         )
 
     if needs_brief_refresh:
@@ -3556,6 +3899,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     if writer_rc != 0:
         return writer_rc
 
+    quality_mode = _read_manifest().get("quality_mode", "standard")
     _upsert_batch_status(
         batch_id,
         phase="review_pending",
@@ -3573,6 +3917,9 @@ def cmd_start(args: argparse.Namespace) -> int:
     print(f"  Review MD:   {_relative_to_root(_batch_review_md_path(batch_id))}")
     print(f"  Review Prompt: {_relative_to_root(_batch_review_prompt_path(batch_id))}")
     print(f"  Verdict: {review.get('status', 'PENDING')}")
+    if quality_mode == "premium":
+        print("\n=== Optional Polish ===")
+        print(f"  Premium mode is enabled. Recommended before review: python _ops/controller.py polish {batch_id}")
     print("\n--- Next Steps ---")
     _print_start_next_steps(batch_id, episodes, focus, include_writer_instruction=False)
     return 0
@@ -3797,6 +4144,9 @@ def main() -> int:
     p_breview = sub.add_parser("batch-review", help="Create durable batch review artifacts")
     p_breview.add_argument("batch_id")
 
+    p_polish = sub.add_parser("polish", help="Create optional premium polish prompt packet for a batch")
+    p_polish.add_argument("batch_id")
+
     p_breview_done = sub.add_parser("batch-review-done", help="Seal batch review verdict")
     p_breview_done.add_argument("batch_id")
     p_breview_done.add_argument("status", help="PASS or FAIL")
@@ -3819,6 +4169,8 @@ def main() -> int:
     p_init.add_argument("--target-total-minutes", type=int, default=DEFAULT_TARGET_TOTAL_MINUTES, help="Approximate full-series runtime target in minutes (default: 50)")
     p_init.add_argument("--strategy", default="original_fidelity", help="Adaptation strategy")
     p_init.add_argument("--intensity", default="light", help="Dialogue adaptation intensity")
+    p_init.add_argument("--quality-mode", choices=["standard", "premium"], default="standard", help="Draft quality mode (default: standard; premium suggests polish before review)")
+    p_init.add_argument("--premium", action="store_true", help="Shortcut for --quality-mode premium")
     p_init.add_argument("--key-episodes", default="", help="Comma-separated key episode IDs for deep review focus")
     p_init.add_argument("--force", action="store_true", help="Overwrite existing project data (auto-backup first)")
 
@@ -3862,6 +4214,7 @@ def main() -> int:
         "validate": cmd_validate,
         "export": cmd_export,
         "log": cmd_log,
+        "polish": cmd_polish,
         "batch-review": cmd_batch_review,
         "batch-review-done": cmd_batch_review_done,
         "unlock": cmd_unlock,

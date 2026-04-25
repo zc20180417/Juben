@@ -1,0 +1,324 @@
+{
+  "schema_version": "juben-output/v1",
+  "generated_at": "2026-04-25T14:06:16",
+  "source_file": "被弃真千金：总裁不好惹.md",
+  "total_episodes": "25",
+  "target_total_minutes": "50",
+  "target_episode_minutes": "2",
+  "batch_size": "5",
+  "run_status": "complete",
+  "active_batch": "(none)",
+  "counts": {
+    "episodes": 25,
+    "drafts": 25,
+    "reviews": 10,
+    "prompts": 8,
+    "briefs": 5,
+    "maps": 3,
+    "anchors": 2,
+    "state": 7
+  },
+  "paths": {
+    "summary": "SUMMARY.md",
+    "episodes": "episodes/",
+    "drafts": "drafts/",
+    "reviews": "reviews/",
+    "prompts": "prompts/",
+    "briefs": "briefs/",
+    "maps": "maps/",
+    "anchors": "anchors/",
+    "state": "state/"
+  },
+  "published_episodes": [
+    {
+      "episode": "EP-01",
+      "path": "episodes/EP-01.md"
+    },
+    {
+      "episode": "EP-02",
+      "path": "episodes/EP-02.md"
+    },
+    {
+      "episode": "EP-03",
+      "path": "episodes/EP-03.md"
+    },
+    {
+      "episode": "EP-04",
+      "path": "episodes/EP-04.md"
+    },
+    {
+      "episode": "EP-05",
+      "path": "episodes/EP-05.md"
+    },
+    {
+      "episode": "EP-06",
+      "path": "episodes/EP-06.md"
+    },
+    {
+      "episode": "EP-07",
+      "path": "episodes/EP-07.md"
+    },
+    {
+      "episode": "EP-08",
+      "path": "episodes/EP-08.md"
+    },
+    {
+      "episode": "EP-09",
+      "path": "episodes/EP-09.md"
+    },
+    {
+      "episode": "EP-10",
+      "path": "episodes/EP-10.md"
+    },
+    {
+      "episode": "EP-11",
+      "path": "episodes/EP-11.md"
+    },
+    {
+      "episode": "EP-12",
+      "path": "episodes/EP-12.md"
+    },
+    {
+      "episode": "EP-13",
+      "path": "episodes/EP-13.md"
+    },
+    {
+      "episode": "EP-14",
+      "path": "episodes/EP-14.md"
+    },
+    {
+      "episode": "EP-15",
+      "path": "episodes/EP-15.md"
+    },
+    {
+      "episode": "EP-16",
+      "path": "episodes/EP-16.md"
+    },
+    {
+      "episode": "EP-17",
+      "path": "episodes/EP-17.md"
+    },
+    {
+      "episode": "EP-18",
+      "path": "episodes/EP-18.md"
+    },
+    {
+      "episode": "EP-19",
+      "path": "episodes/EP-19.md"
+    },
+    {
+      "episode": "EP-20",
+      "path": "episodes/EP-20.md"
+    },
+    {
+      "episode": "EP-21",
+      "path": "episodes/EP-21.md"
+    },
+    {
+      "episode": "EP-22",
+      "path": "episodes/EP-22.md"
+    },
+    {
+      "episode": "EP-23",
+      "path": "episodes/EP-23.md"
+    },
+    {
+      "episode": "EP-24",
+      "path": "episodes/EP-24.md"
+    },
+    {
+      "episode": "EP-25",
+      "path": "episodes/EP-25.md"
+    }
+  ],
+  "draft_episodes": [
+    {
+      "episode": "EP-01",
+      "path": "drafts/EP-01.md"
+    },
+    {
+      "episode": "EP-02",
+      "path": "drafts/EP-02.md"
+    },
+    {
+      "episode": "EP-03",
+      "path": "drafts/EP-03.md"
+    },
+    {
+      "episode": "EP-04",
+      "path": "drafts/EP-04.md"
+    },
+    {
+      "episode": "EP-05",
+      "path": "drafts/EP-05.md"
+    },
+    {
+      "episode": "EP-06",
+      "path": "drafts/EP-06.md"
+    },
+    {
+      "episode": "EP-07",
+      "path": "drafts/EP-07.md"
+    },
+    {
+      "episode": "EP-08",
+      "path": "drafts/EP-08.md"
+    },
+    {
+      "episode": "EP-09",
+      "path": "drafts/EP-09.md"
+    },
+    {
+      "episode": "EP-10",
+      "path": "drafts/EP-10.md"
+    },
+    {
+      "episode": "EP-11",
+      "path": "drafts/EP-11.md"
+    },
+    {
+      "episode": "EP-12",
+      "path": "drafts/EP-12.md"
+    },
+    {
+      "episode": "EP-13",
+      "path": "drafts/EP-13.md"
+    },
+    {
+      "episode": "EP-14",
+      "path": "drafts/EP-14.md"
+    },
+    {
+      "episode": "EP-15",
+      "path": "drafts/EP-15.md"
+    },
+    {
+      "episode": "EP-16",
+      "path": "drafts/EP-16.md"
+    },
+    {
+      "episode": "EP-17",
+      "path": "drafts/EP-17.md"
+    },
+    {
+      "episode": "EP-18",
+      "path": "drafts/EP-18.md"
+    },
+    {
+      "episode": "EP-19",
+      "path": "drafts/EP-19.md"
+    },
+    {
+      "episode": "EP-20",
+      "path": "drafts/EP-20.md"
+    },
+    {
+      "episode": "EP-21",
+      "path": "drafts/EP-21.md"
+    },
+    {
+      "episode": "EP-22",
+      "path": "drafts/EP-22.md"
+    },
+    {
+      "episode": "EP-23",
+      "path": "drafts/EP-23.md"
+    },
+    {
+      "episode": "EP-24",
+      "path": "drafts/EP-24.md"
+    },
+    {
+      "episode": "EP-25",
+      "path": "drafts/EP-25.md"
+    }
+  ],
+  "batches": [
+    {
+      "batch_id": "batch01",
+      "episodes": [
+        "EP-01",
+        "EP-02",
+        "EP-03",
+        "EP-04",
+        "EP-05"
+      ],
+      "source_range": "第1章 line 19 ~ 21 ~ 第5章 line 47 ~ 53",
+      "phase": "recorded",
+      "status": "DONE",
+      "review_status": "PASS",
+      "reviewer": "codex",
+      "review_reason": "",
+      "updated_at": "2026-04-25 13:46"
+    },
+    {
+      "batch_id": "batch02",
+      "episodes": [
+        "EP-06",
+        "EP-07",
+        "EP-08",
+        "EP-09",
+        "EP-10"
+      ],
+      "source_range": "第6章 line 54 ~ 60 ~ 第10章 line 82 ~ 88",
+      "phase": "recorded",
+      "status": "DONE",
+      "review_status": "PASS",
+      "reviewer": "codex",
+      "review_reason": "",
+      "updated_at": "2026-04-25 13:56"
+    },
+    {
+      "batch_id": "batch03",
+      "episodes": [
+        "EP-11",
+        "EP-12",
+        "EP-13",
+        "EP-14",
+        "EP-15"
+      ],
+      "source_range": "第11章 line 89 ~ 95 ~ 第13章 line 103 ~ 109",
+      "phase": "recorded",
+      "status": "DONE",
+      "review_status": "PASS",
+      "reviewer": "codex",
+      "review_reason": "",
+      "updated_at": "2026-04-25 13:58"
+    },
+    {
+      "batch_id": "batch04",
+      "episodes": [
+        "EP-16",
+        "EP-17",
+        "EP-18",
+        "EP-19",
+        "EP-20"
+      ],
+      "source_range": "第14章 line 110 ~ 116 ~ 第15章 line 117 ~ 123",
+      "phase": "recorded",
+      "status": "DONE",
+      "review_status": "PASS",
+      "reviewer": "codex",
+      "review_reason": "",
+      "updated_at": "2026-04-25 13:59"
+    },
+    {
+      "batch_id": "batch05",
+      "episodes": [
+        "EP-21",
+        "EP-22",
+        "EP-23",
+        "EP-24",
+        "EP-25"
+      ],
+      "source_range": "第16章 line 124 ~ 130 ~ 第17章 line 131 ~ 139",
+      "phase": "recorded",
+      "status": "DONE",
+      "review_status": "PASS",
+      "reviewer": "codex",
+      "review_reason": "",
+      "updated_at": "2026-04-25 14:02"
+    }
+  ],
+  "next_action": "所有已映射批次都已发布；可直接交付 `output/`，或继续人工精修成稿。"
+}

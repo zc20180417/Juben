@@ -40,7 +40,7 @@ class AgentBackendTests(unittest.TestCase):
             self.module.shutil,
             "which",
             side_effect=lambda name: {
-                "codex": "C:/bin/codex.exe",
+                "codex.cmd": "C:/bin/codex.cmd",
             }.get(name),
         ):
             backend_name, command = self.module.build_agent_command("PROMPT")
@@ -48,7 +48,7 @@ class AgentBackendTests(unittest.TestCase):
         self.assertEqual(backend_name, "Codex")
         self.assertEqual(
             command[:3],
-            ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox"],
+            ["codex.cmd", "exec", "--dangerously-bypass-approvals-and-sandbox"],
         )
         self.assertEqual(command[-1], "PROMPT")
 

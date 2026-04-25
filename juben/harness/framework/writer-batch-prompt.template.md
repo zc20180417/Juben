@@ -5,7 +5,7 @@
 
 权威输入：
 - `{{brief_rel}}` 决定每集任务与 beats。
-- `harness/project/source.map.md` 决定 source 顺序、must-not-add、must-not-jump 边界。
+- `harness/project/source.map.md` 决定 source 顺序、knowledge_boundary、must-not-add、must-not-jump 边界。
 - `harness/project/run.manifest.md` 的 `current batch brief` 只用于运行时定位；若冲突则忽略。
 本次只处理 batch：{{batch_id}}
 
@@ -20,8 +20,9 @@
 1. 严格按上面列出的 episode 顺序逐个完成，禁止跳集、并集或提前写后面的 episode。
 2. 每完成一集后，先确认对应草稿文件已写入磁盘，再开始下一集。
 3. 写每一集前，先重新读取该集对应的 `source excerpt`，并从中建立当前集的内部 `must_keep` 清单。
-4. 写下一集之前，只重新读取刚写完的上一集草稿和必要的相邻集上下文，再决定承接边界。
-5. 整个批次里优先保护相邻集之间的信息增量和关系渐进，不要为了提速把多集写成同一种试探节奏。
+4. 写每一集前，先读取该集的 `knowledge_boundary`，确认角色当场知道什么、还不知道什么、能怎么称呼对方。
+5. 写下一集之前，只重新读取刚写完的上一集草稿和必要的相邻集上下文，再决定承接边界。
+6. 整个批次里优先保护相邻集之间的信息增量和关系渐进，不要为了提速把多集写成同一种试探节奏。
 
 短剧节奏要求：
 - 当前项目目标总时长以 `run.manifest.md` 的 `target_total_minutes` 为准，不按百集投流模型拖长。
@@ -59,5 +60,6 @@
 - 每集至少 2 场，非终场结尾必须留下服务 beats 的新增推进。
 - 每集写入前必须完成自我打磨：删解释、压台词、补动作/站位/沉默/现场后果，但不得新增 source 外剧情。
 - `角色（os）：` 不得写成新增第一人称“我……”旁白。
+- 称谓、姓氏、全名、职位、亲属关系和身份判断必须有现场来源；介绍前不得抢跑称谓。
 
 {{syntax_guidance}}
