@@ -16,12 +16,26 @@ V1 是 agent-native 本地工具包：Python 只负责初始化、生成 prompt 
 .\~init.cmd "被弃真千金：总裁不好惹.md" --episodes 25 --target-total-minutes 50
 ```
 
+非 Windows 环境使用：
+
+```powershell
+python -m juben init "被弃真千金：总裁不好惹.md" --episodes 25 --target-total-minutes 50
+```
+
 之后按 agent 提示执行三类工作：
 
 ```powershell
 .\~extract.cmd
 .\~map.cmd
 .\~start.cmd batch01 --write
+```
+
+等价 Python 入口：
+
+```powershell
+python -m juben extract
+python -m juben map
+python -m juben start batch01 --write
 ```
 
 把 prompt packet 交给 agent 前，先把这两个文件也交给它：
@@ -36,6 +50,15 @@ V1 是 agent-native 本地工具包：Python 只负责初始化、生成 prompt 
 .\~run.cmd batch01
 .\~record.cmd batch01
 .\~next.cmd
+```
+
+等价 Python 入口：
+
+```powershell
+python -m juben review batch01 PASS --reviewer codex
+python -m juben run batch01
+python -m juben record batch01
+python -m juben next
 ```
 
 ## 交付目录
@@ -71,6 +94,10 @@ V1 是 agent-native 本地工具包：Python 只负责初始化、生成 prompt 
 - `~export`：手动刷新 `output/` 交付包。
 - `~next`：查看当前进度和下一步。
 - `~clean`：备份并清理当前运行产物，用于重新测试工程能力。
+
+跨平台时使用 `python -m juben <command>`。其中 `extract`、`map`、`review` 是短别名，分别对应底层 `extract-book`、`map-book`、`batch-review-done`。
+
+当前 `python -m juben` 只支持在仓库根目录运行；暂不建议做 `pip install`。原因是当前项目运行态仍写入仓库内的 `juben/` 目录，正式 console script 需要等框架包和项目工作区进一步拆分后再做。
 
 ## 使用原则
 

@@ -27,6 +27,19 @@
 
 `~extract / ~map / ~start --write` 会生成 prompt packet。把 packet 交给任意能读写本地文件的 agent 执行，不需要也不建议由 Python 嵌套调用模型 CLI。
 
+跨平台 Python 入口：
+
+```powershell
+python -m juben init "被弃真千金：总裁不好惹.md" --episodes 25 --target-total-minutes 50
+python -m juben extract
+python -m juben map
+python -m juben start batch01 --write
+python -m juben review batch01 PASS --reviewer codex
+python -m juben run batch01
+python -m juben record batch01
+python -m juben next
+```
+
 给 agent 执行 prompt packet 时，先让它阅读：
 
 - [G:\Juben\juben\AGENT-RUNBOOK.md](/G:/Juben/juben/AGENT-RUNBOOK.md)
@@ -56,6 +69,16 @@
 .\~check.cmd batch01
 .\~export.cmd
 .\~clean.cmd
+```
+
+跨平台等价入口：
+
+```powershell
+python -m juben status
+python -m juben next
+python -m juben check batch01
+python -m juben export
+python -m juben clean
 ```
 
 部署与排障：

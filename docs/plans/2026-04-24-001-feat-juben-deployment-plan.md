@@ -276,7 +276,7 @@ This illustrates the intended approach and is directional guidance for review, n
 **Verification:**
 - 新使用者按文档能理解：初始化、生成 prompt、让 agent 写文件、review、发布、查看 output。
 
-- [ ] **Unit 6: V2 CLI 化预留**
+- [x] **Unit 6: V2 CLI 化预留**
 
 **Goal:** 为后续跨平台部署和更正式的发行包预留路径，不阻塞 V1。
 
@@ -294,6 +294,7 @@ This illustrates the intended approach and is directional guidance for review, n
 - V2 可提供 `python -m juben ...` 或 console script `juben ...`。
 - 先复用 controller，不重写业务逻辑。
 - `.cmd` 继续保留，CLI 化只是跨平台入口。
+- 本轮先落 `python -m juben`。`pyproject.toml` / console script 延后，因为当前 controller 仍以源码内 `juben/` 作为可写项目根，直接 pip install 会错误地把运行态写进安装目录。
 
 **Patterns to follow:**
 - 当前 `controller.py` argparse 子命令。

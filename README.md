@@ -18,6 +18,19 @@ V1 使用入口：
 .\~next.cmd
 ```
 
+跨平台 Python 入口：
+
+```powershell
+python -m juben init "被弃真千金：总裁不好惹.md" --episodes 25 --target-total-minutes 50
+python -m juben extract
+python -m juben map
+python -m juben start batch01 --write
+python -m juben review batch01 PASS --reviewer codex
+python -m juben run batch01
+python -m juben record batch01
+python -m juben next
+```
+
 常用辅助命令：
 
 ```powershell
@@ -25,6 +38,15 @@ V1 使用入口：
 .\~export.cmd
 .\~check.cmd batch01
 .\~clean.cmd
+```
+
+等价 Python 入口：
+
+```powershell
+python -m juben status
+python -m juben export
+python -m juben check batch01
+python -m juben clean
 ```
 
 输出入口：

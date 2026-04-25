@@ -25,6 +25,12 @@ PY
 .\~start.cmd batchXX --write
 ```
 
+非 Windows 环境：
+
+```powershell
+python -m juben start batchXX --write
+```
+
 ## review 一直 pending
 
 说明 reviewer 还没有回填结论。通过时运行：
@@ -33,10 +39,22 @@ PY
 .\~review.cmd batchXX PASS --reviewer <name>
 ```
 
+非 Windows 环境：
+
+```powershell
+python -m juben review batchXX PASS --reviewer <name>
+```
+
 失败时运行：
 
 ```powershell
 .\~review.cmd batchXX FAIL --reviewer <name> --reason "具体阻塞原因"
+```
+
+非 Windows 环境：
+
+```powershell
+python -m juben review batchXX FAIL --reviewer <name> --reason "具体阻塞原因"
 ```
 
 ## run 被 gate 拦住
@@ -54,12 +72,24 @@ PY
 .\~check.cmd batchXX
 ```
 
+非 Windows 环境：
+
+```powershell
+python -m juben check batchXX
+```
+
 ## output 没更新
 
 手动刷新：
 
 ```powershell
 .\~export.cmd
+```
+
+非 Windows 环境：
+
+```powershell
+python -m juben export
 ```
 
 如果还是没有目标文件，说明上游 drafts、episodes 或 reviews 本身没有生成，先回到对应批次处理。
@@ -73,6 +103,13 @@ PY
 .\~next.cmd
 ```
 
+非 Windows 环境：
+
+```powershell
+python -m juben status
+python -m juben next
+```
+
 如果确认为历史中断，不要直接删除文件。优先完成当前批次的 review/run/record。只有确认没有并行任务时，才手工处理 lock。
 
 ## promote 中断
@@ -83,10 +120,22 @@ PY
 .\~promote.cmd batchXX
 ```
 
+非 Windows 环境：
+
+```powershell
+python -m juben promote batchXX
+```
+
 恢复后继续：
 
 ```powershell
 .\~record.cmd batchXX
+```
+
+非 Windows 环境：
+
+```powershell
+python -m juben record batchXX
 ```
 
 ## agent 没有写文件，只在聊天里回复

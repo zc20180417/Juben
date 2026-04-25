@@ -176,6 +176,35 @@ class ControllerCliSmokeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("usage: controller.py promote", result.stdout)
 
+    def _run_module(self, *args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, "-m", "juben", *args],
+            cwd=ROOT.parent,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+
+    def test_python_module_entry_routes_to_controller_help(self) -> None:
+        result = self._run_module("--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Harness V2 Controller", result.stdout)
+        self.assertIn("extract-book", result.stdout)
+
+    def test_python_module_entry_supports_short_aliases(self) -> None:
+        cases = (
+            ("extract", "extract-book"),
+            ("map", "map-book"),
+            ("review", "batch-review-done"),
+            ("run", "run"),
+        )
+        for command, expected in cases:
+            with self.subTest(command=command):
+                result = self._run_module(command, "--help")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("usage:", result.stdout)
+                self.assertIn(expected, result.stdout)
+
 
 class ControllerHandlerRegressionTests(unittest.TestCase):
     def setUp(self) -> None:
