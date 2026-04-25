@@ -35,4 +35,6 @@ V1 使用入口：
 
 部署文档：
 - [G:\Juben\docs\deployment\local-agent-pack-v1.md](/G:/Juben/docs/deployment/local-agent-pack-v1.md)
+- [G:\Juben\docs\deployment\operator-guide.md](/G:/Juben/docs/deployment/operator-guide.md)
 - [G:\Juben\docs\deployment\output-package-v1.md](/G:/Juben/docs/deployment/output-package-v1.md)
+- [G:\Juben\docs\deployment\troubleshooting.md](/G:/Juben/docs/deployment/troubleshooting.md)

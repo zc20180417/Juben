@@ -27,9 +27,15 @@
 
 `~extract / ~map / ~start --write` 会生成 prompt packet。把 packet 交给任意能读写本地文件的 agent 执行，不需要也不建议由 Python 嵌套调用模型 CLI。
 
+给 agent 执行 prompt packet 时，先让它阅读：
+
+- [G:\Juben\juben\AGENT-RUNBOOK.md](/G:/Juben/juben/AGENT-RUNBOOK.md)
+- [G:\Juben\juben\harness\framework\prompt-packet-protocol.md](/G:/Juben/juben/harness/framework/prompt-packet-protocol.md)
+
 ## Source Of Truth
 
 - [G:\Juben\juben\harness\framework\entry.md](/G:/Juben/juben/harness/framework/entry.md)
+- [G:\Juben\juben\AGENT-RUNBOOK.md](/G:/Juben/juben/AGENT-RUNBOOK.md)
 - [G:\Juben\juben\harness\project\run.manifest.md](/G:/Juben/juben/harness/project/run.manifest.md)
 - [G:\Juben\juben\_ops\controller.py](/G:/Juben/juben/_ops/controller.py)
 
@@ -51,3 +57,9 @@
 .\~export.cmd
 .\~clean.cmd
 ```
+
+部署与排障：
+
+- [G:\Juben\docs\deployment\local-agent-pack-v1.md](/G:/Juben/docs/deployment/local-agent-pack-v1.md)
+- [G:\Juben\docs\deployment\operator-guide.md](/G:/Juben/docs/deployment/operator-guide.md)
+- [G:\Juben\docs\deployment\troubleshooting.md](/G:/Juben/docs/deployment/troubleshooting.md)

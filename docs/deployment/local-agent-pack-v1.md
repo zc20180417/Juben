@@ -24,6 +24,11 @@ V1 是 agent-native 本地工具包：Python 只负责初始化、生成 prompt 
 .\~start.cmd batch01 --write
 ```
 
+把 prompt packet 交给 agent 前，先把这两个文件也交给它：
+
+- `juben/AGENT-RUNBOOK.md`
+- `juben/harness/framework/prompt-packet-protocol.md`
+
 每批写完后：
 
 ```powershell
@@ -42,6 +47,7 @@ V1 是 agent-native 本地工具包：Python 只负责初始化、生成 prompt 
 - `anchors/`：角色与声纹锚点。
 - `manifest.json`：平台或工具可读取的机器索引。
 - `_runtime/`：内部诊断材料，包含 prompts、reviews、briefs、maps、state、drafts。
+- `_runtime/protocols/`：agent 执行 prompt packet 时必须读取的协议镜像。
 
 普通交付只需要 `SUMMARY.md`、`episodes/`、`anchors/`。需要让另一个 agent 接手时，再交付 `manifest.json` 和 `_runtime/`。
 
@@ -72,3 +78,10 @@ V1 是 agent-native 本地工具包：Python 只负责初始化、生成 prompt 
 - 不把 `harness/project/` 当交付目录；对外只交付 `output/`。
 - 不把 reviewer 伪装成 lint；评审标准在 `juben/harness/framework/review-standard.md`，提示词在 `reviewer-prompt.template.md`。
 - 换模型时只需要让新 agent 读取 prompt packet，并按文件路径写回指定 Markdown。
+
+## 相关文档
+
+- `docs/deployment/operator-guide.md`：完整操作步骤。
+- `docs/deployment/output-package-v1.md`：输出包结构。
+- `docs/deployment/troubleshooting.md`：常见问题排障。
+- `juben/AGENT-RUNBOOK.md`：给执行 agent 的通用说明。

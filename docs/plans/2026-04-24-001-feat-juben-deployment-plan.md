@@ -174,7 +174,7 @@ This illustrates the intended approach and is directional guidance for review, n
 **Verification:**
 - README 可以只列包装命令，不需要用户学习所有 controller 子命令。
 
-- [ ] **Unit 3: 建立标准 agent handoff 协议**
+- [x] **Unit 3: 建立标准 agent handoff 协议**
 
 **Goal:** 让 Codex、Claude、Qwen 或其他 agent 都能按同一方式执行 prompt packet。
 
@@ -189,6 +189,7 @@ This illustrates the intended approach and is directional guidance for review, n
 - Modify: `juben/harness/framework/writer-batch-prompt.template.md`
 - Modify: `juben/harness/framework/reviewer-prompt.template.md`
 - Create: `juben/AGENT-RUNBOOK.md`
+- Create: `juben/harness/framework/prompt-packet-protocol.md`
 - Test: `juben/_ops/test_run_book_extract.py`
 - Test: `juben/_ops/test_run_book_map.py`
 - Test: `juben/_ops/test_run_writer.py`
@@ -211,7 +212,7 @@ This illustrates the intended approach and is directional guidance for review, n
 **Verification:**
 - 使用者可以复制 prompt packet 给任何 agent，agent 不需要理解 controller 内部实现。
 
-- [ ] **Unit 4: 输出交付包标准化**
+- [x] **Unit 4: 输出交付包标准化**
 
 **Goal:** 让别人一眼知道最终成果在哪里，能直接交付剧本或复盘质量。
 
@@ -243,7 +244,7 @@ This illustrates the intended approach and is directional guidance for review, n
 **Verification:**
 - 使用者不需要进入 `harness/project` 就能找到成品和当前进度。
 
-- [ ] **Unit 5: 中文部署文档与快速上手**
+- [x] **Unit 5: 中文部署文档与快速上手**
 
 **Goal:** 降低交接成本，让同事按文档能跑通第一部小说。
 
@@ -254,7 +255,7 @@ This illustrates the intended approach and is directional guidance for review, n
 **Files:**
 - Modify: `README.md`
 - Modify: `juben/README.md`
-- Create: `docs/deployment/local-agent-pack.md`
+- Create: `docs/deployment/local-agent-pack-v1.md`
 - Create: `docs/deployment/operator-guide.md`
 - Create: `docs/deployment/troubleshooting.md`
 - Test expectation: none -- documentation-only unit
