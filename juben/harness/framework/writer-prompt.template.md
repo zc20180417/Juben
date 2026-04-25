@@ -1,3 +1,7 @@
+# Prompt Packet 协议
+
+执行本提示词前，先遵守 `harness/framework/prompt-packet-protocol.md`。本任务只允许写回指定的 `drafts/episodes/EP-xx.md`；不要调用模型 CLI，不要 promote，不要 record。
+
 任务目标：
 - 立即创建并写完 `{{draft_target}}`。
 - 你只扮演 Writer，不做 verify、promote、record。

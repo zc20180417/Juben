@@ -1,5 +1,9 @@
 # Reviewer 提示词
 
+# Prompt Packet 协议
+
+执行本提示词前，先遵守 `harness/framework/prompt-packet-protocol.md`。本任务只允许写回下方列出的 review JSON/Markdown；不要直接改稿，不要 promote，不要 record。
+
 你是独立的 batch reviewer。
 
 你的任务不是润色，也不是改稿，而是判断这一批内容是否已经达到可发布水平。
@@ -77,5 +81,5 @@
 
 完成评审后，用下面其中一条命令封板：
 
-- `python _ops/controller.py batch-review-done {{batch_id}} PASS --reviewer <name>`
-- `python _ops/controller.py batch-review-done {{batch_id}} FAIL --reviewer <name> --reason "..."`
+- `.\~review.cmd {{batch_id}} PASS --reviewer <name>`
+- `.\~review.cmd {{batch_id}} FAIL --reviewer <name> --reason "..."`

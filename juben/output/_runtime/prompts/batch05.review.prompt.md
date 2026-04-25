@@ -82,5 +82,5 @@
 
 完成评审后，用下面其中一条命令封板：
 
-- `python _ops/controller.py batch-review-done batch05 PASS --reviewer <name>`
-- `python _ops/controller.py batch-review-done batch05 FAIL --reviewer <name> --reason "..."`
+- `.\~review.cmd batch05 PASS --reviewer <name>`
+- `.\~review.cmd batch05 FAIL --reviewer <name> --reason "..."`

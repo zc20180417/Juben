@@ -22,7 +22,7 @@
 - `episodes/`：正式成稿，每集一个 `EP-xx.md`
 - `anchors/`：角色与声纹参考，可给人工精修或审稿 agent 使用
 - `manifest.json`：机器可读索引
-- `_runtime/`：内部诊断包，包含草稿、prompt、review、brief、map、state；普通交付可忽略
+- `_runtime/`：内部诊断包，包含草稿、prompt、review、brief、map、protocol、state；普通交付可忽略
 
 ## 已发布剧集
 
@@ -69,4 +69,5 @@
 - briefs: 5
 - maps: 3
 - anchors: 2
+- protocols: 1
 - state: 7

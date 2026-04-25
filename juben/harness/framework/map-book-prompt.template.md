@@ -1,3 +1,7 @@
+# Prompt Packet 协议
+
+执行本提示词前，先遵守 `harness/framework/prompt-packet-protocol.md`。本任务只允许写回指定的 source map 目标文件；不要调用模型 CLI，不要 promote，不要 record。
+
 你现在只做一件事：基于原著和 `book.blueprint.md`，返回一份完整可用的 `source.map.md`。
 
 禁止事项：

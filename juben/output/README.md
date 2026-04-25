@@ -17,6 +17,7 @@
 - `_runtime/prompts/`：可交给 agent 执行的提示词包
 - `_runtime/briefs/`：批次 brief
 - `_runtime/maps/`：全书蓝图、source map、run manifest
+- `_runtime/protocols/`：agent 执行 prompt packet 时必须读取的协议
 - `_runtime/state/`：连续性、关系、open loop 等状态摘要
 
 ## 刷新方式
@@ -34,4 +35,5 @@
 - briefs: 5
 - maps: 3
 - anchors: 2
+- protocols: 1
 - state: 7

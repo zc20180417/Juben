@@ -26,7 +26,7 @@
 3. `map-book`
 4. `start <batch_id>`
 5. `start <batch_id> --write`
-6. reviewer 阅读 review prompt，回填 `batch-review-done`
+6. reviewer 阅读 review prompt，通过 `.\~review.cmd` 回填结论
 7. `run <batch_id>`
 8. `record <batch_id>`
 
@@ -34,15 +34,18 @@
 
 | 聊天命令 | 对应命令 |
 |---|---|
-| `~init ...` | `python _ops/controller.py init ...` |
-| `~extract-book` | `python _ops/controller.py extract-book` |
-| `~map-book` | `python _ops/controller.py map-book` |
-| `~start batch01` | `python _ops/controller.py start batch01` |
-| `~start batch01 --write` | `python _ops/controller.py start batch01 --write` |
-| `~check batch01` | `python _ops/controller.py check batch01`（仅重建 review packet） |
-| `~run batch01` | `python _ops/controller.py run batch01` |
-| `~record batch01` | `python _ops/controller.py record batch01` |
-| `~clean` | `python _ops/controller.py clean` |
+| `.\~init.cmd ...` | 初始化项目 |
+| `.\~extract.cmd` | 生成全书抽取 prompt packet |
+| `.\~map.cmd` | 生成 source map prompt packet |
+| `.\~start.cmd batch01` | 冻结批次 brief |
+| `.\~start.cmd batch01 --write` | 生成/刷新写作与评审 prompt packet |
+| `.\~check.cmd batch01` | 仅重建 review packet |
+| `.\~review.cmd batch01 PASS --reviewer <name>` | 记录评审结论 |
+| `.\~run.cmd batch01` | 正式发布批次 |
+| `.\~promote.cmd batch01` | 仅用于 promote 中断后的恢复 |
+| `.\~record.cmd batch01` | 写入批次状态记忆 |
+| `.\~export.cmd` | 刷新 output/ 交付包 |
+| `.\~clean.cmd` | 清理运行态产物 |
 
 ## 当前原则
 

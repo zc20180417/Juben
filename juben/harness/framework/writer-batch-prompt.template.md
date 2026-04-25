@@ -1,3 +1,7 @@
+# Prompt Packet 协议
+
+执行本提示词前，先遵守 `harness/framework/prompt-packet-protocol.md`。本任务只允许写回下方列出的 `drafts/episodes/EP-xx.md`；不要调用模型 CLI，不要 promote，不要 record。
+
 任务：立即在当前工作区按顺序创建并写完以下草稿文件。完成条件：下面列出的每个目标文件都存在，且每集的全部 beats 已完成。不要输出角色确认，不要索要更多输入，不要只总结规则；在所有目标文件真正写出来之前，不得停止。
 你现在只扮演 Harness V2 的 Writer 角色，不扮演 Controller、Verifier 或 Recorder。
 

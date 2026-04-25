@@ -1,6 +1,6 @@
 {
   "schema_version": "juben-output/v1",
-  "generated_at": "2026-04-25T14:33:25",
+  "generated_at": "2026-04-25T15:44:01",
   "source_file": "被弃真千金：总裁不好惹.md",
   "total_episodes": "25",
   "target_total_minutes": "50",
@@ -15,6 +15,7 @@
     "prompts": 8,
     "briefs": 5,
     "maps": 3,
+    "protocols": 1,
     "anchors": 2,
     "state": 7
   },
@@ -28,6 +29,7 @@
     "prompts": "_runtime/prompts/",
     "briefs": "_runtime/briefs/",
     "maps": "_runtime/maps/",
+    "protocols": "_runtime/protocols/",
     "state": "_runtime/state/"
   },
   "published_episodes": [

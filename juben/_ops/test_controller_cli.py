@@ -171,6 +171,11 @@ class ControllerCliSmokeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("usage: controller.py export", result.stdout)
 
+    def test_tilde_promote_wrapper_routes_to_promote_help(self) -> None:
+        result = self._run_wrapper("~promote", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("usage: controller.py promote", result.stdout)
+
 
 class ControllerHandlerRegressionTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -638,7 +643,7 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
             summary = (output / "SUMMARY.md").read_text(encoding="utf-8")
             payload = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
             self.assertIn("Juben V1 Output Summary", summary)
-            self.assertIn("~review batch01 PASS", summary)
+            self.assertIn(".\\~review.cmd batch01 PASS", summary)
             self.assertEqual(payload["schema_version"], "juben-output/v1")
             self.assertEqual(payload["published_episodes"][0]["episode"], "EP-01")
             self.assertEqual(payload["batches"][0]["review_status"], "PENDING")
@@ -866,7 +871,7 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
             result = self.controller.cmd_check(args)
 
         self.assertEqual(result, 0)
-        self.assertIn("python _ops/controller.py batch-review-done batch01 PASS --reviewer <name>", output.getvalue())
+        self.assertIn(".\\~review.cmd batch01 PASS --reviewer <name>", output.getvalue())
 
     def test_promote_uses_batch_id_for_manifest_and_log(self) -> None:
         args = argparse.Namespace(batch_id="batch01")
@@ -906,7 +911,7 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
         self.assertEqual(result, 0)
         mock_run.assert_called_once_with(args)
         self.assertIn("deprecated", output.getvalue().lower())
-        self.assertIn("python _ops/controller.py run batch01", output.getvalue())
+        self.assertIn(".\\~run.cmd batch01", output.getvalue())
 
 
 class RunCommandTests(unittest.TestCase):
@@ -1185,8 +1190,8 @@ class StartCommandTests(unittest.TestCase):
         mock_writer.assert_not_called()
         mock_run.assert_not_called()
         self.assertIn("prepare-only", output.getvalue())
-        self.assertIn("python _ops/controller.py batch-review-done batch03 PASS --reviewer <name>", output.getvalue())
-        self.assertIn("python _ops/controller.py run batch03", output.getvalue())
+        self.assertIn(".\\~review.cmd batch03 PASS --reviewer <name>", output.getvalue())
+        self.assertIn(".\\~run.cmd batch03", output.getvalue())
 
     def test_start_defaults_to_prepare_mode_without_write_flag(self) -> None:
         args = argparse.Namespace(batch_id="batch03", prepare_only=False, write=False, writer_command="writer --batch {batch_id}")
@@ -1205,8 +1210,8 @@ class StartCommandTests(unittest.TestCase):
         mock_run.assert_not_called()
         text = output.getvalue()
         self.assertIn("default prepare mode", text)
-        self.assertIn("python _ops/controller.py batch-review-done batch03 PASS --reviewer <name>", text)
-        self.assertIn("python _ops/controller.py run batch03", text)
+        self.assertIn(".\\~review.cmd batch03 PASS --reviewer <name>", text)
+        self.assertIn(".\\~run.cmd batch03", text)
 
     def test_start_runs_writer_only_with_write_flag(self) -> None:
         args = argparse.Namespace(batch_id="batch03", prepare_only=False, write=True, writer_command="writer --batch {batch_id}")
@@ -1798,8 +1803,9 @@ class OutputExportTests(unittest.TestCase):
             briefs = root / "harness" / "project" / "batch-briefs"
             state = root / "harness" / "project" / "state"
             project = root / "harness" / "project"
+            framework = root / "harness" / "framework"
             output = root / "output"
-            for path in (episodes, drafts, reviews, prompts, briefs, state, project):
+            for path in (episodes, drafts, reviews, prompts, briefs, state, project, framework):
                 path.mkdir(parents=True, exist_ok=True)
 
             (episodes / "EP-01.md").write_text("# EP-01\n", encoding="utf-8")
@@ -1814,6 +1820,7 @@ class OutputExportTests(unittest.TestCase):
             (project / "source.map.md").write_text("# source\n", encoding="utf-8")
             (project / "run.manifest.md").write_text("# manifest\n", encoding="utf-8")
             (state / "story.state.md").write_text("# story\n", encoding="utf-8")
+            (framework / "prompt-packet-protocol.md").write_text("# protocol\n", encoding="utf-8")
             (root / "character.md").write_text("# character\n", encoding="utf-8")
             (root / "voice-anchor.md").write_text("# voice\n", encoding="utf-8")
 
@@ -1825,6 +1832,7 @@ class OutputExportTests(unittest.TestCase):
                  mock.patch.object(self.controller, "PROMPTS", prompts), \
                  mock.patch.object(self.controller, "BATCH_BRIEFS", briefs), \
                  mock.patch.object(self.controller, "STATE", state), \
+                 mock.patch.object(self.controller, "PROMPT_PACKET_PROTOCOL", framework / "prompt-packet-protocol.md"), \
                  mock.patch.object(self.controller, "BOOK_BLUEPRINT", project / "book.blueprint.md"), \
                  mock.patch.object(self.controller, "SOURCE_MAP", project / "source.map.md"), \
                  mock.patch.object(self.controller, "RUN_MANIFEST", project / "run.manifest.md"):
@@ -1837,6 +1845,7 @@ class OutputExportTests(unittest.TestCase):
             self.assertFalse((output / "drafts").exists())
             self.assertTrue((output / "_runtime" / "prompts" / "batch01.writer.batch.prompt.md").exists())
             self.assertTrue((output / "_runtime" / "prompts" / "batch01.review.prompt.md").exists())
+            self.assertTrue((output / "_runtime" / "protocols" / "prompt-packet-protocol.md").exists())
             self.assertTrue((output / "anchors" / "character.md").exists())
             self.assertIn("_runtime/", (output / "README.md").read_text(encoding="utf-8"))
             self.assertIn(".\\~export.cmd", (output / "README.md").read_text(encoding="utf-8"))
@@ -1853,8 +1862,9 @@ class OutputExportTests(unittest.TestCase):
             state = project / "state"
             locks = project / "locks"
             batch_status = project / "batch-status"
+            framework = root / "harness" / "framework"
             output = root / "output"
-            for path in (project, episodes, drafts, reviews, prompts, briefs, state, locks, batch_status):
+            for path in (project, episodes, drafts, reviews, prompts, briefs, state, locks, batch_status, framework):
                 path.mkdir(parents=True, exist_ok=True)
 
             (episodes / "EP-01.md").write_text("# EP-01\n", encoding="utf-8")
@@ -1899,6 +1909,7 @@ class OutputExportTests(unittest.TestCase):
                 json.dumps({"batch_id": "batch01", "status": "PASS", "reviewer": "codex"}, ensure_ascii=False),
                 encoding="utf-8",
             )
+            (framework / "prompt-packet-protocol.md").write_text("# protocol\n", encoding="utf-8")
 
             with contextlib.redirect_stdout(io.StringIO()), \
                  mock.patch.object(self.controller, "ROOT", root), \
@@ -1911,6 +1922,7 @@ class OutputExportTests(unittest.TestCase):
                  mock.patch.object(self.controller, "STATE", state), \
                  mock.patch.object(self.controller, "LOCKS", locks), \
                  mock.patch.object(self.controller, "BATCH_STATUS_DIR", batch_status), \
+                 mock.patch.object(self.controller, "PROMPT_PACKET_PROTOCOL", framework / "prompt-packet-protocol.md"), \
                  mock.patch.object(self.controller, "BOOK_BLUEPRINT", project / "book.blueprint.md"), \
                  mock.patch.object(self.controller, "SOURCE_MAP", project / "source.map.md"), \
                  mock.patch.object(self.controller, "RUN_MANIFEST", run_manifest):
@@ -1924,6 +1936,7 @@ class OutputExportTests(unittest.TestCase):
             self.assertEqual(payload["run_status"], "complete")
             self.assertEqual(payload["active_batch"], "(none)")
             self.assertEqual(payload["paths"]["drafts"], "_runtime/drafts/")
+            self.assertEqual(payload["paths"]["protocols"], "_runtime/protocols/")
             self.assertEqual(payload["draft_episodes"][0]["path"], "_runtime/drafts/EP-01.md")
 
 
@@ -2937,7 +2950,7 @@ class StatusGoldDisplayTests(unittest.TestCase):
             text = output.getvalue()
             self.assertIn("=== Promote Recovery Required: batch01 ===", text)
             self.assertIn("Journal phase: publishing", text)
-            self.assertIn("To resume: python _ops/controller.py promote batch01", text)
+            self.assertIn("To resume: .\\~promote.cmd batch01", text)
 
     def test_next_prioritizes_batch_review_blocker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2980,7 +2993,7 @@ class StatusGoldDisplayTests(unittest.TestCase):
             text = output.getvalue()
             self.assertIn("=== Current Blocker: batch01 ===", text)
             self.assertIn("batch review artifact missing", text)
-            self.assertIn("python _ops/controller.py check batch01", text)
+            self.assertIn(".\\~check.cmd batch01", text)
 
 
 class BatchBriefAuthoringTests(unittest.TestCase):
@@ -3273,7 +3286,7 @@ def _override_test_start_review_only(self) -> None:
     mock_review.assert_called_once_with("batch03", ["EP-11", "EP-12"], brief_path=Path("brief.md"))
     self.assertEqual(mock_status.call_args.kwargs["phase"], "review_pending")
     text = output.getvalue()
-    self.assertIn("python _ops/controller.py batch-review-done batch03 PASS --reviewer <name>", text)
+    self.assertIn(".\\~review.cmd batch03 PASS --reviewer <name>", text)
     self.assertNotIn("verify-done", text)
     self.assertNotIn("smoke", text.lower())
 
@@ -3396,7 +3409,7 @@ def _override_test_start_review_only_prompt_packet(self) -> None:
     mock_writer.assert_called_once_with("batch03", ["EP-11", "EP-12"], parallelism=1)
     mock_review.assert_called_once_with("batch03", ["EP-11", "EP-12"], brief_path=Path("brief.md"))
     self.assertEqual(mock_status.call_args.kwargs["phase"], "review_pending")
-    self.assertIn("batch-review-done batch03 PASS", output.getvalue())
+    self.assertIn("~review.cmd batch03 PASS", output.getvalue())
 
 
 def _override_test_writer_stage_uses_existing_drafts_without_command(self) -> None:

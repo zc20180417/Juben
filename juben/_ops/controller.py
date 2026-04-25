@@ -62,6 +62,7 @@ MEMORY_CONTRACT = FRAMEWORK / "memory-contract.md"
 REVIEW_STANDARD = FRAMEWORK / "review-standard.md"
 REVIEW_PROMPT_TEMPLATE = FRAMEWORK / "reviewer-prompt.template.md"
 POLISH_PROMPT_TEMPLATE = FRAMEWORK / "polish-prompt.template.md"
+PROMPT_PACKET_PROTOCOL = FRAMEWORK / "prompt-packet-protocol.md"
 BOOK_BLUEPRINT = PROJECT / "book.blueprint.md"
 SOURCE_MAP = PROJECT / "source.map.md"
 RELEASES = PROJECT / "releases"
@@ -501,18 +502,18 @@ def _next_batch_review_action(batch_id: str, runtime: dict | None, review: dict 
     if review is None or batch_review_status == "MISSING":
         return (
             "batch review artifact missing",
-            f"python _ops/controller.py check {batch_id}  # rebuild review packet only",
+            f".\\~check.cmd {batch_id}  # rebuild review packet only",
         )
     review_status = review.get("status", batch_review_status)
     if review_status == "PENDING":
         return (
             "batch review pending verdict",
-            f"python _ops/controller.py batch-review-done {batch_id} PASS --reviewer <name>",
+            f".\\~review.cmd {batch_id} PASS --reviewer <name>",
         )
     if review_status == "FAIL":
         return (
             f"batch review failed: {(review.get('reason', '') or '(no reason recorded)')}",
-            f"python _ops/controller.py batch-review-done {batch_id} PASS --reviewer <name>",
+            f".\\~review.cmd {batch_id} PASS --reviewer <name>",
         )
     return None
 
@@ -1184,11 +1185,11 @@ def _apply_batch_record(batch_id: str, brief_path: Path, brief: dict, review: di
         "当前执行准则",
         "\n".join(
             [
-                "- start batchXX",
-                "- start batchXX --write",
-                "- batch-review-done batchXX PASS|FAIL --reviewer <name>",
-                "- run batchXX",
-                "- record batchXX",
+                "- .\\~start.cmd batchXX",
+                "- .\\~start.cmd batchXX --write",
+                "- .\\~review.cmd batchXX PASS|FAIL --reviewer <name>",
+                "- .\\~run.cmd batchXX",
+                "- .\\~record.cmd batchXX",
             ]
         ),
     )
@@ -1573,7 +1574,7 @@ def _print_start_next_steps(
         print(f"  {step_no}. Writer stage:    draft {', '.join(episodes)} into drafts/episodes/")
         step_no += 1
 
-    print(f"  {step_no}. Review verdict:  python _ops/controller.py batch-review-done {batch_id} PASS --reviewer <name>")
+    print(f"  {step_no}. Review verdict:  .\\~review.cmd {batch_id} PASS --reviewer <name>")
     step_no += 1
 
     unmapped_eps = focus.get("unmapped", [])
@@ -1594,7 +1595,7 @@ def _print_start_next_steps(
             print(f"     LIGHT:    {', '.join(light_eps)}")
         step_no += 1
 
-    print(f"  {step_no}. Formal release:  python _ops/controller.py run {batch_id}")
+    print(f"  {step_no}. Formal release:  .\\~run.cmd {batch_id}")
 
 def _relative_to_root(path: Path) -> str:
     try:
@@ -1918,6 +1919,7 @@ def _render_polish_prompt(batch_id: str, episodes: list[str], brief_path: Path) 
 
 def _print_prompt_ready(prompt_path: Path, target_paths: list[Path], *, next_command: str | None = None) -> None:
     print("  -> Prompt packet ready; no Python-managed model process was started.")
+    print(f"  Protocol: {_relative_to_root(PROMPT_PACKET_PROTOCOL)}")
     print(f"  Prompt: {_relative_to_root(prompt_path)}")
     print("  Expected output:")
     for target in target_paths:
@@ -2069,7 +2071,7 @@ def _run_writer_stage(
         _print_prompt_ready(
             prompt_path,
             prompt_targets,
-            next_command=f"python _ops/controller.py start {batch_id} --write",
+            next_command=f".\\~start.cmd {batch_id} --write",
         )
     return WRITER_STAGE_PROMPTS_READY
 
@@ -2078,7 +2080,7 @@ def _run_polish_stage(batch_id: str, episodes: list[str], brief_path: Path) -> i
     missing = _missing_drafts(episodes)
     if missing:
         print(f"ERROR: cannot polish; missing drafts: {', '.join(missing)}")
-        print(f"  Run first: python _ops/controller.py start {batch_id} --write")
+        print(f"  Run first: .\\~start.cmd {batch_id} --write")
         return 1
     if not POLISH_PROMPT_TEMPLATE.exists():
         print(f"ERROR: polish prompt template missing: {_relative_to_root(POLISH_PROMPT_TEMPLATE)}")
@@ -2099,10 +2101,10 @@ def _run_polish_stage(batch_id: str, episodes: list[str], brief_path: Path) -> i
     _print_prompt_ready(
         prompt_path,
         target_paths,
-        next_command=f"python _ops/controller.py start {batch_id} --write",
+        next_command=f".\\~start.cmd {batch_id} --write",
     )
     print("  Polish mode: external agent only; this command does not call model CLIs.")
-    print("  After polish edits drafts, re-run start --write to refresh the review packet.")
+    print(f"  After polish edits drafts, re-run .\\~start.cmd {batch_id} --write to refresh the review packet.")
     return WRITER_STAGE_PROMPTS_READY
 
 
@@ -2327,7 +2329,7 @@ def cmd_export(args: argparse.Namespace) -> int:
     print(f"  Root: {OUTPUT.relative_to(ROOT)}")
     print(f"  Summary: {(OUTPUT / 'SUMMARY.md').relative_to(ROOT)}")
     print(f"  Manifest: {(OUTPUT / 'manifest.json').relative_to(ROOT)}")
-    for key in ("episodes", "drafts", "reviews", "prompts", "briefs", "maps", "anchors", "state"):
+    for key in ("episodes", "drafts", "reviews", "prompts", "briefs", "maps", "anchors", "state", "protocols"):
         print(f"  {key}: {stats.get(key, 0)}")
     return 0
 
@@ -2380,8 +2382,8 @@ def cmd_batch_review(args: argparse.Namespace) -> int:
     print(f"\n  Use the prompt file above as the reviewer instruction.")
     print(f"  Use the standard file above as the grading rubric.")
     print(f"\n  When review is complete:")
-    print(f"    python _ops/controller.py batch-review-done {batch_id} PASS --reviewer <name>")
-    print(f"    python _ops/controller.py batch-review-done {batch_id} FAIL --reviewer <name> --reason \"...\"")
+    print(f"    .\\~review.cmd {batch_id} PASS --reviewer <name>")
+    print(f"    .\\~review.cmd {batch_id} FAIL --reviewer <name> --reason \"...\"")
     return 0
 
 
@@ -2414,8 +2416,8 @@ def cmd_batch_review_done(args: argparse.Namespace) -> int:
     review = _read_batch_review(batch_id)
     if review is None:
         print(f"ERROR: batch review artifact missing for '{batch_id}'")
-        print(f"  Run: python _ops/controller.py start {batch_id} --write")
-        print(f"  Fallback: python _ops/controller.py check {batch_id}")
+        print(f"  Run: .\\~start.cmd {batch_id} --write")
+        print(f"  Fallback: .\\~check.cmd {batch_id}")
         return 1
 
     if verdict == "FAIL" and reason and reason not in blocking_reasons:
@@ -2597,7 +2599,7 @@ def cmd_record_done(args: argparse.Namespace) -> int:
 
     if next_batch:
         next_info = batches[next_batch]
-        print(f"\n  Next: python _ops/controller.py start {next_batch}")
+        print(f"\n  Next: .\\~start.cmd {next_batch}")
         print(f"  ({next_info['ep_start']} ~ {next_info['ep_end']}, {next_info['source_range']})")
     else:
         print(f"\n  All batches complete!")
@@ -2981,7 +2983,7 @@ def _output_next_action(batch_summaries: list[dict]) -> str:
     if _is_locked("batch.lock"):
         lock_data = _read_lock("batch.lock")
         owner = lock_data.get("owner", "?")
-        return f"batch.lock 当前由 {owner} 持有；先完成当前批次或运行 `python _ops/controller.py unlock batch.lock`。"
+        return f"batch.lock 当前由 {owner} 持有；先完成当前批次或人工确认后解除锁。"
 
     for item in batch_summaries:
         batch_id = item["batch_id"]
@@ -2990,12 +2992,12 @@ def _output_next_action(batch_summaries: list[dict]) -> str:
         if phase in {"promoted", "recorded"}:
             continue
         if review_status == "PENDING":
-            return f"评审 {batch_id}：`~review {batch_id} PASS --reviewer <name>` 或记录 FAIL 原因。"
+            return f"评审 {batch_id}：`.\\~review.cmd {batch_id} PASS --reviewer <name>` 或记录 FAIL 原因。"
         if review_status == "FAIL":
-            return f"修正 {batch_id} 后重新评审：`~start {batch_id} --write`，再 `~review {batch_id} PASS --reviewer <name>`。"
+            return f"修正 {batch_id} 后重新评审：`.\\~start.cmd {batch_id} --write`，再 `.\\~review.cmd {batch_id} PASS --reviewer <name>`。"
         if phase in {"writer_ready", "review_pending"}:
-            return f"生成或重建 {batch_id} 评审包：`python _ops/controller.py check {batch_id}`。"
-        return f"启动下一批 {batch_id}：`~start {batch_id} --write`。"
+            return f"生成或重建 {batch_id} 评审包：`.\\~check.cmd {batch_id}`。"
+        return f"启动下一批 {batch_id}：`.\\~start.cmd {batch_id} --write`。"
 
     if batch_summaries:
         return "所有已映射批次都已发布；可直接交付 `output/`，或继续人工精修成稿。"
@@ -3064,7 +3066,7 @@ def _write_output_summary(stats: dict[str, int]) -> None:
         "- `episodes/`：正式成稿，每集一个 `EP-xx.md`\n"
         "- `anchors/`：角色与声纹参考，可给人工精修或审稿 agent 使用\n"
         "- `manifest.json`：机器可读索引\n"
-        "- `_runtime/`：内部诊断包，包含草稿、prompt、review、brief、map、state；普通交付可忽略\n\n"
+        "- `_runtime/`：内部诊断包，包含草稿、prompt、review、brief、map、protocol、state；普通交付可忽略\n\n"
         "## 已发布剧集\n\n"
         f"{episode_lines}\n\n"
         "## 批次状态\n\n"
@@ -3077,6 +3079,7 @@ def _write_output_summary(stats: dict[str, int]) -> None:
         f"- briefs: {stats.get('briefs', 0)}\n"
         f"- maps: {stats.get('maps', 0)}\n"
         f"- anchors: {stats.get('anchors', 0)}\n"
+        f"- protocols: {stats.get('protocols', 0)}\n"
         f"- state: {stats.get('state', 0)}\n"
     )
     (OUTPUT / "SUMMARY.md").write_text(summary, encoding="utf-8")
@@ -3110,6 +3113,7 @@ def _write_output_manifest(stats: dict[str, int]) -> None:
             "prompts": "_runtime/prompts/",
             "briefs": "_runtime/briefs/",
             "maps": "_runtime/maps/",
+            "protocols": "_runtime/protocols/",
             "state": "_runtime/state/",
         },
         "published_episodes": [
@@ -3145,6 +3149,7 @@ def _write_output_readme(stats: dict[str, int]) -> None:
         "- `_runtime/prompts/`：可交给 agent 执行的提示词包\n"
         "- `_runtime/briefs/`：批次 brief\n"
         "- `_runtime/maps/`：全书蓝图、source map、run manifest\n"
+        "- `_runtime/protocols/`：agent 执行 prompt packet 时必须读取的协议\n"
         "- `_runtime/state/`：连续性、关系、open loop 等状态摘要\n\n"
         "## 刷新方式\n\n"
         "```powershell\n"
@@ -3158,6 +3163,7 @@ def _write_output_readme(stats: dict[str, int]) -> None:
         f"- briefs: {stats.get('briefs', 0)}\n"
         f"- maps: {stats.get('maps', 0)}\n"
         f"- anchors: {stats.get('anchors', 0)}\n"
+        f"- protocols: {stats.get('protocols', 0)}\n"
         f"- state: {stats.get('state', 0)}\n",
         encoding="utf-8",
     )
@@ -3175,6 +3181,7 @@ def _export_outputs() -> dict[str, int]:
         "prompts": runtime / "prompts",
         "briefs": runtime / "briefs",
         "maps": runtime / "maps",
+        "protocols": runtime / "protocols",
         "state": runtime / "state",
     }
     for dest in sections.values():
@@ -3193,6 +3200,11 @@ def _export_outputs() -> dict[str, int]:
         if source.exists():
             shutil.copy2(source, sections["maps"] / source.name)
             stats["maps"] += 1
+
+    stats["protocols"] = 0
+    if PROMPT_PACKET_PROTOCOL.exists():
+        shutil.copy2(PROMPT_PACKET_PROTOCOL, sections["protocols"] / PROMPT_PACKET_PROTOCOL.name)
+        stats["protocols"] += 1
 
     stats["anchors"] = 0
     for source in (ROOT / "character.md", ROOT / "voice-anchor.md"):
@@ -3332,7 +3344,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         novel_file = _read_manifest().get("source_file")
     if not novel_file:
         print("ERROR: novel file is required for first init")
-        print("  Usage: python _ops/controller.py init <novel_file>")
+        print("  Usage: .\\~init.cmd <novel_file>")
         return 1
 
     novel_path = ROOT / novel_file
@@ -3354,7 +3366,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         print("ERROR: existing project data detected (promoted batches, episodes, state files)")
         print("  This command will OVERWRITE all project files.")
         print("  To proceed, re-run with --force:")
-        print(f"    python _ops/controller.py init {novel_file} --force")
+        print(f"    .\\~init.cmd {novel_file} --force")
         return 1
 
     if total_eps is None:
@@ -3606,7 +3618,7 @@ def cmd_extract_book(args: argparse.Namespace) -> int:
     _print_prompt_ready(
         prompt_path,
         [BOOK_BLUEPRINT, ROOT / "character.md", ROOT / "voice-anchor.md"],
-        next_command="python _ops/controller.py map-book --force",
+        next_command=".\\~map.cmd --force",
     )
     print("  Note: fill book.blueprint.md first; map-book will reject pending placeholders.")
     _append_log("-", "-", "plan_inputs", "extract-book", "prompt", novel_path.name)
@@ -3681,7 +3693,7 @@ def cmd_map_book(args: argparse.Namespace) -> int:
     _print_prompt_ready(
         prompt_path,
         [SOURCE_MAP],
-        next_command="python _ops/controller.py start batch01",
+        next_command=".\\~start.cmd batch01",
     )
     print("  Note: fill source.map.md first; start will reject pending placeholders.")
     _append_log("-", "-", "plan_inputs", "map-book", "prompt", novel_path.name)
@@ -3895,7 +3907,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     if writer_rc == WRITER_STAGE_PROMPTS_READY:
         print("\n=== Writer Prompt Packet Ready ===")
         print("  Drafts are still pending; have an agent execute the prompt packet above.")
-        print(f"  Re-run after drafts exist: python _ops/controller.py start {batch_id} --write")
+        print(f"  Re-run after drafts exist: .\\~start.cmd {batch_id} --write")
         return 0
     if writer_rc != 0:
         return writer_rc
@@ -3920,7 +3932,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     print(f"  Verdict: {review.get('status', 'PENDING')}")
     if quality_mode == "premium":
         print("\n=== Optional Polish ===")
-        print(f"  Premium mode is enabled. Recommended before review: python _ops/controller.py polish {batch_id}")
+        print(f"  Premium mode is enabled. Recommended before review: .\\~polish.cmd {batch_id}")
     print("\n--- Next Steps ---")
     _print_start_next_steps(batch_id, episodes, focus, include_writer_instruction=False)
     return 0
@@ -4000,11 +4012,11 @@ def _do_promote_and_report(batch_id: str, brief_path: Path, episodes: list[str])
     print(f"  BATCH FINISHED: {batch_id}")
     print(f"{'='*50}")
     print("\n--- Next Steps ---")
-    print(f"  1. Update state:   python _ops/controller.py record {batch_id}")
+    print(f"  1. Update state:   .\\~record.cmd {batch_id}")
     print("     (controller auto-writes state files and validates them)")
     if next_batch:
         next_info = batches[next_batch]
-        print(f"  2. Start next:     python _ops/controller.py start {next_batch}")
+        print(f"  2. Start next:     .\\~start.cmd {next_batch}")
         print(f"     ({next_info['ep_start']} ~ {next_info['ep_end']}, {next_info['source_range']})")
     else:
         print("  2. All batches complete!")
@@ -4014,7 +4026,7 @@ def _do_promote_and_report(batch_id: str, brief_path: Path, episodes: list[str])
 def cmd_finish(args: argparse.Namespace) -> int:
     """Deprecated alias for cmd_run()."""
     print("WARNING: 'finish' is deprecated; use 'run' as the only formal release entry.")
-    print(f"  Re-run with: python _ops/controller.py run {args.batch_id}")
+    print(f"  Re-run with: .\\~run.cmd {args.batch_id}")
     return cmd_run(args)
 
 
@@ -4080,7 +4092,7 @@ def cmd_next(args: argparse.Namespace) -> int:
         print(f"\n=== Promote Recovery Required: {batch_id} ===")
         print(f"  Journal phase: {journal.get('phase', '?')}")
         print(f"  Published in prior attempt: {published}")
-        print(f"  To resume: python _ops/controller.py promote {batch_id}")
+        print(f"  To resume: .\\~promote.cmd {batch_id}")
         return 0
 
     for bid in batch_ids:
@@ -4109,7 +4121,7 @@ def cmd_next(args: argparse.Namespace) -> int:
     print(f"\n=== Next Batch: {next_batch} ===")
     print(f"  Episodes: {', '.join(next_info['episodes'])}")
     print(f"  Source:   {next_info['source_range']}")
-    print(f"\n  To start: python _ops/controller.py start {next_batch}")
+    print(f"\n  To start: .\\~start.cmd {next_batch}")
 
     return 0
 
