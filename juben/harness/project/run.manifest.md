@@ -1,17 +1,17 @@
 # Run Manifest
 
-- source_file: 被弃真千金：总裁不好惹.md
-- total_episodes: 25
+- source_file: 实业帝国：从继承养猪场开始.txt
+- total_episodes: 40
 - recommended_total_episodes: pending_book_extraction
 - episode_count_source: manual_override
 - batch_size: 5
-- target_total_minutes: 50
+- target_total_minutes: 55
 - target_episode_minutes: 2
 - episode_minutes_min: 1
 - episode_minutes_max: 3
 - key_episodes: 
 - adaptation_mode: novel_to_short_drama
-- adaptation_strategy: original_fidelity
+- adaptation_strategy: transformative_adaptation
 - dialogue_adaptation_intensity: light
 - quality_mode: standard
 - generation_execution_mode: prompt_packet_external_agent

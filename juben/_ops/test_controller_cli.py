@@ -336,6 +336,65 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
 
         self.assertIn("must-keep beats are too abstract", issues[0])
 
+    def test_transformative_source_map_requires_reconstruction_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_map = root / "source.map.md"
+            manifest = root / "run.manifest.md"
+            manifest.write_text("- adaptation_strategy: transformative_adaptation\n", encoding="utf-8")
+            source_map.write_text(
+                "# Source Map\n\n"
+                "- mapping_status: complete\n\n"
+                "## Batch 01 (EP01-05): 测试批次\n\n"
+                "### EP01: 测试集\n\n"
+                "**source_chapter_span**: 第1章前半\n\n"
+                "**must-keep_beats**:\n"
+                "- 【关系】冷静拒认，拒绝回家\n\n"
+                "**knowledge_boundary**:\n"
+                "- 女主不知道对方真实目的\n\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(self.controller, "SOURCE_MAP", source_map), \
+                 mock.patch.object(self.controller, "RUN_MANIFEST", manifest):
+                issues = self.controller._source_map_quality_issues()
+
+        self.assertIn("batch01/EP-01: source_function is missing", issues)
+        self.assertIn("batch01/EP-01: new_episode_event is missing", issues)
+        self.assertIn("batch01/EP-01: setting_translation is missing", issues)
+        self.assertIn("batch01/EP-01: must_change_surface is missing", issues)
+        self.assertIn("batch01/EP-01: do_not_copy is missing", issues)
+
+    def test_transformative_fields_are_rendered_into_batch_brief(self) -> None:
+        batch_info = {
+            "episodes": ["EP-01"],
+            "ep_start": "EP-01",
+            "ep_end": "EP-01",
+            "source_range": "ch1",
+            "episode_data": {
+                "EP-01": {
+                    "source_span": "ch1",
+                    "source_function": "- 原作功能：陌生人误认并施压",
+                    "new_episode_event": "- 新事件：资方审计会上误把女主当成失踪合伙人继承人",
+                    "setting_translation": "- 原认亲场转译为公司控制权审计场",
+                    "must_keep_function": "- 保留被迫入局和身份压力",
+                    "must_change_surface": "- 不写街头拦车和亲缘鉴定",
+                    "do_not_copy": "- 不复用原作认亲台词和车门锁死桥段",
+                    "must_keep": "【信息】审计会误认并施压",
+                    "knowledge_boundary": "女主不知道对方为何误认",
+                    "must_not": "不能写亲缘鉴定",
+                    "ending_function": "confrontation_pending",
+                },
+            },
+        }
+
+        brief = self.controller._generate_batch_brief("batch01", batch_info)
+
+        self.assertIn("transformative_adaptation:", brief)
+        self.assertIn("source_function: 原作功能：陌生人误认并施压", brief)
+        self.assertIn("new_episode_event: 新事件：资方审计会上误把女主当成失踪合伙人继承人", brief)
+        self.assertIn("do_not_copy: 不复用原作认亲台词和车门锁死桥段", brief)
+
     def test_generate_batch_brief_no_longer_embeds_fake_ready_state(self) -> None:
         batch_info = {
             "episodes": ["EP-01", "EP-02"],
@@ -573,6 +632,18 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
             self.assertIn("Promoted: batch01, batch02", text)
             self.assertNotIn("Pending:  batch01", text)
 
+    def test_next_reports_source_map_not_ready_when_no_batches_exist(self) -> None:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), \
+             mock.patch.object(self.controller, "_parse_source_map", return_value={}), \
+             mock.patch.object(self.controller, "_read_manifest", return_value={"active_batch": "(none)"}):
+            rc = self.controller.cmd_next(argparse.Namespace())
+
+        self.assertEqual(rc, 0)
+        text = output.getvalue()
+        self.assertIn("Source map not ready", text)
+        self.assertNotIn("production complete", text)
+
     def test_export_outputs_writes_summary_and_machine_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -745,6 +816,26 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
         self.assertEqual(chapters[1]["title"], "第二章 旧事如刀")
         self.assertEqual(chapters[1]["start_line"], 4)
 
+    def test_detect_chapters_allows_space_before_chapter_marker(self) -> None:
+        novel_text = "\n".join([
+            "实业帝国",
+            "第16章 早期管培生",
+            "第十六章内容",
+            "",
+            "第21 章 刘玉芳加盟",
+            "第二十一章内容",
+            "",
+            "第23　章 资金问题",
+            "第二十三章内容",
+        ])
+
+        chapters = self.controller._detect_chapters(novel_text)
+
+        self.assertEqual(len(chapters), 3)
+        self.assertEqual(chapters[0]["title"], "第16章 早期管培生")
+        self.assertEqual(chapters[1]["title"], "第21 章 刘玉芳加盟")
+        self.assertEqual(chapters[2]["title"], "第23　章 资金问题")
+
     def test_init_creates_missing_project_directories(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -767,6 +858,13 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
             source_map = project / "source.map.md"
             output = root / "output"
             run_log = state / "run.log.md"
+            stale_status = batch_status_dir / "batch01.status.json"
+            stale_review = reviews / "batch01.review.json"
+            stale_release = releases / "gold-set.json"
+            stale_output = output / "manifest.json"
+            for stale_file in (stale_status, stale_review, stale_release, stale_output):
+                stale_file.parent.mkdir(parents=True, exist_ok=True)
+                stale_file.write_text("stale", encoding="utf-8")
 
             args = argparse.Namespace(
                 novel_file="sample.md",
@@ -805,6 +903,10 @@ class ControllerHandlerRegressionTests(unittest.TestCase):
             self.assertTrue(batch_status_dir.exists())
             self.assertTrue(prompts.exists())
             self.assertTrue(release_journals.exists())
+            self.assertFalse(stale_status.exists())
+            self.assertFalse(stale_review.exists())
+            self.assertFalse(stale_release.exists())
+            self.assertFalse(stale_output.exists())
 
     def test_parse_source_map_supports_generated_markdown_format(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

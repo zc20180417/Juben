@@ -1,8 +1,8 @@
 {
   "batch_id": "batch01",
   "status": "PASS",
-  "reviewer": "codex-smoke",
-  "timestamp": "2026-04-25 16:24",
+  "reviewer": "codex-transformative-smoke",
+  "timestamp": "2026-04-26 17:16",
   "episodes": [
     "EP-01",
     "EP-02",
@@ -15,12 +15,10 @@
     "EP-02"
   ],
   "blocking_reasons": [],
-  "warning_families": [
-    "局部台词仍有短剧模板感，但不影响主戏功能。"
-  ],
+  "warning_families": [],
   "arc_regressions": [],
   "function_theft_findings": [],
   "quality_anchor_findings": [],
   "evidence_refs": [],
-  "reason": "batch01完成黄金开场、称谓边界、三场主戏闭环和阶段钩；未发现原著人名残留或核心越界。"
+  "reason": ""
 }

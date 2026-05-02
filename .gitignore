@@ -1,9 +1,11 @@
 .worktrees/
+.codex-tmp/
 
 # >>> juben runtime noise >>>
 # Python bytecode and local test caches
 juben/_ops/__pycache__/
 juben/**/__pycache__/
+v3_webui/**/__pycache__/
 juben/.pytest_cache/
 juben/**/.pytest_cache/
 
@@ -11,5 +13,8 @@ juben/**/.pytest_cache/
 juben/episodes/*.meta.json
 juben/harness/project/releases/
 juben/versions/rebuild_snapshots/
+juben/input/novels/
+juben/__webui_input_*
+v3_webui/runtime/
 # <<< juben runtime noise <<<
 

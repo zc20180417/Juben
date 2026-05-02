@@ -24,7 +24,7 @@
 - 只写 `{{draft_target}}`；不改 `episodes/`、`harness/project/state/`、`harness/project/source.map.md`、`harness/project/run.manifest.md`；不 promote、不写 state、不越 `must-not-add / must-not-jump`。
 - 信息不足时保守贴合 batch brief 与 source.map，不擅自补设定。
 - 先把 Harness V2 语法壳写正确；写完即停，并确认 `{{draft_target}}` 已存在。
-- 直接生成 `{{episode}}` 完整草稿，保持 original_fidelity + light 对话改编力度。
+- 直接生成 `{{episode}}` 完整草稿，保持 narrative-function fidelity：保叙事功能、关系弧光和情绪逻辑，不保原文句子、原场面外壳、原道具和原事件组合。
 - 语法壳：`场{{episode_num}}-1：` / `场{{episode_num}}-N：`、`日/夜`、`外/内`、`场景：`、`♪：`、`△：`、`【镜头】：`、`角色（os）：`。
 - 首场编号固定为 `{{episode_num}}`；整集至少 2 场；场次数按 beats 和 source 推进自然决定。
 - 排版参考 `style_digest` 与 `{{sample_rel}}`。
@@ -32,6 +32,8 @@
 短剧节奏要求：
 - 当前项目目标总时长以 `run.manifest.md` 的 `target_total_minutes` 为准，不按百集投流模型拖长。
 - 成稿必须使用剧中改名后的姓名，不能沿用原著人物名；如上游仍出现原名，按改名映射统一替换。
+- 改名只是最低要求；每集必须用新设定下的场景、职业动作、道具/流程或现场阻力承载原作功能，不能把原事件换名搬运。
+- 不得复用原文台词或近义改写原句；source excerpt 只用于理解功能、因果和信息顺序。
 - 如果当前集是 EP-01 到 EP-03，第一场第一组可拍动作或第一句台词必须直接进入异常、冲突、羞辱、逼选、误认、证据或身份错位。
 - EP-01 必须完成“异常入局 + 第一轮关系冲突 + 强钩”；EP-02/EP-03 必须升级冲突，不复述上一集。
 - 每集至少跑完一个主戏闭环：进入 -> 对抗/变化 -> 结果或钩子。

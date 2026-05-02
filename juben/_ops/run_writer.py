@@ -858,7 +858,7 @@ def _extract_brief_metadata(brief_path: Path) -> dict[str, object]:
 
 def _contract_digest() -> dict[str, object]:
     return {
-        "adaptation_strategy": "original_fidelity",
+        "adaptation_strategy": "transformative_adaptation",
         "dialogue_adaptation_intensity": "light",
         "shell_format": [
             "场EP-N：",
@@ -939,19 +939,19 @@ def _build_episode_source_excerpt(batch_id: str, episode: str) -> Path:
     reusable_lines = _extract_reusable_source_lines(excerpt_body)
     scene_modes: list[str] = []
     must_keep_names = _extract_must_keep_names(excerpt_body)
-    must_keep_long_lines = _extract_must_keep_long_lines(excerpt_body, reusable_lines)
+    must_keep_long_line_candidates = _extract_must_keep_long_lines(excerpt_body, reusable_lines)
+    # Transformative adaptation treats source wording as meaning-only context.
+    # Do not expose "must keep" original long lines to the writer.
+    must_keep_long_lines: list[str] = []
     abstract_narration = _extract_abstract_narration_to_externalize(excerpt_body)
     forbidden_fill = _forbidden_fill_hints(scene_modes)
     excerpt_tier = _classify_excerpt_tier(
         scene_modes=scene_modes,
-        must_keep_long_lines=must_keep_long_lines,
+        must_keep_long_lines=must_keep_long_line_candidates,
         abstract_narration=abstract_narration,
         reusable_lines_present=bool(reusable_lines),
     )
-    include_reusable_lines = _excerpt_should_include_reusable_lines(
-        reusable_lines,
-        excerpt_tier=excerpt_tier,
-    )
+    include_reusable_lines = False
     event_anchors = _event_anchor_paragraphs(
         excerpt_body,
         excerpt_tier=excerpt_tier,
@@ -963,11 +963,6 @@ def _build_episode_source_excerpt(batch_id: str, episode: str) -> Path:
         excerpt_tier=excerpt_tier,
         must_keep_names=must_keep_names,
         reusable_lines=reusable_lines,
-    )
-    reusable_block = (
-        "\n".join(f"- {line}" for line in reusable_lines)
-        if reusable_lines
-        else "（当前片段未提取到可直接复用的引号台词；仍需贴着原文语义和信息顺序改写）"
     )
     scene_modes_block = "\n".join(f"- {mode}" for mode in scene_modes)
     must_keep_names_block = (
@@ -1002,9 +997,13 @@ def _build_episode_source_excerpt(batch_id: str, episode: str) -> Path:
         "",
         f"- source_span: {source_span}",
         f"- excerpt_tier: {excerpt_tier}",
+        "- source_usage: meaning_only_transformative_reference",
         "",
         "## Original Excerpt",
         rendered_excerpt_body,
+        "",
+        "## Source Usage Boundary",
+        "原文片段只用于理解叙事功能、人物关系、因果压力和信息顺序；不得复用原文句子、近义改写原句、沿用标志性场面外壳或把原事件逐镜头搬进剧本。",
         "",
         "## Must-Keep Names",
         must_keep_names_block,
@@ -1013,22 +1012,11 @@ def _build_episode_source_excerpt(batch_id: str, episode: str) -> Path:
         knowledge_boundary_block,
         "",
     ]
-    if include_reusable_lines:
-        sections.extend(
-            [
-                "## Reusable Source Lines",
-                reusable_block,
-                "",
-            ]
-        )
     if excerpt_tier == "strong_scene":
         sections.extend(
             [
                 "## Scene Modes",
                 scene_modes_block,
-                "",
-                "## Must-Keep Long Lines",
-                must_keep_long_lines_block,
                 "",
                 "## Abstract Narration To Externalize",
                 abstract_narration_block,
@@ -1052,11 +1040,8 @@ def _build_episode_source_excerpt(batch_id: str, episode: str) -> Path:
         "knowledge_boundary": knowledge_boundary,
         "forbidden_fill": forbidden_fill,
     }
-    if excerpt_tier in {"low_risk", "strong_scene"}:
-        payload["reusable_source_lines"] = reusable_lines
     if excerpt_tier == "strong_scene":
         payload["scene_modes"] = scene_modes
-        payload["must_keep_long_lines"] = must_keep_long_lines
         payload["abstract_narration"] = abstract_narration
 
     excerpt_path.write_text("\n".join(sections), encoding="utf-8")
@@ -1266,10 +1251,10 @@ def _build_rule_priority_block() -> str:
     lines = [
         "冲突优先级：",
         "1. 完成当前集全部 beats > 其他一切；`【信息】/【关系】/【动作】/【钩子】` 任何一类都不能缺失。",
-        "2. source 顺序与边界 > 节奏性后拖或压场数；已发生硬事件不能后拖。",
+        "2. source 功能顺序与边界 > 节奏性后拖或压场数；已发生的叙事功能不能后拖。",
         "3. batch brief 当前集任务 > voice/style 借用；`voice-anchor` 只看气质与禁区，不抢任务优先级。",
         "4. `角色（os）：` 只是壳；不得新增第一人称“我……”式旁白。",
-        "5. `must_keep_long_lines` 只有在不违反 `forbidden_fill`、must-not-add、must-not-jump 时才保。",
+        "5. 原文句子只作含义参考；不得复用原句、近义改写原句或照搬标志性场面外壳。",
     ]
     return "\n".join(lines)
 
@@ -1297,16 +1282,17 @@ def _episode_rule_profile(source_excerpt_path: Path) -> dict[str, object]:
     json_path, markdown_path = _source_excerpt_companion_paths(source_excerpt_path)
     payload = _read_json_object(json_path)
     if payload is not None:
-        reusable_source_lines = payload.get("reusable_source_lines", [])
         return {
             "excerpt_tier": str(payload.get("excerpt_tier", "baseline")),
             "scene_modes": [item for item in payload.get("scene_modes", []) if isinstance(item, str)],
             "must_keep_names": [item for item in payload.get("must_keep_names", []) if isinstance(item, str)],
             "knowledge_boundary": [item for item in payload.get("knowledge_boundary", []) if isinstance(item, str)],
-            "must_keep_long_lines": [item for item in payload.get("must_keep_long_lines", []) if isinstance(item, str)],
+            # Legacy payloads may contain original long lines or reusable source
+            # lines. In transformative mode they are intentionally ignored.
+            "must_keep_long_lines": [],
             "abstract_narration": [item for item in payload.get("abstract_narration", []) if isinstance(item, str)],
             "forbidden_fill": [item for item in payload.get("forbidden_fill", []) if isinstance(item, str)],
-            "reusable_lines_present": isinstance(reusable_source_lines, list) and bool(reusable_source_lines),
+            "reusable_lines_present": False,
         }
 
     if not markdown_path.exists():
@@ -1319,10 +1305,10 @@ def _episode_rule_profile(source_excerpt_path: Path) -> dict[str, object]:
         "scene_modes": _extract_bullet_section(text, "Scene Modes"),
         "must_keep_names": _extract_bullet_section(text, "Must-Keep Names"),
         "knowledge_boundary": _extract_bullet_section(text, "Knowledge Boundary From Source Map"),
-        "must_keep_long_lines": _extract_bullet_section(text, "Must-Keep Long Lines"),
+        "must_keep_long_lines": [],
         "abstract_narration": _extract_bullet_section(text, "Abstract Narration To Externalize"),
         "forbidden_fill": _extract_bullet_section(text, "Forbidden Fill"),
-        "reusable_lines_present": "## Reusable Source Lines" in text,
+        "reusable_lines_present": False,
     }
 
 
@@ -1383,11 +1369,12 @@ def _build_minimal_rule_pack(
 ) -> str:
     excerpt_tier = str(profile.get("excerpt_tier", "baseline"))
     bullets = [
-        "- `event_anchors` 定顺序；已发生事件不得后拖。",
+        "- `event_anchors` 只定叙事功能和因果顺序；不得把原文事件逐镜头照搬。",
         "- 默认禁新事件、禁新流程、禁新职业说明、禁新后台调度、禁新承接对白。",
         "- 角色只按当场已公开信息行动；模型知道不等于角色知道。",
         "- 称谓必须有现场来源；介绍前不提前喊姓氏、全名、职位或关系词。",
         "- `voice-anchor.md` 只看气质和禁区，不复用例句。",
+        "- 原文句子、标志性道具、特殊场景组合只作含义参考；剧本必须用新设定下的动作、场景和冲突载体承接同一功能。",
         "- 场次数按 beats 和 source 推进自然决定；整集至少 2 场，不要为凑格式硬拆或硬并。",
         "- 非终场最后一个 `△` 必须带新增推进，别停在静态结果或环境余波。",
         "- 禁新增第一人称叙述；`角色（os）：` 也不能写成“我……”式内心旁白。",
@@ -1396,17 +1383,17 @@ def _build_minimal_rule_pack(
     if excerpt_tier == "strong_scene":
         bullets.insert(
             1,
-            "- `strong_scene`：先读 `scene_modes` / `must_keep_names` / `must_keep_long_lines` / `abstract_narration` / `forbidden_fill`；有 `reusable_source_lines` 先保原句。",
+            "- `strong_scene`：先读 `scene_modes` / `must_keep_names` / `abstract_narration` / `forbidden_fill`；保功能和压力，不保原句和原场面外壳。",
         )
     elif excerpt_tier == "low_risk":
         bullets.insert(
             1,
-            "- `low_risk`：先读 `reusable_source_lines` / `must_keep_names` / `forbidden_fill`；贴原句和句意写，别补桥接句。",
+            "- `low_risk`：先读 `must_keep_names` / `forbidden_fill`；贴功能和句意写，别贴原句或补桥接句。",
         )
     else:
         bullets.insert(
             1,
-            "- `baseline`：先读 `event_anchors` / `must_keep_names` / `forbidden_fill`；贴锚点和句意写，别补桥接句。",
+            "- `baseline`：先读 `event_anchors` / `must_keep_names` / `forbidden_fill`；贴功能锚点和句意写，别补桥接句。",
         )
     if include_adjacent_boundary:
         bullets.append("- 承接上一集最多 1-2 镜头，随后立刻进入新增推进。")
@@ -1414,8 +1401,6 @@ def _build_minimal_rule_pack(
     scene_modes = set(profile.get("scene_modes", []))
     if profile.get("must_keep_names"):
         bullets.append("- `must_keep_names` 非空时，人名别退化成泛称。")
-    if profile.get("must_keep_long_lines"):
-        bullets.append("- `must_keep_long_lines` 非空时，至少保住 1 句长句递进。")
     if excerpt_tier == "strong_scene":
         bullets.append("- `△` 优先落手、眼、肩背、站位、道具或声场变化，别只写“冷静”“漠然”“惊艳”“死寂”这类抽象判断。")
         bullets.append("- 未公开的关系词、身份词、真名别抢跑；没到那一步时别替角色下确认性称谓或身份结论。")
@@ -1451,13 +1436,7 @@ def _build_minimal_self_check(profile: dict[str, object], episode_facts: dict[st
         "- 节奏：按当前戏的需要自然拆分，别写成解释清单。",
     ]
 
-    if excerpt_tier in {"low_risk", "strong_scene"} and profile.get("reusable_lines_present"):
-        bullets.append("- 原句：有 `reusable_source_lines` 就优先保；否则贴着 `event_anchors` 句意写。")
-    else:
-        bullets.append("- 原句：贴着 `event_anchors` 句意写。")
-
-    if profile.get("must_keep_long_lines"):
-        bullets.append("- 长句：`must_keep_long_lines` 至少保住 1 句长句递进。")
+    bullets.append("- 原句：不得复用原句或近义改写原句；只保留 `event_anchors` 的功能和因果。")
 
     if profile.get("abstract_narration") or profile.get("forbidden_fill"):
         ending_checks: list[str] = []
@@ -1568,7 +1547,7 @@ def _build_sequential_batch_writer_prompt(
     sequence_runtime_lines = [
         "批次顺序写作最小规则：",
         "- 每集只读自己的 excerpt，并完成自己在 batch brief / batch_facts 里的全部 beats；压场数不能成为缺 beat 的理由。",
-        "- `event_anchors` 定顺序；`must_keep_names`、`forbidden_fill` 守边界；有 `reusable_source_lines` 就先保原句。",
+        "- `event_anchors` 定叙事功能顺序；`must_keep_names`、`forbidden_fill` 守边界；原文句子只作含义参考，不保原句。",
         "- 整集至少 2 场；按当前戏的推进自然拆场，不为凑格式硬拆或硬并。",
         "- 非终场最后一个 `△` 必须带服务 beats 的新增推进，别停在静态结果。",
         "- 禁新增第一人称叙述；`角色（os）：` 也不能写成“我……”式内心旁白。",

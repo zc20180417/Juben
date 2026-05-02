@@ -28,11 +28,11 @@
 
 ## 当前导出统计
 
-- episodes: 25
-- drafts: 25
-- reviews: 10
-- prompts: 12
-- briefs: 5
+- episodes: 40
+- drafts: 40
+- reviews: 16
+- prompts: 18
+- briefs: 8
 - maps: 3
 - anchors: 2
 - protocols: 1

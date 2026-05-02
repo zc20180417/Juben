@@ -1,19 +1,19 @@
 {
   "schema_version": "juben-output/v1",
-  "generated_at": "2026-04-25T17:46:43",
-  "source_file": "被弃真千金：总裁不好惹.md",
-  "total_episodes": "25",
-  "target_total_minutes": "50",
+  "generated_at": "2026-04-26T17:45:15",
+  "source_file": "实业帝国：从继承养猪场开始.txt",
+  "total_episodes": "40",
+  "target_total_minutes": "55",
   "target_episode_minutes": "2",
   "batch_size": "5",
   "run_status": "complete",
   "active_batch": "(none)",
   "counts": {
-    "episodes": 25,
-    "drafts": 25,
-    "reviews": 10,
-    "prompts": 12,
-    "briefs": 5,
+    "episodes": 40,
+    "drafts": 40,
+    "reviews": 16,
+    "prompts": 18,
+    "briefs": 8,
     "maps": 3,
     "protocols": 1,
     "anchors": 2,
@@ -132,6 +132,66 @@
     {
       "episode": "EP-25",
       "path": "episodes/EP-25.md"
+    },
+    {
+      "episode": "EP-26",
+      "path": "episodes/EP-26.md"
+    },
+    {
+      "episode": "EP-27",
+      "path": "episodes/EP-27.md"
+    },
+    {
+      "episode": "EP-28",
+      "path": "episodes/EP-28.md"
+    },
+    {
+      "episode": "EP-29",
+      "path": "episodes/EP-29.md"
+    },
+    {
+      "episode": "EP-30",
+      "path": "episodes/EP-30.md"
+    },
+    {
+      "episode": "EP-31",
+      "path": "episodes/EP-31.md"
+    },
+    {
+      "episode": "EP-32",
+      "path": "episodes/EP-32.md"
+    },
+    {
+      "episode": "EP-33",
+      "path": "episodes/EP-33.md"
+    },
+    {
+      "episode": "EP-34",
+      "path": "episodes/EP-34.md"
+    },
+    {
+      "episode": "EP-35",
+      "path": "episodes/EP-35.md"
+    },
+    {
+      "episode": "EP-36",
+      "path": "episodes/EP-36.md"
+    },
+    {
+      "episode": "EP-37",
+      "path": "episodes/EP-37.md"
+    },
+    {
+      "episode": "EP-38",
+      "path": "episodes/EP-38.md"
+    },
+    {
+      "episode": "EP-39",
+      "path": "episodes/EP-39.md"
+    },
+    {
+      "episode": "EP-40",
+      "path": "episodes/EP-40.md"
     }
   ],
   "draft_episodes": [
@@ -234,6 +294,66 @@
     {
       "episode": "EP-25",
       "path": "_runtime/drafts/EP-25.md"
+    },
+    {
+      "episode": "EP-26",
+      "path": "_runtime/drafts/EP-26.md"
+    },
+    {
+      "episode": "EP-27",
+      "path": "_runtime/drafts/EP-27.md"
+    },
+    {
+      "episode": "EP-28",
+      "path": "_runtime/drafts/EP-28.md"
+    },
+    {
+      "episode": "EP-29",
+      "path": "_runtime/drafts/EP-29.md"
+    },
+    {
+      "episode": "EP-30",
+      "path": "_runtime/drafts/EP-30.md"
+    },
+    {
+      "episode": "EP-31",
+      "path": "_runtime/drafts/EP-31.md"
+    },
+    {
+      "episode": "EP-32",
+      "path": "_runtime/drafts/EP-32.md"
+    },
+    {
+      "episode": "EP-33",
+      "path": "_runtime/drafts/EP-33.md"
+    },
+    {
+      "episode": "EP-34",
+      "path": "_runtime/drafts/EP-34.md"
+    },
+    {
+      "episode": "EP-35",
+      "path": "_runtime/drafts/EP-35.md"
+    },
+    {
+      "episode": "EP-36",
+      "path": "_runtime/drafts/EP-36.md"
+    },
+    {
+      "episode": "EP-37",
+      "path": "_runtime/drafts/EP-37.md"
+    },
+    {
+      "episode": "EP-38",
+      "path": "_runtime/drafts/EP-38.md"
+    },
+    {
+      "episode": "EP-39",
+      "path": "_runtime/drafts/EP-39.md"
+    },
+    {
+      "episode": "EP-40",
+      "path": "_runtime/drafts/EP-40.md"
     }
   ],
   "batches": [
@@ -246,13 +366,13 @@
         "EP-04",
         "EP-05"
       ],
-      "source_range": "第1章开头至姜照眠被带入沈家前后，可自然吃进初到沈家门口的第一轮压迫。 ~ 第4章至第5章沈家求和、女主公开切割、沈雨棠下一轮谋划。",
+      "source_range": "第1章 首富从继承养猪场开始 ~ 第6章 配合饲料 至 第7章 砖厂的恐怖利润",
       "phase": "recorded",
       "status": "DONE",
       "review_status": "PASS",
-      "reviewer": "codex-smoke",
-      "review_reason": "batch01完成黄金开场、称谓边界、三场主戏闭环和阶段钩；未发现原著人名残留或核心越界。",
-      "updated_at": "2026-04-25 16:24"
+      "reviewer": "codex-transformative-smoke",
+      "review_reason": "",
+      "updated_at": "2026-04-26 17:16"
     },
     {
       "batch_id": "batch02",
@@ -263,13 +383,13 @@
         "EP-09",
         "EP-10"
       ],
-      "source_range": "第5章至第6章顾砚舟追求、赔罪与姜照眠建立边界。 ~ 第9章至第10章沈家权力重排、旧案线索浮现。",
+      "source_range": "第7章 砖厂的恐怖利润 至 第8章 卖猪，惊人的收益 ~ 第15章 春节 至 第16章 早期管培生",
       "phase": "recorded",
       "status": "DONE",
       "review_status": "PASS",
-      "reviewer": "codex-smoke",
-      "review_reason": "batch02完成追求边界、发布会反击、姐妹登场、资料陷害和旧案线索；未发现原著人名残留或核心越界。",
-      "updated_at": "2026-04-25 17:10"
+      "reviewer": "codex-transformative-smoke",
+      "review_reason": "",
+      "updated_at": "2026-04-26 17:20"
     },
     {
       "batch_id": "batch03",
@@ -280,13 +400,13 @@
         "EP-14",
         "EP-15"
       ],
-      "source_range": "第10章至第11章旧案回忆、家宴冲突、失踪疑点。 ~ 第14章至第15章沈知微被栽赃、姐妹信任与沈家站队。",
+      "source_range": "第16章 早期管培生 至 第21章 刘玉芳加盟 ~ 第30章 资金到位 至 第31章 高伟良再次视察",
       "phase": "recorded",
       "status": "DONE",
       "review_status": "PASS",
-      "reviewer": "codex-smoke",
-      "review_reason": "batch03完成旧案疑点、行动取证、被困硬钩、诱捕反咬和沈知微信任危机；未直接洗清或提前收网。",
-      "updated_at": "2026-04-25 17:13"
+      "reviewer": "codex-transformative-smoke",
+      "review_reason": "",
+      "updated_at": "2026-04-26 17:24"
     },
     {
       "batch_id": "batch04",
@@ -297,13 +417,13 @@
         "EP-19",
         "EP-20"
       ],
-      "source_range": "第15章至第16章沈知微反证、沈雨棠关键漏洞。 ~ 求婚场面、情感确认、主线关系闭环前半。",
+      "source_range": "第32章 万家超市 至 第33章 火爆的开业 ~ 第39章 收购县食品厂 至 第41章 年终总结（上）",
       "phase": "recorded",
       "status": "DONE",
       "review_status": "PASS",
-      "reviewer": "codex-smoke",
-      "review_reason": "batch04按顺序完成沈知微反证、沈雨棠崩盘、亲情有限修复、求婚前自我确认和尊重式求婚；未提前婚礼或一哭和好。",
-      "updated_at": "2026-04-25 17:44"
+      "reviewer": "codex-transformative-smoke",
+      "review_reason": "",
+      "updated_at": "2026-04-26 17:27"
     },
     {
       "batch_id": "batch05",
@@ -314,13 +434,64 @@
         "EP-24",
         "EP-25"
       ],
-      "source_range": "结局支线，陆知衡归来、沈知微情感线补全。 ~ 全书尾声，婚后与家庭关系闭环。",
+      "source_range": "第41章 年终总结（上）至 第44章 远丰的新架构 ~ 第52章 蔬菜加工厂 至 第56章 荷县新城和产业园",
       "phase": "recorded",
       "status": "DONE",
       "review_status": "PASS",
-      "reviewer": "codex-smoke",
-      "review_reason": "batch05完成陆知衡归来、婚礼自主权、婚纱高光、双重誓言和尾声闭环；未新增反派、狗血或续集悬念。",
-      "updated_at": "2026-04-25 17:46"
+      "reviewer": "codex-transformative-smoke",
+      "review_reason": "",
+      "updated_at": "2026-04-26 17:32"
+    },
+    {
+      "batch_id": "batch06",
+      "episodes": [
+        "EP-26",
+        "EP-27",
+        "EP-28",
+        "EP-29",
+        "EP-30"
+      ],
+      "source_range": "第57章 饲料厂估值 至 第58章 新版方便面 ~ 第65章 期货对冲 至 第66章 开户",
+      "phase": "recorded",
+      "status": "DONE",
+      "review_status": "PASS",
+      "reviewer": "codex-transformative-smoke",
+      "review_reason": "",
+      "updated_at": "2026-04-26 17:36"
+    },
+    {
+      "batch_id": "batch07",
+      "episodes": [
+        "EP-31",
+        "EP-32",
+        "EP-33",
+        "EP-34",
+        "EP-35"
+      ],
+      "source_range": "第67章 固定仓位浮盈加仓 至 第68章 边境贸易 ~ 第76章 “三角贸易” 至 第78章 对未来期货价格的分析",
+      "phase": "recorded",
+      "status": "DONE",
+      "review_status": "PASS",
+      "reviewer": "codex-transformative-smoke",
+      "review_reason": "",
+      "updated_at": "2026-04-26 17:42"
+    },
+    {
+      "batch_id": "batch08",
+      "episodes": [
+        "EP-36",
+        "EP-37",
+        "EP-38",
+        "EP-39",
+        "EP-40"
+      ],
+      "source_range": "第79章 东方沃尔顿家族 至 第81章 收购阿穆尔农机厂 ~ 第86章 远丰高层例会（下半）至全文收束",
+      "phase": "recorded",
+      "status": "DONE",
+      "review_status": "PASS",
+      "reviewer": "codex-transformative-smoke",
+      "review_reason": "",
+      "updated_at": "2026-04-26 17:45"
     }
   ],
   "next_action": "所有已映射批次都已发布；可直接交付 `output/`，或继续人工精修成稿。"

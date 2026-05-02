@@ -3,6 +3,7 @@
 执行本提示词前，先遵守 `harness/framework/prompt-packet-protocol.md`。本任务只允许写回指定的 source map 目标文件；不要调用模型 CLI，不要 promote，不要 record。
 
 你现在只做一件事：基于原著和 `book.blueprint.md`，返回一份完整可用的 `source.map.md`。
+本任务不是原著事件摘录，而是“叙事功能映射 + 新设定分集重构”。
 
 禁止事项：
 - 不要解释 `source.map` 是什么
@@ -33,11 +34,14 @@
 
 分集原则：
 - 你做的是“短剧分集编排”，不是“原著事件摘录”
+- 你必须把原著每段先抽象成叙事功能，再用 `book.blueprint.md` 中的新剧设定重构为新事件
+- source.map 不能只是“原著事件换人名”；每集都要写明新的场景外壳、冲突载体或行动机制
 - 当前项目目标总时长来自 `run.manifest.md`，本次为约 {{target_total_minutes}} 分钟；必须围绕这个总时长、单集时长和原著有效戏剧单元共同编排
 - 不按 80-100 集付费长链条拖长，也不把必要主戏压成提纲切片
 - source.map 必须使用剧中改名后的姓名，不能沿用原著人物名
 - 剧中所有主要人物、反派、关键配角的姓名必须与原著姓名完全不同；不能只改姓或只改名，不能使用同音、近音、叠字变体
 - 如 `book.blueprint.md` 已给出“剧名 -> 原著对应人物”映射，必须全程沿用；如未给出，先在 source.map 顶部补 `## Character Rename Map` 再统一使用剧名
+- 如 `book.blueprint.md` 已给出“改编重构蓝图”或“同源风险与设定替换”，必须全程遵守；禁止把其中列出的高风险同源元素写回 episode 任务
 - 每一集都应当是一个可以成立的短剧单元，不是只完成几个动作点就停
 - 一集至少要形成一个完整主戏：进入 -> 对抗/变化 -> 结果或钩子
 - 不要把分集切成“提纲式事件切片”
@@ -62,12 +66,24 @@
 
 每集必须包含的字段：
 - `**source_chapter_span**:`
+- `**source_function**:`
+- `**new_episode_event**:`
+- `**setting_translation**:`
+- `**must_keep_function**:`
+- `**must_change_surface**:`
+- `**do_not_copy**:`
 - `**must-keep_beats**:`
 - `**knowledge_boundary**:`
 - `**must-not-add / must-not-jump**:`
 - `**ending_function**:` 只有在收尾目标非常明确时才填写
 
 字段要求：
+- `source_function` 写原著该段承担的叙事功能，不复述原事件
+- `new_episode_event` 写新剧这一集实际发生的原创化事件，必须能支撑完整主戏
+- `setting_translation` 写清原作设定外壳如何转译成新剧行业/空间/道具/流程
+- `must_keep_function` 只写必须保留的情绪、关系、爽点、压力和因果
+- `must_change_surface` 写必须改掉的原作场景、道具、职业动作、证据形态、事件触发方式
+- `do_not_copy` 写禁止沿用或近义改写的标志性桥段、台词、道具、特殊事件组合
 - `must-keep_beats` 保持 3-5 条
 - 每条 beat 必须是“可执行的成集任务”，不是抽象标签
 - beats 必须帮助 writer 写出完整主戏，不要只列动作摘要

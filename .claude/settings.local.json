@@ -6,7 +6,8 @@
       "Bash(python _ops/test_controller_cli.py)",
       "Bash(python _ops/test_run_book_extract.py)",
       "Bash(python _ops/test_run_book_map.py)",
-      "Bash(python _ops/test_run_writer.py)"
+      "Bash(python _ops/test_run_writer.py)",
+      "Bash(echo \"exit: $?\")"
     ]
   }
 }

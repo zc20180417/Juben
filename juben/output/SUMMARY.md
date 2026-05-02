@@ -4,14 +4,14 @@
 
 ## 项目概况
 
-- 原著文件：被弃真千金：总裁不好惹.md
-- 目标集数：25
-- 目标总时长：50 分钟
+- 原著文件：实业帝国：从继承养猪场开始.txt
+- 目标集数：40
+- 目标总时长：55 分钟
 - 单集中心时长：2 分钟
 - 当前状态：complete
 - 当前批次：(none)
-- 已发布成稿：25 集
-- 内部草稿镜像：25 集
+- 已发布成稿：40 集
+- 内部草稿镜像：40 集
 
 ## 下一步
 
@@ -51,22 +51,40 @@
 - [EP-23](episodes/EP-23.md)
 - [EP-24](episodes/EP-24.md)
 - [EP-25](episodes/EP-25.md)
+- [EP-26](episodes/EP-26.md)
+- [EP-27](episodes/EP-27.md)
+- [EP-28](episodes/EP-28.md)
+- [EP-29](episodes/EP-29.md)
+- [EP-30](episodes/EP-30.md)
+- [EP-31](episodes/EP-31.md)
+- [EP-32](episodes/EP-32.md)
+- [EP-33](episodes/EP-33.md)
+- [EP-34](episodes/EP-34.md)
+- [EP-35](episodes/EP-35.md)
+- [EP-36](episodes/EP-36.md)
+- [EP-37](episodes/EP-37.md)
+- [EP-38](episodes/EP-38.md)
+- [EP-39](episodes/EP-39.md)
+- [EP-40](episodes/EP-40.md)
 
 ## 批次状态
 
-- batch01：recorded / review=PASS / codex-smoke / EP-01, EP-02, EP-03, EP-04, EP-05
-- batch02：recorded / review=PASS / codex-smoke / EP-06, EP-07, EP-08, EP-09, EP-10
-- batch03：recorded / review=PASS / codex-smoke / EP-11, EP-12, EP-13, EP-14, EP-15
-- batch04：recorded / review=PASS / codex-smoke / EP-16, EP-17, EP-18, EP-19, EP-20
-- batch05：recorded / review=PASS / codex-smoke / EP-21, EP-22, EP-23, EP-24, EP-25
+- batch01：recorded / review=PASS / codex-transformative-smoke / EP-01, EP-02, EP-03, EP-04, EP-05
+- batch02：recorded / review=PASS / codex-transformative-smoke / EP-06, EP-07, EP-08, EP-09, EP-10
+- batch03：recorded / review=PASS / codex-transformative-smoke / EP-11, EP-12, EP-13, EP-14, EP-15
+- batch04：recorded / review=PASS / codex-transformative-smoke / EP-16, EP-17, EP-18, EP-19, EP-20
+- batch05：recorded / review=PASS / codex-transformative-smoke / EP-21, EP-22, EP-23, EP-24, EP-25
+- batch06：recorded / review=PASS / codex-transformative-smoke / EP-26, EP-27, EP-28, EP-29, EP-30
+- batch07：recorded / review=PASS / codex-transformative-smoke / EP-31, EP-32, EP-33, EP-34, EP-35
+- batch08：recorded / review=PASS / codex-transformative-smoke / EP-36, EP-37, EP-38, EP-39, EP-40
 
 ## 导出统计
 
-- episodes: 25
-- drafts: 25
-- reviews: 10
-- prompts: 12
-- briefs: 5
+- episodes: 40
+- drafts: 40
+- reviews: 16
+- prompts: 18
+- briefs: 8
 - maps: 3
 - anchors: 2
 - protocols: 1

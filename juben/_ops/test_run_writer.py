@@ -231,11 +231,12 @@ class RunWriterTests(unittest.TestCase):
 
         self.assertIn("- excerpt_tier: strong_scene", ep15_text)
         self.assertIn("## Scene Modes", ep15_text)
-        self.assertIn("## Must-Keep Long Lines", ep15_text)
+        self.assertIn("## Source Usage Boundary", ep15_text)
+        self.assertNotIn("## Must-Keep Long Lines", ep15_text)
         self.assertIn("## Abstract Narration To Externalize", ep15_text)
         self.assertEqual(ep15_payload["excerpt_tier"], "strong_scene")
         self.assertIn("scene_modes", ep15_payload)
-        self.assertIn("must_keep_long_lines", ep15_payload)
+        self.assertNotIn("must_keep_long_lines", ep15_payload)
         self.assertIn("abstract_narration", ep15_payload)
 
     def test_build_episode_source_excerpt_uses_low_risk_tier_for_reusable_non_strong_content(self) -> None:
@@ -285,13 +286,14 @@ class RunWriterTests(unittest.TestCase):
                 ep12_json_size = len(self._json_sidecar(ep12).read_bytes())
 
         self.assertIn("- excerpt_tier: low_risk", ep12_text)
-        self.assertIn("## Reusable Source Lines", ep12_text)
+        self.assertIn("## Source Usage Boundary", ep12_text)
+        self.assertNotIn("## Reusable Source Lines", ep12_text)
         self.assertNotIn("## Scene Modes", ep12_text)
         self.assertNotIn("## Must-Keep Long Lines", ep12_text)
         self.assertNotIn("## Abstract Narration To Externalize", ep12_text)
         self.assertEqual(profile["excerpt_tier"], "low_risk")
         self.assertEqual(ep12_payload["excerpt_tier"], "low_risk")
-        self.assertIn("reusable_source_lines", ep12_payload)
+        self.assertNotIn("reusable_source_lines", ep12_payload)
         self.assertNotIn("scene_modes", ep12_payload)
         self.assertLess(ep12_json_size, ep12_markdown_size)
 
@@ -339,7 +341,7 @@ class RunWriterTests(unittest.TestCase):
         self.assertEqual(profile["excerpt_tier"], "low_risk")
         self.assertEqual(profile["must_keep_names"], ["Ava"])
         self.assertEqual(profile["forbidden_fill"], ["extra_guest_lines"])
-        self.assertTrue(profile["reusable_lines_present"])
+        self.assertFalse(profile["reusable_lines_present"])
         self.assertEqual(profile["scene_modes"], [])
 
     def test_build_episode_source_excerpt_compacts_baseline_original_excerpt(self) -> None:

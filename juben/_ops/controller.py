@@ -1377,6 +1377,42 @@ def _parse_source_map() -> dict:
                     markdown_pattern=r"\*\*must-keep_beats\*\*:\s*(.*?)(?=\n\*\*|\n---|\Z)",
                     multiline=True,
                 ),
+                "source_function": _extract_episode_map_field(
+                    ep_block,
+                    legacy_pattern=r"source function：(.+)",
+                    markdown_pattern=r"\*\*source_function\*\*:\s*(.*?)(?=\n\*\*|\n---|\Z)",
+                    multiline=True,
+                ),
+                "new_episode_event": _extract_episode_map_field(
+                    ep_block,
+                    legacy_pattern=r"new episode event：(.+)",
+                    markdown_pattern=r"\*\*new_episode_event\*\*:\s*(.*?)(?=\n\*\*|\n---|\Z)",
+                    multiline=True,
+                ),
+                "setting_translation": _extract_episode_map_field(
+                    ep_block,
+                    legacy_pattern=r"setting translation：(.+)",
+                    markdown_pattern=r"\*\*setting_translation\*\*:\s*(.*?)(?=\n\*\*|\n---|\Z)",
+                    multiline=True,
+                ),
+                "must_keep_function": _extract_episode_map_field(
+                    ep_block,
+                    legacy_pattern=r"must keep function：(.+)",
+                    markdown_pattern=r"\*\*must_keep_function\*\*:\s*(.*?)(?=\n\*\*|\n---|\Z)",
+                    multiline=True,
+                ),
+                "must_change_surface": _extract_episode_map_field(
+                    ep_block,
+                    legacy_pattern=r"must change surface：(.+)",
+                    markdown_pattern=r"\*\*must_change_surface\*\*:\s*(.*?)(?=\n\*\*|\n---|\Z)",
+                    multiline=True,
+                ),
+                "do_not_copy": _extract_episode_map_field(
+                    ep_block,
+                    legacy_pattern=r"do not copy：(.+)",
+                    markdown_pattern=r"\*\*do_not_copy\*\*:\s*(.*?)(?=\n\*\*|\n---|\Z)",
+                    multiline=True,
+                ),
                 "knowledge_boundary": _extract_episode_map_field(
                     ep_block,
                     legacy_pattern=r"knowledge boundary：(.+)",
@@ -1444,6 +1480,26 @@ def _generate_batch_brief(batch_id: str, batch_info: dict) -> str:
         beat_arrows = " -> ".join(_beats_from_raw(beats)[:5])
         knowledge_lines = _beats_from_raw(data.get("knowledge_boundary", ""))
         ep_mapping_lines.append(f"- {ep}：{span}")
+        source_function = "；".join(_beats_from_raw(data.get("source_function", ""))[:3])
+        new_event = "；".join(_beats_from_raw(data.get("new_episode_event", ""))[:3])
+        setting_translation = "；".join(_beats_from_raw(data.get("setting_translation", ""))[:3])
+        must_keep_function = "；".join(_beats_from_raw(data.get("must_keep_function", ""))[:3])
+        must_change_surface = "；".join(_beats_from_raw(data.get("must_change_surface", ""))[:3])
+        do_not_copy = "；".join(_beats_from_raw(data.get("do_not_copy", ""))[:3])
+        if source_function or new_event or setting_translation or must_keep_function or must_change_surface or do_not_copy:
+            ep_mapping_lines.append("  - transformative_adaptation:")
+            if source_function:
+                ep_mapping_lines.append(f"    - source_function: {source_function}")
+            if new_event:
+                ep_mapping_lines.append(f"    - new_episode_event: {new_event}")
+            if setting_translation:
+                ep_mapping_lines.append(f"    - setting_translation: {setting_translation}")
+            if must_keep_function:
+                ep_mapping_lines.append(f"    - must_keep_function: {must_keep_function}")
+            if must_change_surface:
+                ep_mapping_lines.append(f"    - must_change_surface: {must_change_surface}")
+            if do_not_copy:
+                ep_mapping_lines.append(f"    - do_not_copy: {do_not_copy}")
         ep_mapping_lines.append(f"  - {beat_arrows}")
         if knowledge_lines:
             ep_mapping_lines.append("  - knowledge_boundary:")
@@ -1464,7 +1520,7 @@ def _generate_batch_brief(batch_id: str, batch_info: dict) -> str:
     # Read manifest for project-specific values
     manifest = _read_manifest()
     source_file = manifest.get("source_file", "原著正文.md")
-    strategy = manifest.get("adaptation_strategy", "original_fidelity")
+    strategy = manifest.get("adaptation_strategy", "transformative_adaptation")
     intensity = manifest.get("dialogue_adaptation_intensity", "light")
     exec_mode = manifest.get("generation_execution_mode", "orchestrated_subagents")
     reset_mode = manifest.get("generation_reset_mode", "clean_rebuild")
@@ -1509,6 +1565,8 @@ def _source_map_quality_issues() -> list[str]:
         return ["source.map.md missing"]
 
     issues = []
+    manifest_strategy = _read_manifest().get("adaptation_strategy", "transformative_adaptation")
+    require_transformative_fields = manifest_strategy == "transformative_adaptation"
     try:
         batches = _parse_source_map()
     except Exception as exc:  # pragma: no cover - defensive guard for malformed map files
@@ -1523,8 +1581,24 @@ def _source_map_quality_issues() -> list[str]:
             source_span = str(episode_data.get("source_span", "")).strip()
             must_keep = _beats_from_raw(episode_data.get("must_keep", ""))
             knowledge_boundary = _beats_from_raw(episode_data.get("knowledge_boundary", ""))
+            source_function = _beats_from_raw(episode_data.get("source_function", ""))
+            new_episode_event = _beats_from_raw(episode_data.get("new_episode_event", ""))
+            setting_translation = _beats_from_raw(episode_data.get("setting_translation", ""))
+            must_change_surface = _beats_from_raw(episode_data.get("must_change_surface", ""))
+            do_not_copy = _beats_from_raw(episode_data.get("do_not_copy", ""))
             if not source_span:
                 issues.append(f"{batch_id}/{episode}: source_chapter_span is missing")
+            if require_transformative_fields:
+                if not source_function:
+                    issues.append(f"{batch_id}/{episode}: source_function is missing")
+                if not new_episode_event:
+                    issues.append(f"{batch_id}/{episode}: new_episode_event is missing")
+                if not setting_translation:
+                    issues.append(f"{batch_id}/{episode}: setting_translation is missing")
+                if not must_change_surface:
+                    issues.append(f"{batch_id}/{episode}: must_change_surface is missing")
+                if not do_not_copy:
+                    issues.append(f"{batch_id}/{episode}: do_not_copy is missing")
             if not must_keep:
                 issues.append(f"{batch_id}/{episode}: must-keep beats are missing")
             elif not any(_beat_looks_executable(beat) for beat in must_keep):
@@ -2616,7 +2690,7 @@ def _detect_chapters(novel_text: str) -> list[dict]:
     lines = novel_text.split("\n")
     chapter_starts = []
     plain_chapter_pattern = (
-        r"^第[0-9０-９一二三四五六七八九十百千万两〇零○]+[章节回卷]"
+        r"^第[0-9０-９一二三四五六七八九十百千万两〇零○]+[\s\u3000]*[章节回卷]"
         r"(?:$|[\s\u3000]+.+)$"
     )
 
@@ -2725,6 +2799,7 @@ def _book_blueprint_template(
 - 本文件是全书级改编蓝图，先锁主线/弧光/反转/结局，再切 batch / episode
 - 全剧目标总时长约 {target_total_minutes} 分钟；集数建议围绕总时长、单集时长和有效戏剧单元共同估算
 - 单集时长按 {DEFAULT_EPISODE_MINUTES_MIN}-{DEFAULT_EPISODE_MINUTES_MAX} 分钟动态浮动，中心值 {DEFAULT_TARGET_EPISODE_MINUTES} 分钟/集
+- 改编目标是保留叙事功能、人物关系功能、情绪曲线和阶段爽点；具体设定、行业、场景、道具、事件外壳必须原创化重构
 
 ## 主线
 
@@ -2737,6 +2812,14 @@ def _book_blueprint_template(
 - 可独立成集戏剧节点： （AGENT_EXTRACT_REQUIRED）
 - 应合并压缩的内容： （AGENT_EXTRACT_REQUIRED）
 - 为什么不是更短/更长： （AGENT_EXTRACT_REQUIRED）
+
+## 改编重构蓝图
+
+（AGENT_EXTRACT_REQUIRED）
+
+## 同源风险与设定替换
+
+（AGENT_EXTRACT_REQUIRED）
 
 ## 角色弧光
 
@@ -3412,17 +3495,12 @@ def cmd_init(args: argparse.Namespace) -> int:
     else:
         print(f"  (no existing data to back up)")
 
-    # Clear old project data
-    for d in [DRAFTS, EPISODES]:
-        if d.exists():
-            for f in d.glob("EP-*.md"):
-                f.unlink()
-    if BATCH_BRIEFS.exists():
-        for f in BATCH_BRIEFS.glob("batch*.md"):
-            f.unlink()
-    if LOCKS.exists():
-        for f in LOCKS.iterdir():
-            f.unlink()
+    # Clear all runtime state for the new project, not just episode files.
+    # Otherwise a fresh source.map can inherit old batch PASS/gold metadata.
+    cleared = _clear_runtime_project_data()
+    _ensure_runtime_directories()
+    cleared_summary = ", ".join(f"{key}={value}" for key, value in cleared.items() if value)
+    print(f"  + cleared runtime data: {cleared_summary or 'none'}")
 
     # Generate run.manifest.md
     manifest_content = f"""# Run Manifest
@@ -3659,7 +3737,7 @@ def cmd_map_book(args: argparse.Namespace) -> int:
     if novel_path is None:
         return 1
 
-    strategy = manifest.get("adaptation_strategy", "original_fidelity")
+    strategy = manifest.get("adaptation_strategy", "transformative_adaptation")
     intensity = manifest.get("dialogue_adaptation_intensity", "light")
     force = getattr(args, "force", False)
 
@@ -4055,6 +4133,14 @@ def cmd_next(args: argparse.Namespace) -> int:
 
     batches = _parse_source_map()
     batch_ids = sorted(batches.keys())
+    if not batch_ids:
+        print("=== Pipeline Progress ===")
+        print("  Source map not ready: no batches found")
+        print("\n=== Next Step ===")
+        print("  1. Run extract-book if book.blueprint.md is still pending")
+        print("  2. Run map-book after book.blueprint.md is complete")
+        print("  3. Do not start batch writing until source.map.md has mapped batches")
+        return 0
 
     promoted = []
     pending = []
@@ -4180,7 +4266,7 @@ def main() -> int:
     p_init.add_argument("--episodes", type=int, default=None, help="Optional manual episode count override (default: model recommendation after extract-book)")
     p_init.add_argument("--batch-size", type=int, default=5, help="Episodes per batch (default: 5)")
     p_init.add_argument("--target-total-minutes", type=int, default=DEFAULT_TARGET_TOTAL_MINUTES, help="Approximate full-series runtime target in minutes (default: 50)")
-    p_init.add_argument("--strategy", default="original_fidelity", help="Adaptation strategy")
+    p_init.add_argument("--strategy", default="transformative_adaptation", help="Adaptation strategy")
     p_init.add_argument("--intensity", default="light", help="Dialogue adaptation intensity")
     p_init.add_argument("--quality-mode", choices=["standard", "premium"], default="standard", help="Draft quality mode (default: standard; premium suggests polish before review)")
     p_init.add_argument("--premium", action="store_true", help="Shortcut for --quality-mode premium")
