@@ -1,0 +1,14 @@
+{
+  "episode": "EP-25",
+  "provenance": "rebuild-2026-04",
+  "source_batch": "batch05",
+  "runtime_authority": "rebuild-2026-04",
+  "release_status": "gold",
+  "ruleset_version": "reviewer-gate/v1",
+  "review_status": "PASS",
+  "reviewer": "codex",
+  "warnings": [],
+  "batch_brief": "harness/project/batch-briefs/batch05_EP21-25.md",
+  "content_path": "episodes/EP-25.md",
+  "updated_at": "2026-04-26 16:38"
+}

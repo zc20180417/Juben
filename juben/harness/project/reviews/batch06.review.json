@@ -1,0 +1,24 @@
+{
+  "batch_id": "batch06",
+  "status": "PASS",
+  "reviewer": "codex-transformative-smoke",
+  "timestamp": "2026-04-26 17:36",
+  "episodes": [
+    "EP-26",
+    "EP-27",
+    "EP-28",
+    "EP-29",
+    "EP-30"
+  ],
+  "sampled_episodes": [
+    "EP-26",
+    "EP-27"
+  ],
+  "blocking_reasons": [],
+  "warning_families": [],
+  "arc_regressions": [],
+  "function_theft_findings": [],
+  "quality_anchor_findings": [],
+  "evidence_refs": [],
+  "reason": ""
+}

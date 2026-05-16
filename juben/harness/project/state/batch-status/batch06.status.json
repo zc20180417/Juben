@@ -1,0 +1,22 @@
+{
+  "batch_id": "batch06",
+  "phase": "recorded",
+  "status": "DONE",
+  "episodes": [
+    "EP-26",
+    "EP-27",
+    "EP-28",
+    "EP-29",
+    "EP-30"
+  ],
+  "completed_episodes": [
+    "EP-26",
+    "EP-27",
+    "EP-28",
+    "EP-29",
+    "EP-30"
+  ],
+  "brief_path": "harness/project/batch-briefs/batch06_EP26-30.md",
+  "batch_review_status": "PASS",
+  "updated_at": "2026-04-26 17:36"
+}

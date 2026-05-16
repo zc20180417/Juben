@@ -11,7 +11,8 @@ Orchestration commands:
   start <batch_id>       Prepare batch → writer stage → stop for review
   check <batch_id>       Rebuild review packet only (fallback/debug)
   polish <batch_id>      Create optional premium polish prompt packet
-  run <batch_id>         Review gate → promote → next
+  revise <batch_id>      Generate targeted revision prompt from review FAIL verdict
+  run <batch_id>         Review gate → [FAIL? → revise → re-review] → promote → next
   finish <batch_id>      Deprecated alias for run
   next                   Show pipeline progress and next batch to start
 
@@ -61,6 +62,7 @@ RUN_LOG = STATE / "run.log.md"
 MEMORY_CONTRACT = FRAMEWORK / "memory-contract.md"
 REVIEW_STANDARD = FRAMEWORK / "review-standard.md"
 REVIEW_PROMPT_TEMPLATE = FRAMEWORK / "reviewer-prompt.template.md"
+REVISION_PROMPT_TEMPLATE = FRAMEWORK / "revision-prompt.template.md"
 POLISH_PROMPT_TEMPLATE = FRAMEWORK / "polish-prompt.template.md"
 PROMPT_PACKET_PROTOCOL = FRAMEWORK / "prompt-packet-protocol.md"
 BOOK_BLUEPRINT = PROJECT / "book.blueprint.md"
@@ -86,6 +88,8 @@ PENDING_TOTAL_EPISODES = "pending_model_recommendation"
 PENDING_RECOMMENDED_TOTAL_EPISODES = "pending_book_extraction"
 PENDING_BLUEPRINT_RECOMMENDATION = "pending_extraction"
 PENDING_TOTAL_BATCHES = "pending_total_episodes"
+DEFAULT_MAX_REVISION_ROUNDS = 3
+SMOKE_REVIEWER_MARKER = "smoke"
 
 
 def _configure_stdio() -> None:
@@ -396,7 +400,7 @@ def _ensure_batch_review_artifacts(batch_id: str, episodes: list[str], brief_pat
     return review
 
 
-def _require_batch_review_pass(batch_id: str) -> tuple[bool, str]:
+def _require_batch_review_pass(batch_id: str, *, strict: bool = False) -> tuple[bool, str]:
     review = _read_batch_review(batch_id)
     if review is None:
         return False, (
@@ -406,7 +410,151 @@ def _require_batch_review_pass(batch_id: str) -> tuple[bool, str]:
     status = review.get("status", "MISSING")
     if status != "PASS":
         return False, f"ERROR: batch review verdict is {status} for '{batch_id}'"
+
+    if strict:
+        reviewer = (review.get("reviewer", "") or "").lower()
+        if SMOKE_REVIEWER_MARKER in reviewer:
+            return False, (
+                f"ERROR: review for '{batch_id}' was performed by smoke reviewer '{review.get('reviewer')}'. "
+                f"Re-run review with a full reviewer before promoting."
+            )
+        evidence = review.get("evidence_refs", []) or []
+        reason = (review.get("reason", "") or "").strip()
+        if not evidence and not reason:
+            return False, (
+                f"ERROR: review for '{batch_id}' is PASS but has no evidence_refs and no reason. "
+                f"This suggests the review was not substantively performed. "
+                f"Re-run review with actual findings before promoting."
+            )
+
     return True, ""
+
+
+def _gather_revision_episodes(batch_id: str, review: dict) -> list[str]:
+    """Determine which episodes need revision based on review findings.
+
+    Uses evidence_refs to identify which specific episodes have blocking issues.
+    Falls back to all episodes in the batch if evidence_refs can't be parsed.
+    """
+    episodes: list[str] = []
+    evidence_refs: list[str] = review.get("evidence_refs", []) or []
+    blocking: list[str] = review.get("blocking_reasons", []) or []
+
+    if not blocking:
+        return episodes
+
+    ep_pattern = re.compile(r"EP-\d{2,3}", re.IGNORECASE)
+    for ref in evidence_refs:
+        for match in ep_pattern.finditer(ref):
+            ep = match.group(0).upper()
+            if ep not in episodes:
+                episodes.append(ep)
+
+    if not episodes:
+        episodes = list(review.get("episodes", []) or [])
+
+    return sorted(episodes)
+
+
+def _render_revision_prompt(batch_id: str, episodes: list[str], review: dict, brief_path: Path | None = None) -> str:
+    """Build a targeted revision prompt from review FAIL verdict."""
+    blocking_reasons = review.get("blocking_reasons", []) or []
+    warning_families = review.get("warning_families", []) or []
+    arc_regressions = review.get("arc_regressions", []) or []
+
+    def _numbered(items: list[str], empty: str = "(none)") -> str:
+        if not items:
+            return f"- {empty}"
+        return "\n".join(f"{i}. {item}" for i, item in enumerate(items, 1))
+
+    brief_rel = _relative_to_root(brief_path) if brief_path is not None else "(unknown)"
+    review_json_rel = _relative_to_root(_batch_review_json_path(batch_id))
+    review_md_rel = _relative_to_root(_batch_review_md_path(batch_id))
+
+    targets_block = "\n".join(f"- drafts/episodes/{ep}.md" for ep in episodes) or "- (none)"
+
+    replacements = {
+        "batch_id": batch_id,
+        "failed_episodes": ", ".join(episodes) or "(none)",
+        "review_json_path": review_json_rel,
+        "review_md_path": review_md_rel,
+        "batch_brief_path": brief_rel,
+        "blocking_reasons_block": _numbered(blocking_reasons),
+        "warning_families_block": _numbered(warning_families),
+        "arc_regressions_block": _numbered(arc_regressions),
+        "targets_block": targets_block,
+    }
+    return _render_template_text(REVISION_PROMPT_TEMPLATE, replacements)
+
+
+def cmd_revise(args: argparse.Namespace) -> int:
+    """Generate a targeted revision prompt packet from a FAIL review verdict."""
+    batch_id = args.batch_id
+    resolved = _resolve_batch(args.batch_id, require_frozen=True)
+    if resolved is None:
+        return 1
+    brief_path, _brief, all_episodes = resolved
+
+    review = _read_batch_review(batch_id)
+    if review is None:
+        print(f"ERROR: no review artifact found for '{batch_id}'")
+        print(f"  Run `start {batch_id} --write` first.")
+        return 1
+
+    status = review.get("status", "PENDING")
+    if status != "FAIL":
+        print(f"ERROR: batch review verdict is {status}, not FAIL. No revision needed.")
+        if status == "PASS":
+            print(f"  This batch has already passed review. Use `run {batch_id}` to promote.")
+        elif status == "PENDING":
+            print(f"  Review is still pending. Complete review first, then revise if needed.")
+        return 1
+
+    revision_episodes = _gather_revision_episodes(batch_id, review)
+    if not revision_episodes:
+        print(f"ERROR: could not determine which episodes to revise from review evidence_refs.")
+        print(f"  Review blocking_reasons exist but evidence_refs don't reference specific episodes.")
+        print(f"  Add evidence_refs like 'draft:EP-03:scene2' to the review, then re-run revise.")
+        return 1
+
+    blocking = review.get("blocking_reasons", []) or []
+    warnings_list = review.get("warning_families", []) or []
+    arcs = review.get("arc_regressions", []) or []
+
+    print(f"=== Revision Prompt Packet: {batch_id} ===")
+    print(f"  Review verdict: FAIL")
+    print(f"  Reviewer: {review.get('reviewer', '?')}")
+    print(f"  Episodes to revise: {', '.join(revision_episodes)}")
+    print(f"  Blocking reasons ({len(blocking)}):")
+    for br in blocking:
+        print(f"    - {br}")
+    if warnings_list:
+        print(f"  Warning families ({len(warnings_list)}):")
+        for wf in warnings_list:
+            print(f"    - {wf}")
+    if arcs:
+        print(f"  Arc regressions ({len(arcs)}):")
+        for ar in arcs:
+            print(f"    - {ar}")
+
+    prompt = _render_revision_prompt(batch_id, revision_episodes, review, brief_path=brief_path)
+    prompt_path = _write_prompt_packet(f"{batch_id}.revision.prompt.md", prompt)
+
+    _upsert_batch_status(
+        batch_id,
+        phase="revision_pending",
+        status="BLOCKED",
+        revision_episodes=revision_episodes,
+        batch_review_status="FAIL",
+    )
+
+    print(f"\n  Revision prompt: {_relative_to_root(prompt_path)}")
+    print(f"\n  Next step: have a Writer agent execute the revision prompt above.")
+    print(f"  After revision drafts are written, re-run review:")
+    print(f"    .\\~start.cmd {batch_id} --write")
+    print(f"    .\\~review.cmd {batch_id} PASS --reviewer <name>")
+    print(f"    .\\~run.cmd {batch_id}")
+    return 0
 
 
 def _known_batch_ids() -> list[str]:
@@ -4109,22 +4257,122 @@ def cmd_finish(args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    """Formal release entry: batch review gate → promote → next."""
+    """Formal release entry with revise→re-review loop.
+
+    Flow:
+      1. Check review gate (strict mode — rejects smoke/pass-through reviews)
+      2. If PASS → promote → report → done
+      3. If FAIL → auto-generate revision prompt → print instructions → exit
+      4. Operator runs revision agent → re-runs review → re-runs `run`
+
+    With --auto-loop, repeats step 3 up to --max-retries times (prompt-only;
+    external agent must still execute each revision round).
+    """
     batch_id = args.batch_id
+    max_retries = getattr(args, "max_retries", DEFAULT_MAX_REVISION_ROUNDS)
+
     resolved = _resolve_batch(batch_id, require_frozen=True)
     if resolved is None:
         return 1
     brief_path, _brief, episodes = resolved
 
-    print("=== Step 1: Batch Review Gate ===")
-    ok, message = _require_batch_review_pass(batch_id)
-    if not ok:
-        print(message)
-        print("\n  GATE FAIL — complete batch review before formal release")
-        return 1
-    print("\n  GATE PASS")
+    # --- Track revision rounds from batch status ---
+    status = _read_batch_status(batch_id) or {}
+    revision_rounds: list[dict] = list(status.get("revision_rounds", []) or [])
 
-    return _do_promote_and_report(batch_id, brief_path, episodes)
+    # --- Revision loop ---
+    for round_num in range(1, max_retries + 2):  # +2 because round 1 = initial check
+        print(f"\n{'='*50}")
+        print(f"  REVIEW GATE — Round {round_num}/{max_retries + 1}")
+        print(f"{'='*50}")
+
+        # Ensure review artifacts exist
+        review = _read_batch_review(batch_id)
+        if review is None:
+            print(f"\n  No review artifact found. Generating review packet...")
+            review = _ensure_batch_review_artifacts(batch_id, episodes, brief_path=brief_path)
+            print(f"  Review packet ready: {_relative_to_root(_batch_review_md_path(batch_id))}")
+            print(f"\n  Next: run reviewer agent against the review prompt, then re-run `run {batch_id}`")
+            return 1
+
+        verdict = review.get("status", "PENDING")
+
+        # --- PENDING: review hasn't been performed yet ---
+        if verdict == "PENDING":
+            print(f"\n  Review is PENDING — reviewer has not yet submitted a verdict.")
+            print(f"  Review prompt: {_relative_to_root(_batch_review_prompt_path(batch_id))}")
+            print(f"\n  Next step: have a Reviewer agent execute the review prompt above.")
+            print(f"  Then seal verdict: .\\~review.cmd {batch_id} PASS --reviewer <name>")
+            return 1
+
+        # --- FAIL: attempt revision ---
+        if verdict == "FAIL":
+            blocking = review.get("blocking_reasons", []) or []
+            print(f"\n  GATE FAIL — {len(blocking)} blocking reasons")
+            for br in blocking:
+                print(f"    - {br}")
+
+            if round_num > max_retries:
+                print(f"\n  ✗ Max revision rounds ({max_retries}) exhausted.")
+                print(f"  Manual intervention required for {batch_id}.")
+                return 1
+
+            # Auto-generate revision prompt
+            print(f"\n  --- Auto-generating revision prompt (round {round_num}) ---")
+            rev_episodes = _gather_revision_episodes(batch_id, review)
+            if not rev_episodes:
+                rev_episodes = episodes
+
+            prompt = _render_revision_prompt(batch_id, rev_episodes, review, brief_path=brief_path)
+            prompt_path = _write_prompt_packet(f"{batch_id}.revision.r{round_num}.prompt.md", prompt)
+
+            revision_rounds.append({
+                "round": round_num,
+                "verdict": "FAIL",
+                "blocking_count": len(blocking),
+                "revision_episodes": rev_episodes,
+                "revision_prompt": str(_relative_to_root(prompt_path)),
+                "timestamp": NOW,
+            })
+            _upsert_batch_status(
+                batch_id,
+                phase="revision_pending",
+                status="BLOCKED",
+                revision_episodes=rev_episodes,
+                revision_rounds=revision_rounds,
+                batch_review_status="FAIL",
+            )
+
+            print(f"\n  Revision prompt: {_relative_to_root(prompt_path)}")
+            print(f"\n  --- Next Steps (Revision Round {round_num}) ---")
+            print(f"  1. Have Writer agent execute the revision prompt above")
+            print(f"  2. Re-run review:")
+            print(f"     .\\~start.cmd {batch_id} --write")
+            print(f"     .\\~review.cmd {batch_id} PASS --reviewer <name>")
+            print(f"  3. Re-run gate:")
+            print(f"     .\\~run.cmd {batch_id}")
+            return 1
+
+        # --- PASS: verify quality then promote ---
+        if verdict == "PASS":
+            ok, message = _require_batch_review_pass(batch_id, strict=True)
+            if not ok:
+                print(f"\n  GATE FAIL — {message}")
+                print(f"\n  The review is marked PASS but appears insubstantial.")
+                print(f"  Options:")
+                print(f"    1. Re-run review with a full reviewer against the review prompt")
+                print(f"    2. Use --skip-strict to force through (CAUTION: skips quality check)")
+                if getattr(args, "skip_strict", False):
+                    print(f"\n  --skip-strict: forcing through despite quality concerns.")
+                else:
+                    return 1
+
+            print("\n  GATE PASS — review is substantiated.")
+            return _do_promote_and_report(batch_id, brief_path, episodes)
+
+    # Should not reach here
+    print(f"\n  ✗ Unexpected state for {batch_id}. Check review artifact.")
+    return 1
 
 def cmd_next(args: argparse.Namespace) -> int:
     """Determine and display next batch to work on."""
@@ -4295,8 +4543,15 @@ def main() -> int:
     p_finish = sub.add_parser("finish", help="Deprecated alias for run")
     p_finish.add_argument("batch_id")
 
-    p_run = sub.add_parser("run", help="Review gate ? promote ? next")
+    p_run = sub.add_parser("run", help="Review gate with revise→re-review loop → promote → next")
     p_run.add_argument("batch_id")
+    p_run.add_argument("--max-retries", type=int, default=DEFAULT_MAX_REVISION_ROUNDS,
+                       help=f"Max revision rounds before giving up (default: {DEFAULT_MAX_REVISION_ROUNDS})")
+    p_run.add_argument("--skip-strict", action="store_true",
+                       help="Skip the strict review quality check (CAUTION: allows insubstantial reviews through)")
+
+    p_revise = sub.add_parser("revise", help="Generate targeted revision prompt from FAIL review verdict")
+    p_revise.add_argument("batch_id")
 
     sub.add_parser("next", help="Show pipeline progress and next batch")
 
@@ -4324,6 +4579,7 @@ def main() -> int:
         "map-book": cmd_map_book,
         "start": cmd_start,
         "check": cmd_check,
+        "revise": cmd_revise,
         "finish": cmd_finish,
         "run": cmd_run,
         "next": cmd_next,

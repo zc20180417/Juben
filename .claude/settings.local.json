@@ -7,7 +7,18 @@
       "Bash(python _ops/test_run_book_extract.py)",
       "Bash(python _ops/test_run_book_map.py)",
       "Bash(python _ops/test_run_writer.py)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('juben/_ops/controller.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(python -m juben._ops.controller revise --help)",
+      "Bash(python -m juben._ops.controller run --help)",
+      "Bash(python -m pytest juben/_ops/test_controller_cli.py -x -v)",
+      "Bash(pip list *)",
+      "Bash(pip install *)",
+      "Bash(python -m juben._ops.controller status)",
+      "Bash(python -m juben status)",
+      "Bash(python -m juben revise batch01)",
+      "Bash(python -m juben run batch01)",
+      "Bash(python -c ' *)"
     ]
   }
 }

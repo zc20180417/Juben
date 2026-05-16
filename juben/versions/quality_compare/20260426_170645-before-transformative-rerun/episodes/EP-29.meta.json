@@ -1,0 +1,14 @@
+{
+  "episode": "EP-29",
+  "provenance": "rebuild-2026-04",
+  "source_batch": "batch06",
+  "runtime_authority": "rebuild-2026-04",
+  "release_status": "gold",
+  "ruleset_version": "reviewer-gate/v1",
+  "review_status": "PASS",
+  "reviewer": "codex",
+  "warnings": [],
+  "batch_brief": "harness/project/batch-briefs/batch06_EP26-30.md",
+  "content_path": "episodes/EP-29.md",
+  "updated_at": "2026-04-26 16:43"
+}

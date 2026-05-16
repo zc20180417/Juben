@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Juben V3 Local Console</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">V3 实验控制台 · 本机 127.0.0.1</p>
+        <h1>先判断下一步，再决定要不要启动 Codex</h1>
+        <p class="subhead">
+          这个页面会先把 Juben 的工程状态翻译成人话。只有提示“需要执行 prompt”时，才使用 Codex CLI Runner。
+        </p>
+      </div>
+      <div class="status-pill" id="connectionState">未连接</div>
+    </header>
+
+    <main class="workspace">
+      <section class="panel create-panel">
+        <div class="panel-head">
+          <div>
+            <h2>新建短剧项目</h2>
+            <p>普通用户只需要填这里：粘贴小说或上传文件，设置集数和总时长，然后点击开始。</p>
+          </div>
+        </div>
+        <div class="form-grid">
+          <label class="field">
+            <span>小说文件名</span>
+            <input id="novelFilename" value="novel.md" />
+          </label>
+          <label class="field">
+            <span>目标集数</span>
+            <input id="episodesInput" type="number" value="25" min="1" max="300" />
+          </label>
+          <label class="field">
+            <span>目标总时长（分钟）</span>
+            <input id="totalMinutesInput" type="number" value="50" min="1" max="1000" />
+          </label>
+        </div>
+        <label class="file-picker">
+          <span>上传原文文件（md/txt）</span>
+          <input id="novelFile" type="file" accept=".md,.txt,text/plain,text/markdown" />
+        </label>
+        <label class="field">
+          <span>或直接粘贴小说原文</span>
+          <textarea id="novelText" placeholder="把小说全文粘贴到这里..."></textarea>
+        </label>
+        <label class="check simple-check">
+          <input id="autoCodex" type="checkbox" />
+          <span>实验性：尝试自动调用 Codex CLI（默认会被后端保护禁用；推荐用 Codex App 执行 prompt）</span>
+        </label>
+        <div class="actions">
+          <button id="startProjectBtn" class="primary">开始新项目</button>
+        </div>
+      </section>
+
+      <section class="panel terminal-panel">
+        <div class="panel-head">
+          <div>
+            <h2>实时 CLI 输出</h2>
+            <p>开始后这里会持续显示后台命令输出；如果 CLI 等待输入，可以在下面发送文本。</p>
+          </div>
+          <button id="cancelJobBtn" class="danger">停止当前任务</button>
+        </div>
+        <pre id="liveTerminal" class="terminal live-terminal">还没有启动任务。</pre>
+        <div class="terminal-input-row">
+          <input id="terminalInput" placeholder="需要交互时，在这里输入给 CLI..." />
+          <button id="sendInputBtn">发送输入</button>
+        </div>
+      </section>
+
+      <section class="panel guide-panel">
+        <div class="panel-head">
+          <div>
+            <h2>你现在该做什么</h2>
+            <p>这里是主判断。不要先看黑色日志，也不要先点 Codex job。</p>
+          </div>
+          <button id="refreshGuideBtn">重新判断</button>
+        </div>
+        <div class="guide-state" id="guideState">
+          <strong>正在读取项目状态...</strong>
+          <span>请稍候。</span>
+        </div>
+        <div class="guide-paths" id="guidePaths"></div>
+        <div class="quick-actions" id="quickActions"></div>
+      </section>
+
+      <section class="panel command-panel">
+        <div class="panel-head">
+          <div>
+            <h2>项目控制</h2>
+            <p>这些按钮只调用现有 Juben 命令。普通使用优先看上面的“你现在该做什么”。</p>
+          </div>
+          <button id="refreshBtn">刷新</button>
+        </div>
+        <div class="command-grid">
+          <button data-op="status">status</button>
+          <button data-op="next">next</button>
+          <button data-op="extract">extract</button>
+          <button data-op="map">map</button>
+          <button data-op="export">export</button>
+        </div>
+        <div class="batch-row">
+          <input id="batchId" value="batch01" aria-label="batch id" />
+          <button data-op="start_prepare">prepare</button>
+          <button data-op="start_write">write packet</button>
+          <button data-op="check">review packet</button>
+          <button data-op="run">run</button>
+          <button data-op="record">record</button>
+        </div>
+        <details class="debug-details">
+          <summary>调试输出：只有排查问题时再看</summary>
+          <pre id="commandOutput" class="terminal">等待命令执行...</pre>
+        </details>
+      </section>
+
+      <section class="panel runner-panel">
+        <div class="panel-head">
+          <div>
+            <h2>高级执行：Codex CLI Runner</h2>
+            <p id="runnerHint">只有当上方提示“需要执行 prompt”时才用这里。默认 dry run 不调用模型。</p>
+          </div>
+        </div>
+        <label class="field">
+          <span>Prompt packet</span>
+          <select id="promptSelect"></select>
+        </label>
+        <div class="runner-options">
+          <label class="field">
+            <span>Model</span>
+            <input id="modelInput" placeholder="留空使用 Codex 默认模型" />
+          </label>
+          <label class="field">
+            <span>Profile</span>
+            <input id="profileInput" placeholder="可选 config profile" />
+          </label>
+          <label class="field">
+            <span>Sandbox</span>
+            <select id="sandboxSelect">
+              <option value="workspace-write">workspace-write</option>
+              <option value="read-only">read-only</option>
+              <option value="danger-full-access">danger-full-access</option>
+            </select>
+          </label>
+          <label class="check">
+            <input id="dryRun" type="checkbox" checked />
+            <span>Dry run</span>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="previewPromptBtn">预览 prompt</button>
+          <button id="runCodexBtn" class="primary">测试执行命令</button>
+        </div>
+        <pre id="promptPreview" class="preview">选择 prompt 后可预览。</pre>
+      </section>
+
+      <section class="panel jobs-panel">
+        <div class="panel-head">
+          <div>
+            <h2>执行记录</h2>
+            <p>每次 Codex CLI 调用都会写入独立 job 目录，便于和 Codex App 手工结果对比。</p>
+          </div>
+        </div>
+        <div id="jobsList" class="jobs-list"></div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
